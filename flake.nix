@@ -1,5 +1,5 @@
 {
-  description = "One Big Flake";
+  description = "Eliza's NixOS and Home-Manager configuration flake";
 
   ############################################################################
   #### INPUTS ################################################################
@@ -7,35 +7,66 @@
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
 
-    home-manager = {
+    home = {
       url = "github:nix-community/home-manager?ref=release-23.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    home-manager-unstable.url = "github:nix-community/home-manager";
-    home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    home-unstable = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+    utils.url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
   };
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, home-manager, ... }@inputs: {
+  outputs = { self, nixpkgs, home, utils, ... }@inputs:
+    let
+      config = {
+        allowUnfree = true;
+        input-fonts.acceptLicense = true;
+        # needed for Obsidian 1.4.16; this version of Electron is EOL but the nixpkgs
+        # package for Obsidian hasn't been updated to a newer electron yet.
+        # 
+        # TODO: remove this once https://github.com/NixOS/nixpkgs/issues/263764
+        # is resolved...
+        permittedInsecurePackages = [ "electron-25.9.0" ];
+      };
+      overlays = [ (import ./pkgs/overlay.nix) ];
+    in {
 
-    nixosConfigurations = {
-      noctis = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          ./nixos/hosts/noctis/default.nix
-          home-manager.nixosModules.home-manager
-          { _module.args = { inherit inputs; }; }
+      lib = import ./lib;
+
+      ###########
+      ## NixOS ##
+      ###########
+      nixosConfigurations = self.lib.genNixOSHosts {
+        inherit inputs config overlays;
+
+        baseModules = [
+          utils.nixosModules.autoGenFromInputs
+          self.nixosModules.default
+          home.nixosModules.home-manager
         ];
       };
-    };
 
-    homeManagerConfigurations = {
-      "eliza@noctis" = home-manager.lib.homeManagerConfiguration {
-        configuration = ./home/machines/noctis.nix;
+      nixosModules.default = import ./modules/nixos;
+
+      ##################
+      ## Home Manager ##
+      ##################
+      homeConfigurations = self.lib.genHomeHosts {
+        inherit inputs config overlays;
+
+        user = "eliza";
+
+        baseModules = [ self.homeModules.default ];
+
       };
-    };
 
-  };
+      homeModules.default = import ./modules/home;
+
+    };
 }

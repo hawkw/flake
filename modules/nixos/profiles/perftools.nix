@@ -3,11 +3,13 @@
 { config, lib, pkgs, ... }:
 
 with lib;
-let linuxpkgs = config.boot.kernelPackages;
+let
+  linuxpkgs = config.boot.kernelPackages;
+  cfg = config.profiles.perftools.enable;
 in {
-  options.programs.perftools.enable = mkEnableOption "perftools";
+  options.profiles.perftools.enable = mkEnableOption "perftools";
 
-  config = mkIf config.programs.perftools.enable {
+  config = mkIf cfg {
     environment.systemPackages = with pkgs; [
       # use the correct version of `perf` for the configured `linuxPackages`
       linuxpkgs.perf

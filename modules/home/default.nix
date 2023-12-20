@@ -3,17 +3,25 @@
 let
   user = {
     name = "Eliza Weisman";
-    email = "eliza@elizas.io";
+    email = "eliza@elizas.website";
   };
 in rec {
   imports = [
+    ./devtools
     ./fonts.nix
-    ../../role/zsh.nix
-    ../../role/vscode.nix
-    ../../role/rusty.nix
-    ../../role/git.nix
-    ../../role/devbox.nix
+    ./ssh.nix
+    ./zsh.nix
+    ./profiles/games.nix
+    ./profiles/gnome3.nix
+    ./profiles/git.nix
+    ./profiles/rusty.nix
+    ./profiles/k8s.nix
   ];
+
+  home.stateVersion = "23.11";
+
+  # https://github.com/nix-community/home-manager/issues/3342
+  manual.manpages.enable = false;
 
   home.sessionVariables = {
     EDITOR = "code --wait";
@@ -31,8 +39,6 @@ in rec {
         zoom-us
         keybase
         keybase-gui
-        _1password
-        _1password-gui
         spotify
         tdesktop
         obsidian
@@ -117,7 +123,7 @@ in rec {
   ## Programs                                                                 #
   #############################################################################
   # my custom config modules
-  programs.eliza = {
+  profiles = {
     # use a collection of Rust versions of common unix utilities.
     rustyUtils = {
       enable = true;
@@ -130,12 +136,12 @@ in rec {
       user = {
         name = user.name;
         email = user.email;
-        privateConfig = ./git.private.nix;
       };
     };
   };
 
   programs = {
+    firefox.enable = true;
     nushell = {
       enable = true;
       configFile.text = ''
@@ -305,32 +311,6 @@ in rec {
       };
     };
 
-  };
-
-  #############################################################################
-  ## Services                                                                 #
-  #############################################################################
-  services = {
-    gpg-agent.enable = true;
-    kbfs.enable = true;
-    keybase.enable = true;
-    gnome-keyring = {
-      enable = true;
-      components = [ "pkcs11" "secrets" "ssh" ];
-    };
-  };
-
-  #############################################################################
-  ## Programs                                                                 #
-  #############################################################################
-  programs = {
-    # # Keychain
-    # keychain = {
-    #   enable = true;
-    #   enableXsessionIntegration = true;
-    #   keys = [ "id_ed25519" ];
-    # };
-
     tmux = {
       enable = true;
       plugins = with pkgs.tmuxPlugins; [
@@ -377,29 +357,25 @@ in rec {
       '';
     };
 
-    firefox = { enable = true; };
-
     nix-index = {
       enable = true;
       enableZshIntegration = true;
     };
 
-    ssh = {
-      enable = true;
-      # includes = .config/ssh-extra.conf;
-      # forwardAgent = true;
-      matchBlocks = {
-        "dev" = {
-          hostname = "20.237.171.61";
-          user = "eliza";
-          port = 22;
-          # batchMode = "yes";
-          serverAliveInterval = 60;
-          serverAliveCountMax = 5;
-          extraOptions = { "BatchMode" = "yes"; };
-        };
+    ssh = { enable = true; };
 
-      };
+  };
+
+  #############################################################################
+  ## Services                                                                 #
+  #############################################################################
+  services = {
+    gpg-agent.enable = true;
+    kbfs.enable = true;
+    keybase.enable = true;
+    gnome-keyring = {
+      enable = true;
+      components = [ "pkcs11" "secrets" "ssh" ];
     };
   };
 

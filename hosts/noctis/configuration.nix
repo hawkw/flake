@@ -1,22 +1,19 @@
-{ config, lib, pkgs, ... }:
+{ config, pkgs, ... }:
 
-let xfel = pkgs.callPackage ../pkgs/xfel.nix { };
-in {
-  imports = [
-    ../../common.nix
-    # role-based configurations
-    ../../roles/docs.nix
-    ../../roles/zsh.nix
-    ../../roles/gnome3.nix
-    ../../roles/games.nix
-    ../../roles/perftools.nix
-    ../../roles/observability.nix
-    # local packages
-    ../../pkgs/logiops/logid.nix
-    ../../pkgs/openrgb.nix
-    # filesystems for this machine
-    ./filesystems/noctis.nix
-  ];
+{
+
+  imports = [ ./hardware-configuration.nix ./filesystems.nix ];
+
+  system.stateVersion = "22.11";
+
+  profiles = {
+    docs.enable = true;
+    games.enable = true;
+    gnome3.enable = true;
+    observability.enable = true;
+    # enable the correct perf tools for this kernel version
+    perftools.enable = true;
+  };
 
   #### Boot configuration ####
   boot = {
@@ -51,8 +48,7 @@ in {
   powerManagement.cpuFreqGovernor = "performance";
 
   # high-DPI console font
-  console.font =
-    lib.mkDefault "${pkgs.terminus_font}/share/consolefonts/ter-u28n.psf.gz";
+  console.font = "${pkgs.terminus_font}/share/consolefonts/ter-u28n.psf.gz";
 
   # i have 24 cores
   nix.settings.max-jobs = 24;
@@ -61,13 +57,17 @@ in {
   programs = {
     # Used specifically for its (quite magical) "copy as html" function.
     gnome-terminal.enable = true;
-    # enable the correct perf tools for this kernel version
-    perftools.enable = true;
     openrgb.enable = true;
 
     # makes dynamic binaries not built for NixOS work! :D
     # see: https://github.com/Mic92/nix-ld
     nix-ld.enable = true;
+
+    _1password.enable = true;
+    _1password-gui = {
+      enable = true;
+      polkitPolicyOwners = [ "eliza" ];
+    };
   };
 
   #### Services ####
@@ -101,8 +101,8 @@ in {
 
   ### xfel ###
   # add xfel udev rules
-  services.udev.packages = [ xfel ];
-  environment.systemPackages = [ xfel ];
+  services.udev.packages = [ pkgs.xfel ];
+  environment.systemPackages = [ pkgs.xfel ];
 
   ### pipewire ###
   # don't use the default `sound` config (alsa)

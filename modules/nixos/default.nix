@@ -1,11 +1,16 @@
-{ config, lib, pkgs, ... }:
+{ pkgs, ... }:
 
-let unstable = import <nixos-unstable> { config = config.nixpkgs.config; };
+let eliza = "eliza";
 in {
-  # # Define `nixPath` here so that included config files can conditionally add overlays.
-  # nix.nixPath =
-  #   # Prepend default nixPath values.
-  #   options.nix.nixPath.default;
+  imports = [
+    ./profiles/docs.nix
+    ./profiles/games.nix
+    ./profiles/gnome3.nix
+    ./profiles/kde.nix
+    ./profiles/observability.nix
+    ./profiles/perftools.nix
+    ./programs/openrgb.nix
+  ];
 
   #### Networking Configuration ####
 
@@ -44,10 +49,7 @@ in {
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
-  console = {
-    font = "Lat2-Terminus16";
-    keyMap = "us";
-  };
+  console = { keyMap = "us"; };
 
   # Set your time zone.
   # time.timeZone = "Europe/Amsterdam";k3d
@@ -84,14 +86,9 @@ in {
     # Some programs need SUID wrappers, can be configured further or are
     # started in user sessions.
     mtr.enable = true;
-    # programs.gnupg.agent = {
-    #   enable = true;
-    #   enableSSHSupport = true;
-    #   pinentryFlavor = "gnome3";
-    # }
+    home-manager.enable = true;
+    zsh.enable = true;
   };
-
-  # fonts.fonts = with pkgs; [ roboto ];
 
   #### Services ####
 
@@ -133,17 +130,8 @@ in {
     # workaround for https://github.com/moby/moby/issues/45935, see
     # https://github.com/armbian/build/issues/5586#issuecomment-1677708996
     # or i could try podman...
-    package = unstable.pkgs.docker_24;
+    package = pkgs.docker_24;
   };
-  # virtualisation = {
-  #   docker.enable = false;
-  #   podman = {
-  #     enable = true;
-  #     dockerCompat = true;
-  #     dockerSocket.enable = true;
-  #     extraPackages = [ pkgs.zfs ];
-  #   };
-  # };
 
   #### nix configurations ####
 
@@ -155,6 +143,10 @@ in {
     extraOptions = ''
       experimental-features = nix-command flakes
     '';
+    generateNixPathFromInputs = true;
+    generateRegistryFromInputs = true;
+    linkInputs = true;
+    settings.trusted-users = [ "root" eliza ];
 
     # It's good to do this every now and then.
     gc = {
@@ -182,7 +174,5 @@ in {
       "dialout" # allows writing to serial ports
     ];
     shell = pkgs.zsh;
-    #   openssh.authorizedKeys.keyFiles =
-    #      [ "/home/eliza/.ssh/butterfly.id_ed25519.pub" ];
   };
 }
