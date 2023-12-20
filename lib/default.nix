@@ -1,4 +1,3 @@
-# based on https://github.com/arnarg/config/blob/c953c8f7633b0a489f8000f3039491c0b20868cf/lib/default.nix
 let
   inherit (builtins) readDir hasAttr attrNames filter concatMap listToAttrs;
 
@@ -21,7 +20,7 @@ in {
   genNixOSHosts = { inputs, directory ? "${inputs.self}/hosts"
     , nixpkgs ? inputs.nixpkgs, builder ? nixpkgs.lib.nixosSystem
     , specialArgs ? { }, baseModules ? [ ], overlays ? [ ]
-    , config ? { allowUnfree = true; } }:
+    , config ? { allowUnfree = true; }, }:
     let
       mkHost = { system, modules, hostname, }:
         builder {
@@ -32,6 +31,7 @@ in {
           modules = [
             ({ ... }: {
               networking.hostName = hostname;
+
               nixpkgs = { inherit overlays config; };
             })
           ] ++ baseModules ++ modules;
@@ -43,7 +43,7 @@ in {
 
   # Discover home-manager configurations.
   # It will find all sub-directories in `directory` and
-  # include it if it has a home.nix.
+  # include it if it has a default.nix.
   genHomeHosts = { inputs, user, directory ? "${inputs.self}/hosts"
     , nixpkgs ? inputs.nixpkgs, home ? inputs.home
     , builder ? home.lib.homeManagerConfiguration, specialArgs ? { }

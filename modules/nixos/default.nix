@@ -74,6 +74,7 @@ in {
       tailscale
       ethtool
       pciutils
+      home-manager
     ];
 
     # "Don't forget to add `environment.pathsToLink = [ "/share/zsh" ];` to your
@@ -86,7 +87,6 @@ in {
     # Some programs need SUID wrappers, can be configured further or are
     # started in user sessions.
     mtr.enable = true;
-    home-manager.enable = true;
     zsh.enable = true;
   };
 
