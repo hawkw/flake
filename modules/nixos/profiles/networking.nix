@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 with lib;
-let cfg = config.profiles.networking.enable;
+let cfg = config.profiles.networking;
 in {
   options.profiles.networking = with lib; {
     enable = mkEnableOption "Network profile";
