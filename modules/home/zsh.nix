@@ -12,6 +12,7 @@
 
     # zsh config
     zsh = {
+      enable = true;
       syntaxHighlighting.enable = true;
       enableVteIntegration = true;
       autocd = true;

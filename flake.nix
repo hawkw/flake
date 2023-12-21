@@ -17,12 +17,14 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    nixos-hardware.url = "github:nixos/nixos-hardware/master";
+
     utils.url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
   };
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, home, utils, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home, utils, ... }@inputs:
     let
       config = {
         allowUnfree = true;

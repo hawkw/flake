@@ -9,43 +9,9 @@ in {
     ./profiles/kde.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
+    ./profiles/networking.nix
     ./programs/openrgb.nix
   ];
-
-  #### Networking Configuration ####
-
-  networking = {
-    # use networkmanager.
-    networkmanager.enable = true;
-    # disable wpa_supplicant, as NetworkManager is used instead.
-    wireless.enable = false;
-    # `dhcpcd` conflicts with NetworkManager's `dhclient`, as they try to bind
-    # the same address; it needs to be explicitly disabled.
-    dhcpcd.enable = false;
-
-    # The global useDHCP flag is deprecated, therefore explicitly set to false here.
-    # Per-interface useDHCP will be mandatory in the future, so this generated config
-    # replicates the default behaviour.
-    useDHCP = false;
-    interfaces = {
-      enp5s0.useDHCP = true;
-      wlp4s0.useDHCP = true;
-    };
-
-    # Configure network proxy if necessary
-    # networking.proxy.default = "http://user:password@proxy:port/";
-    # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
-    # Open ports in the firewall.
-    # networking.firewall.allowedTCPPorts = [ ... ];
-    # networking.firewall.allowedUDPPorts = [ ... ];
-    # Or disable the firewall altogether.
-    # networking.firewall.enable = false;
-
-    # Strict reverse path filtering breaks Tailscale exit node use and some
-    # subnet routing setups.
-    firewall.checkReversePath = "loose";
-  };
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
@@ -66,13 +32,6 @@ in {
       testdisk
       git
       nano
-      networkmanager
-      networkmanagerapplet
-      openssh
-      bluedevil
-      bluez
-      tailscale
-      ethtool
       pciutils
       home-manager
     ];
@@ -88,18 +47,25 @@ in {
     # started in user sessions.
     mtr.enable = true;
     zsh.enable = true;
+
+    # makes dynamic binaries not built for NixOS work! :D
+    # see: https://github.com/Mic92/nix-ld
+    nix-ld.enable = true;
+
+    _1password.enable = true;
+    _1password-gui = {
+      enable = true;
+      polkitPolicyOwners = [ "eliza" ];
+    };
   };
+
+  # custom networking settings
+  profiles.networking.enable = true;
 
   #### Services ####
 
   services = {
     # List services that you want to enable:
-
-    # Enable the OpenSSH daemon.
-    openssh = {
-      enable = true;
-      settings = { X11Forwarding = true; };
-    };
 
     # Enable CUPS to print documents.
     printing.enable = true;
@@ -110,11 +76,6 @@ in {
       # Rule for the Planck EZ Standard / Glow
       SUBSYSTEM=="usb", ATTR{idVendor}=="feed", ATTR{idProduct}=="6060", TAG+="uaccess"
     '';
-
-    # enable tailscale
-    tailscale.enable = true;
-
-    # cpupower-gui.enable = true;
   };
 
   # Enable the Docker daemon.
@@ -175,4 +136,25 @@ in {
     ];
     shell = pkgs.zsh;
   };
+
+  ### pipewire ###
+  # don't use the default `sound` config (alsa)
+  sound.enable = false;
+  # Use PipeWire as the system audio/video bus
+  hardware.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa = {
+      enable = true;
+      support32Bit = true;
+    };
+    jack.enable = true;
+    pulse.enable = true;
+    socketActivation = true;
+  };
+
+  security.sudo.configFile = ''
+    Defaults    env_reset,pwfeedback
+  '';
 }
