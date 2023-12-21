@@ -11,6 +11,7 @@ in {
     ./profiles/perftools.nix
     ./profiles/networking.nix
     ./programs/openrgb.nix
+    ./programs/xfel.nix
   ];
 
   # Select internationalisation properties.
