@@ -1,11 +1,12 @@
 { config, pkgs, ... }:
 
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-    ];
-    
+  imports = [ # Include the results of the hardware scan.
+    ./hardware-configuration.nix
+  ];
+
+  networking.hostName = "theseus"; # Define your hostname.
+
   profiles = {
     docs.enable = true;
     gnome3.enable = true;
@@ -13,12 +14,19 @@
   };
 
   #### System configuration ####
-  
+
   # Bootloader.
   boot = {
-    loader.systemd-boot.enable = true;
-    loader.efi.canTouchEfiVariables = true;
-    initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device = "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
+    loader = {
+      systemd-boot.enable = true;
+      efi.canTouchEfiVariables = true;
+    };
+
+    # use the latest stable Linux kernel
+    kernelPackages = pkgs.linuxPackages_latest;
+
+    initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
+      "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
   };
 
   services = {
@@ -34,47 +42,6 @@
   # with the trade-off that keyboard presses also no longer wake the system.
   # see https://github.com/NixOS/nixos-hardware/tree/7763c6fd1f299cb9361ff2abf755ed9619ef01d6/framework/13-inch/7040-amd#suspendwake-workaround
   # hardware.framework.amd-7040.preventWakeOnAC = true;
-
-  networking.hostName = "theseus"; # Define your hostname.
-  # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
-  # Enable networking
-  # networking.networkmanager.enable = true;
-
-  # Set your time zone.
-  time.timeZone = "America/Los_Angeles";
-
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_US.UTF-8";
-
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_US.UTF-8";
-    LC_IDENTIFICATION = "en_US.UTF-8";
-    LC_MEASUREMENT = "en_US.UTF-8";
-    LC_MONETARY = "en_US.UTF-8";
-    LC_NAME = "en_US.UTF-8";
-    LC_NUMERIC = "en_US.UTF-8";
-    LC_PAPER = "en_US.UTF-8";
-    LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
-  };
-
-  # Enable the X11 windowing system.
-  services.xserver.enable = true;
-
-  # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-
-  # Configure keymap in X11
-  services.xserver = {
-    layout = "us";
-    xkbVariant = "";
-  };
 
   # Enable CUPS to print documents.
   services.printing.enable = true;
