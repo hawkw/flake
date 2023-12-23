@@ -43,9 +43,6 @@
   # see https://github.com/NixOS/nixos-hardware/tree/7763c6fd1f299cb9361ff2abf755ed9619ef01d6/framework/13-inch/7040-amd#suspendwake-workaround
   # hardware.framework.amd-7040.preventWakeOnAC = true;
 
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
   # on your system were taken. It‘s perfectly fine and recommended to leave

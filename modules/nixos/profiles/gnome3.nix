@@ -9,12 +9,22 @@ in {
   config = lib.mkIf cfg.enable {
     services = {
       xserver = {
+        # Enable the X11 windowing system.
         enable = true;
-        layout = "us";
-        displayManager.gdm.enable = true;
-        displayManager.gdm.wayland = true;
+
+        # Enable the GNOME Desktop Environment.
         desktopManager.gnome.enable = true;
-        displayManager.defaultSession = "gnome";
+        displayManager = {
+          gdm = {
+            enable = true;
+            wayland = true;
+          };
+          defaultSession = "gnome";
+        };
+
+        # Configure keymap in X11
+        layout = "us";
+        xkbVariant = "";
       };
       dbus.packages = with pkgs; [ dconf ];
       udev.packages = with pkgs; [ gnome3.gnome-settings-daemon ];

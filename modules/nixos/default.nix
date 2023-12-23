@@ -14,12 +14,26 @@ in {
     ./programs/xfel.nix
   ];
 
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_US.UTF-8";
-  console = { keyMap = "us"; };
-
   # Set your time zone.
-  # time.timeZone = "Europe/Amsterdam";k3d
+  time.timeZone = "America/Los_Angeles";
+
+  # Select internationalisation properties.
+  console = { keyMap = "us"; };
+  i18n = let locale = "en_US.UTF-8";
+  in {
+    defaultLocale = locale;
+    extraLocaleSettings = {
+      LC_ADDRESS = locale;
+      LC_IDENTIFICATION = locale;
+      LC_MEASUREMENT = locale;
+      LC_MONETARY = locale;
+      LC_NAME = locale;
+      LC_NUMERIC = locale;
+      LC_PAPER = locale;
+      LC_TELEPHONE = locale;
+      LC_TIME = locale;
+    };
+  };
 
   #### Programs & Packages ####
 
@@ -56,7 +70,7 @@ in {
     _1password.enable = true;
     _1password-gui = {
       enable = true;
-      polkitPolicyOwners = [ "eliza" ];
+      polkitPolicyOwners = [ eliza ];
     };
   };
 
@@ -66,8 +80,6 @@ in {
   #### Services ####
 
   services = {
-    # List services that you want to enable:
-
     # Enable CUPS to print documents.
     printing.enable = true;
 
