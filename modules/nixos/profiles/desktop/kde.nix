@@ -1,10 +1,14 @@
 { config, lib, pkgs, ... }:
 
-let cfg = config.profiles.kde;
+let cfg = config.profiles.desktop;
 in {
-  options.profiles.kde = with lib; { enable = mkEnableOption "KDE profile"; };
+  options.profiles.desktop.kde = with lib; {
+    enable = mkEnableOption "KDE profile";
+  };
 
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf cfg.kde.enable {
+    profiles.desktop.enable = lib.mkDefault true;
+
     environment.systemPackages = with pkgs; [
       spectacle
       libsForQt5.qtstyleplugin-kvantum
@@ -12,10 +16,7 @@ in {
     ];
 
     services = {
-      # Enable the X11 windowing system.
       xserver = {
-        enable = true;
-        layout = "us";
         # xkbOptions = "eurosign:e";
 
         # Enable touchpad support.

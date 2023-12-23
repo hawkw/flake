@@ -1,15 +1,14 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
-let eliza = "eliza";
-in {
+{
   imports = [
+    ./profiles/desktop
     ./profiles/docs.nix
     ./profiles/games.nix
-    ./profiles/gnome3.nix
-    ./profiles/kde.nix
+    ./profiles/laptop.nix
+    ./profiles/networking.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
-    ./profiles/networking.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];
@@ -66,30 +65,12 @@ in {
     # makes dynamic binaries not built for NixOS work! :D
     # see: https://github.com/Mic92/nix-ld
     nix-ld.enable = true;
-
-    _1password.enable = true;
-    _1password-gui = {
-      enable = true;
-      polkitPolicyOwners = [ eliza ];
-    };
   };
 
   # custom networking settings
-  profiles.networking.enable = true;
+  profiles.networking.enable = lib.mkDefault true;
 
   #### Services ####
-
-  services = {
-    # Enable CUPS to print documents.
-    printing.enable = true;
-
-    udev.extraRules = ''
-      # Rule for the Ergodox EZ Original / Shine / Glow
-      SUBSYSTEM=="usb", ATTR{idVendor}=="feed", ATTR{idProduct}=="1307", TAG+="uaccess"
-      # Rule for the Planck EZ Standard / Glow
-      SUBSYSTEM=="usb", ATTR{idVendor}=="feed", ATTR{idProduct}=="6060", TAG+="uaccess"
-    '';
-  };
 
   # Enable the Docker daemon.
   virtualisation.docker = {
@@ -120,7 +101,7 @@ in {
     generateNixPathFromInputs = true;
     generateRegistryFromInputs = true;
     linkInputs = true;
-    settings.trusted-users = [ "root" eliza ];
+    settings.trusted-users = [ "root" "eliza" ];
 
     # It's good to do this every now and then.
     gc = {
@@ -129,10 +110,6 @@ in {
     };
   };
 
-  #### Hardware ####
-
-  hardware = { bluetooth.enable = true; };
-
   #### users ####
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
@@ -140,7 +117,6 @@ in {
     isNormalUser = true;
     extraGroups = [
       "wheel" # Enable ‘sudo’ for the user.
-      "networkmanager"
       "audio"
       "docker" # Enable docker.
       "podman" # Enable podman.
@@ -148,23 +124,6 @@ in {
       "dialout" # allows writing to serial ports
     ];
     shell = pkgs.zsh;
-  };
-
-  ### pipewire ###
-  # don't use the default `sound` config (alsa)
-  sound.enable = false;
-  # Use PipeWire as the system audio/video bus
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa = {
-      enable = true;
-      support32Bit = true;
-    };
-    jack.enable = true;
-    pulse.enable = true;
-    socketActivation = true;
   };
 
   security.sudo.configFile = ''

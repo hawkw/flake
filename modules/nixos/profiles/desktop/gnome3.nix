@@ -1,17 +1,16 @@
 { config, lib, pkgs, ... }:
 
-let cfg = config.profiles.gnome3;
+let cfg = config.profiles.desktop;
 in {
-  options.profiles.gnome3 = with lib; {
+  options.profiles.desktop.gnome3 = with lib; {
     enable = mkEnableOption "gnome3 profile";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf cfg.gnome3.enable {
+    profiles.desktop.enable = lib.mkDefault true;
+
     services = {
       xserver = {
-        # Enable the X11 windowing system.
-        enable = true;
-
         # Enable the GNOME Desktop Environment.
         desktopManager.gnome.enable = true;
         displayManager = {
@@ -21,11 +20,8 @@ in {
           };
           defaultSession = "gnome";
         };
-
-        # Configure keymap in X11
-        layout = "us";
-        xkbVariant = "";
       };
+
       dbus.packages = with pkgs; [ dconf ];
       udev.packages = with pkgs; [ gnome3.gnome-settings-daemon ];
 
@@ -39,15 +35,13 @@ in {
       };
     };
 
-    environment.systemPackages = with pkgs; [ firefox-wayland ];
-
     programs = {
       # gpaste, a clipboard manager for Gnome
       gpaste.enable = true;
 
       firefox = {
         package = pkgs.firefox-wayland;
-        nativeMessagingHosts.packages = with pkgs; [ gnome-browser-connector ];
+        # nativeMessagingHosts.packages = with pkgs; [ gnome-browser-connector ];
       };
     };
 

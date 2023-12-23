@@ -9,7 +9,8 @@
 
   profiles = {
     docs.enable = true;
-    gnome3.enable = true;
+    laptop.enable = true;
+    desktop.gnome3.enable = true;
     observability.enable = true;
   };
 

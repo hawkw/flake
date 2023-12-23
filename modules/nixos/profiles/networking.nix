@@ -65,6 +65,8 @@ in {
 
       # enable tailscale
       tailscale.enable = true;
+
+      resolved.enable = true;
     };
 
     environment.systemPackages = with pkgs; [
@@ -76,5 +78,7 @@ in {
       tailscale
       ethtool
     ];
+
+    users.users.eliza.extraGroups = [ "networkmanager" ];
   };
 }

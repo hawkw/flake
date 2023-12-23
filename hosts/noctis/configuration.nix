@@ -9,7 +9,7 @@
   profiles = {
     docs.enable = true;
     games.enable = true;
-    gnome3.enable = true;
+    desktop.gnome3.enable = true;
     observability.enable = true;
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
