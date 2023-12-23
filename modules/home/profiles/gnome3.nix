@@ -17,7 +17,8 @@ let
     # zfs-status-monitor
     # POP!_OS shell tiling extensions for Gnome 3
     pop-shell
-    dash-to-dock-for-cosmic
+    # dash-to-dock-for-cosmic
+    tailscale-status
   ];
   # configure Gnome themes
   themes = with pkgs; [
