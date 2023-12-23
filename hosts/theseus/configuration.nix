@@ -11,7 +11,6 @@
     docs.enable = true;
     laptop.enable = true;
     desktop.gnome3.enable = true;
-    observability.enable = true;
   };
 
   #### System configuration ####
