@@ -27,6 +27,9 @@
     # docker stuff
     docker-compose
     docker-credential-helpers
+
+    # nix stuff
+    nil
   ];
 
   # Dev tools with extra configuration
