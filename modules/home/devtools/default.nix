@@ -30,6 +30,7 @@
 
     # nix stuff
     nil
+    nixpkgs-fmt
   ];
 
   # Dev tools with extra configuration
