@@ -9,6 +9,7 @@
     ./profiles/networking.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
+    ./profiles/secureboot.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];

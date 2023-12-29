@@ -12,14 +12,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    home-unstable = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     nixos-hardware.url = "github:nixos/nixos-hardware/master";
 
     utils.url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
+
+    # for secureboot support on theseus
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v0.3.0";
+
+      # Optional but recommended to limit the size of your system closure.
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   ############################################################################
