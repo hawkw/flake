@@ -34,7 +34,8 @@ let
     yaru-theme
     matcha-gtk-theme
   ];
-in {
+in
+{
 
   options.profiles.desktop.gnome3 = with lib; {
     enable = mkEnableOption "gnome3 profile";

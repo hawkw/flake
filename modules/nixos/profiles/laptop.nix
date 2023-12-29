@@ -57,10 +57,11 @@ in {
     programs.light.enable = true;
 
     # Setup suspend then hibernate.
-    services.logind.lidSwitch = if cfg.suspendThenHibernate.enable then
-      "suspend-then-hibernate"
-    else
-      "suspend";
+    services.logind.lidSwitch =
+      if cfg.suspendThenHibernate.enable then
+        "suspend-then-hibernate"
+      else
+        "suspend";
     systemd.sleep.extraConfig =
       lib.optionalString cfg.suspendThenHibernate.enable ''
         HibernateDelaySec=${

@@ -23,7 +23,8 @@ in {
           tdesktop
           obsidian
         ];
-      in ([
+      in
+      ([
 
         ### networking tools ##
         mtr-gui

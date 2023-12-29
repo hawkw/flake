@@ -8,7 +8,7 @@
       gnome3.enable = true;
     };
     k8s.enable = true;
-      devtools = {
+    devtools = {
       enable = true;
       enablePython = true;
     };

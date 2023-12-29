@@ -29,7 +29,8 @@ let
       };
     };
   cfg = config.programs.gdb.dashboard;
-in {
+in
+{
   options.programs.gdb.dashboard = {
     enable = mkEnableOption "dashboard";
 
@@ -68,8 +69,9 @@ in {
       [ cfg.gdbPackage ]
     ];
 
-    home.file.".gdbinit".text = let pkg = pkgs.callPackage gdbinitPkg { };
-    in builtins.readFile "${pkg}/.gdbinit";
+    home.file.".gdbinit".text =
+      let pkg = pkgs.callPackage gdbinitPkg { };
+      in builtins.readFile "${pkg}/.gdbinit";
 
     xdg.configFile."gdb-dashboard/extraConfig".text = cfg.extraConfig;
   };

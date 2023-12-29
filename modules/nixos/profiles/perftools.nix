@@ -6,7 +6,8 @@ with lib;
 let
   linuxpkgs = config.boot.kernelPackages;
   cfg = config.profiles.perftools.enable;
-in {
+in
+{
   options.profiles.perftools.enable = mkEnableOption "perftools";
 
   config = mkIf cfg {

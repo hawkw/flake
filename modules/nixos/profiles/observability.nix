@@ -3,7 +3,8 @@
 let
   mdnsJson = "/etc/prometheus/mdns-sd.json";
   cfg = config.profiles.observability;
-in {
+in
+{
   options.profiles.observability = with lib; {
     enable = mkEnableOption "observability profile";
   };

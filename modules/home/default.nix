@@ -5,7 +5,8 @@ let
     name = "Eliza Weisman";
     email = "eliza@elizas.website";
   };
-in rec {
+in
+rec {
   imports = [
     ./fonts.nix
     ./ssh.nix
