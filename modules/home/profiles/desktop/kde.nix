@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, lib, ... }:
 
 let cfg = config.profiles.desktop.kde;
 in {
@@ -8,10 +8,10 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    programs = {
-      # enable gpaste, a gnome clipboard manager.
-      gpaste.enable = true;
-    };
+    # programs = {
+    #   # enable gpaste, a gnome clipboard manager.
+    #   gpaste.enable = true;
+    # };
   };
 
 }

@@ -31,7 +31,7 @@
         input-fonts.acceptLicense = true;
         # needed for Obsidian 1.4.16; this version of Electron is EOL but the nixpkgs
         # package for Obsidian hasn't been updated to a newer electron yet.
-        # 
+        #
         # TODO: remove this once https://github.com/NixOS/nixpkgs/issues/263764
         # is resolved...
         permittedInsecurePackages = [ "electron-25.9.0" ];
