@@ -42,6 +42,11 @@
     fprintd.enable = true;
   };
 
+  # disable the Gnome keyring, since we are using 1password to manage secrets
+  # instead.
+  services.gnome.gnome-keyring.enable = lib.mkForce false;
+  security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
+
   # As of firmware v03.03, a bug in the EC causes the system to wake if AC is
   # connected despite the lid being closed. The following works around this,
   # with the trade-off that keyboard presses also no longer wake the system.
