@@ -1,13 +1,17 @@
-{ config, pkgs, lib, ... }:
+{ pkgs, ... }:
 
 {
   profiles = {
     games.enable = true;
-    destkop = {
+    desktop = {
       enable = true;
       gnome3.enable = true;
     };
     k8s.enable = true;
+      devtools = {
+      enable = true;
+      enablePython = true;
+    };
   };
 
   home.packages = with pkgs; [ lm_sensors wally-cli conky ];

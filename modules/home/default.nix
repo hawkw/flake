@@ -7,11 +7,11 @@ let
   };
 in rec {
   imports = [
-    ./devtools
     ./fonts.nix
     ./ssh.nix
     ./zsh.nix
     ./profiles/desktop
+    ./profiles/devtools
     ./profiles/games.nix
     ./profiles/git.nix
     ./profiles/rusty.nix

@@ -3,7 +3,7 @@
 with lib;
 let
   gdbinitPkg = { stdenv, lib, pkgs }:
-    stdenv.mkDerivation rec {
+    stdenv.mkDerivation {
       pname = "gdb-dashboard";
       version = "latest";
 
