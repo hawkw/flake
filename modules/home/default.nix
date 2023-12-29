@@ -57,7 +57,7 @@ in rec {
       ${fd}/bin/fd -t f '^_[^.]+$' \
         ${lib.escapeShellArgs home.packages} \
         | xargs -0 -I {} bash -c '${ripgrep}/bin/rg -0l "^#compdef" $@ || :' _ {} \
-        | xargs -0 cp -t $out/
+        | xargs -0 -I {} cp -t $out/ {}
     '';
 
   # configure discord to launch even when an update is available
