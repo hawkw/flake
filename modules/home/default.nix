@@ -11,8 +11,8 @@ in rec {
     ./fonts.nix
     ./ssh.nix
     ./zsh.nix
+    ./profiles/desktop
     ./profiles/games.nix
-    ./profiles/gnome3.nix
     ./profiles/git.nix
     ./profiles/rusty.nix
     ./profiles/k8s.nix
@@ -29,83 +29,26 @@ in rec {
     TERMINAL = "alacritty";
   };
 
-  # programs.steam.enable = true;
-  home.packages = with pkgs;
-    let
-      unfreePkgs = [
-        slack
-        discord
-        signal-desktop
-        zoom-us
-        keybase
-        keybase-gui
-        spotify
-        tdesktop
-        obsidian
-      ];
-    in ([
+  home.packages = with pkgs; [
+    ### networking tools ##
+    nmap
+    slurm
+    bandwhich
+    nghttp2
+    # assorted wiresharks
+    termshark
+    tcpdump
 
-      ### networking tools ##
-      nmap
-      mtr-gui
-      slurm
-      bandwhich
-      nghttp2
-      # assorted wiresharks
-      wireshark
-      termshark
-      tcpdump
+    ### stuff ###
+    neofetch
+    dtrx # Do The Right eXtraction --- extract any kind of archive file
+    unzip
 
-      ### images, media, etc ###
-      ark
-      darktable
-      inkscape
-      obs-studio
-      # broken due to https://github.com/NixOS/nixpkgs/issues/188525
-      # llpp # fast & lightweight PDF pager
-      krita # like the GNU Image Manipulation Photoshop, but more good
-      gimp
-      syncplay
-      vlc
-      plex-media-player
-      ghostscriptX
+    asciinema
 
-      ### stuff ###
-      neofetch
-      # wpgtk
-      pywal
-      dtrx # Do The Right eXtraction --- extract any kind of archive file
-      unzip
-
-      ### "crypto" ###
-      kbfs
-      gnupg
-
-      ### nix stuff ###
-      nix-prefetch-git
-      nixfmt
-      nix-index
-      nix-diff
-      nix-output-monitor
-      nix-tree
-      nix-top
-
-      ### misc
-      wally-cli
-      chromium
-      asciinema
-      torrential
-      usbutils
-
-      ### chat clients & stuff
-      # element-desktop-wayland
-      (element-desktop.override { electron = electron_26; })
-      nheko
-      # element-desktop
-
-      ### zfs stuff
-      httm
-    ] ++ unfreePkgs);
+    ### "crypto" ###
+    gnupg
+  ];
 
   # automagically add zsh completions from packages
   xdg.configFile."zsh/vendor-completions".source = with pkgs;
@@ -126,13 +69,13 @@ in rec {
   profiles = {
     # use a collection of Rust versions of common unix utilities.
     rustyUtils = {
-      enable = true;
-      enableAliases = true;
+      enable = lib.mkDefault true;
+      enableAliases = lib.mkDefault true;
     };
 
     # custom git configs
     git = {
-      enable = true;
+      enable = lib.mkDefault true;
       user = {
         name = user.name;
         email = user.email;
@@ -141,7 +84,6 @@ in rec {
   };
 
   programs = {
-    firefox.enable = true;
     nushell = {
       enable = true;
       configFile.text = ''
@@ -364,19 +306,6 @@ in rec {
 
     ssh = { enable = true; };
 
-  };
-
-  #############################################################################
-  ## Services                                                                 #
-  #############################################################################
-  services = {
-    gpg-agent.enable = true;
-    kbfs.enable = true;
-    keybase.enable = true;
-    gnome-keyring = {
-      enable = true;
-      components = [ "pkcs11" "secrets" "ssh" ];
-    };
   };
 
 }

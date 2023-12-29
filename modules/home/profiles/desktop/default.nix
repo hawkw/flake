@@ -1,0 +1,83 @@
+# Profile for desktop machines (i.e. not servers).
+{ config, lib, pkgs, ... }:
+let cfg = config.profiles.desktop;
+in {
+  imports = [ ./gnome3.nix ./kde.nix ];
+
+  options.profiles.desktop = with lib; {
+    enable = mkEnableOption "Profile for desktop machines (i.e. not servers)";
+  };
+
+  config = lib.mkIf cfg.enable {
+
+    home.packages = with pkgs;
+      let
+        unfreePkgs = [
+          slack
+          discord
+          signal-desktop
+          zoom-us
+          keybase
+          keybase-gui
+          spotify
+          tdesktop
+          obsidian
+        ];
+      in ([
+
+        ### networking tools ##
+        mtr-gui
+        slurm
+        wireshark
+
+        ### images, media, etc ###
+        ark
+        darktable
+        inkscape
+        obs-studio
+        # broken due to https://github.com/NixOS/nixpkgs/issues/188525
+        # llpp # fast & lightweight PDF pager
+        krita # like the GNU Image Manipulation Photoshop, but more good
+        gimp
+        syncplay
+        vlc
+        plex-media-player
+        ghostscriptX
+
+        ### stuff ###
+        pywal
+        wally-cli
+        chromium
+        torrential
+        usbutils
+
+        ### "crypto" ###
+        kbfs
+
+        ### chat clients & stuff
+        (element-desktop.override { electron = electron_26; })
+      ] ++ unfreePkgs);
+    #############################################################################
+    ## Programs                                                                 #
+    #############################################################################
+    programs = {
+      firefox.enable = true;
+      _1password-gui.enableSshAgent = true;
+      keychain = {
+        enable = true;
+        enableXsessionIntegration = true;
+        keys = [ "id_ed25519" ];
+      };
+    };
+
+    #############################################################################
+    ## Services                                                                 #
+    #############################################################################
+    services = {
+      kbfs.enable = true;
+      keybase.enable = true;
+      gpg-agent.enable = true;
+    };
+
+  };
+}

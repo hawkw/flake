@@ -1,7 +1,7 @@
 { config, pkgs, lib, ... }:
 
 let
-  cfg = config.profiles.gnome3;
+  cfg = config.profiles.desktop.gnome3;
 
   # configure installed Gnome 3 extensions
   # note: these have to be *enabled* manually in the gnome extensions UI...
@@ -36,7 +36,7 @@ let
   ];
 in {
 
-  options.profiles.gnome3 = with lib; {
+  options.profiles.desktop.gnome3 = with lib; {
     enable = mkEnableOption "gnome3 profile";
   };
 
