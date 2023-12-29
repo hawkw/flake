@@ -49,6 +49,9 @@ in {
     # enable the Gnome keyring
     services.gnome.gnome-keyring.enable = true;
     # enable gnome keyring unlock on login
-    security.pam.services = { login.enableGnomeKeyring = true; };
+    security.pam.services = {
+      gdm.enableGnomeKeyring = true;
+      login.enableGnomeKeyring = true;
+    };
   };
 }

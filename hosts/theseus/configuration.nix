@@ -1,7 +1,8 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
-  imports = [ # Include the results of the hardware scan.
+  imports = [
+    # Include the results of the hardware scan.
     ./hardware-configuration.nix
   ];
 
@@ -10,7 +11,10 @@
   profiles = {
     docs.enable = true;
     laptop.enable = true;
-    desktop.gnome3.enable = true;
+    desktop = {
+      enable = true;
+      gnome3.enable = true;
+    };
     secureboot.enable = true;
   };
 
@@ -19,7 +23,7 @@
   # Bootloader.
   boot = {
     loader = {
-      systemd-boot.enable = true;
+      systemd-boot.enable = lib.mkDefault true;
       efi.canTouchEfiVariables = true;
     };
 
