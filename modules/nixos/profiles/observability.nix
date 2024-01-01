@@ -21,7 +21,6 @@ in
         default = true;
         description = "enable mDNS service discovery";
       };
-
     };
   };
 
@@ -49,17 +48,17 @@ in
             };
           };
         };
-        services.prometheus = {
+        services.prometheus = let nodePort = toString promCfg.exporters.node.port; in {
           enable = true;
           webExternalUrl = "https://${cfg.domain}/${promPath}/";
           exporters = {
             node = {
               enable = true;
-              port = 9100;
+              port = lib.mkDefault 9100;
               enabledCollectors = [ "logind" "systemd" ];
               disabledCollectors = [ "textfile" ];
               openFirewall = true;
-              firewallFilter = "-i br0 -p tcp -m tcp --dport 9100";
+              firewallFilter = "-i br0 -p tcp -m tcp --dport ${nodePort}";
             };
             unifi = {
               enable = true;
@@ -73,7 +72,7 @@ in
               job_name = "node";
               static_configs = [{
                 targets =
-                  [ "localhost:${toString promCfg.exporters.node.port}" ];
+                  [ "localhost:${nodePort}" ];
               }];
             }
             {
