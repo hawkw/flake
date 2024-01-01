@@ -22,16 +22,25 @@
 
   # Bootloader.
   boot = {
-    loader = {
-      systemd-boot.enable = lib.mkDefault true;
-      efi.canTouchEfiVariables = true;
-    };
+    loader.efi.canTouchEfiVariables = true;
 
     # use the latest stable Linux kernel
     kernelPackages = pkgs.linuxPackages_latest;
 
     initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
       "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
+
+    ### secureboot using Lanzaboote ###
+
+    lanzaboote = {
+      enable = true;
+      pkiBundle = "/etc/secureboot";
+    };
+    # Lanzaboote currently replaces the systemd-boot module.
+    # This setting is usually set to true in configuration.nix
+    # generated at installation time. So we force it to false
+    # for now.
+    loader.systemd-boot.enable = lib.mkForce false;
   };
 
   services = {
@@ -41,6 +50,11 @@
     # For fingerprint support
     fprintd.enable = true;
   };
+
+  environment.systemPackages = [
+    # For debugging and troubleshooting Secure Boot.
+    pkgs.sbctl
+  ];
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
