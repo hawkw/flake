@@ -3,17 +3,18 @@
 let
   cfg = config.profiles.git;
   enable1PasswordSshAgent = config.programs._1password-gui.enableSshAgent;
-in with lib; {
+in
+with lib; {
   options = {
     profiles.git = {
       enable = mkEnableOption "custom git configs";
       user = {
         name = mkOption {
-          type = with types; uniq string;
+          type = with types; uniq str;
           description = "Git user name";
         };
         email = mkOption {
-          type = with types; uniq string;
+          type = with types; uniq str;
           description = "Git user email";
         };
       };
