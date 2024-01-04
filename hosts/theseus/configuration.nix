@@ -15,7 +15,6 @@
       enable = true;
       gnome3.enable = true;
     };
-    secureboot.enable = true;
   };
 
   #### System configuration ####
@@ -29,6 +28,14 @@
 
     initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
       "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
+
+    kernelParams = [
+      # Disable AMD GPU scatter-gather buffer.
+      # this (hopefully) fixes white screen issues when driving a thunderbolt
+      # display. see here for details:
+      # https://community.frame.work/t/tracking-graphical-corruption-in-fedora-39-amd-3-03-bios/39073/52
+      "amdgpu.sg_display=0"
+    ];
 
     ### secureboot using Lanzaboote ###
 
