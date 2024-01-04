@@ -68,6 +68,13 @@
   services.gnome.gnome-keyring.enable = lib.mkForce false;
   security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
 
+  # necessary to enable 802.11ax for the MEDIATEK WiFi chipset, as per:
+  # https://community.frame.work/t/framework-nixos-linux-users-self-help/31426/77
+  hardware.wirelessRegulatoryDatabase = true;
+  boot.extraModprobeConfig = ''
+    options cfg80211 ieee80211_regdom="US"
+  '';
+
   # As of firmware v03.03, a bug in the EC causes the system to wake if AC is
   # connected despite the lid being closed. The following works around this,
   # with the trade-off that keyboard presses also no longer wake the system.
