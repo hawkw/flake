@@ -24,6 +24,7 @@ in {
         time
         psmisc
         valgrind
+        gnumake42
 
         # `just` --- a command runner
         just

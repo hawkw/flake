@@ -13,5 +13,5 @@
   };
 
   # not trying to build ESP32-C3 on this machine, so global clang is fine...
-  home.packages = with pkgs; [ clang ];
+  home.packages = with pkgs; [ clang qemu screen ];
 }
