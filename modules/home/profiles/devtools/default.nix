@@ -63,10 +63,16 @@ in {
             export PATH="$PATH:$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin"
           '';
         };
+
+        direnv = {
+          enable = mkDefault true;
+          nix-direnv.enable = mkDefault true;
+        };
       };
     })
     (mkIf cfg.enablePython {
-      home.packages = with pkgs; [ python39Packages.pip ];
+      home.packages = with pkgs;
+        [ python39Packages.pip ];
     })
   ];
 }
