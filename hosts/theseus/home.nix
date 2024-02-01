@@ -10,6 +10,7 @@
       enable = true;
       enablePython = true;
     };
+    oxide-scripts.enable = true;
   };
 
   home.packages = with pkgs; [
