@@ -7,6 +7,7 @@
     ./profiles/games.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
+    ./profiles/nix-ld.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
     ./programs/openrgb.nix
@@ -63,14 +64,16 @@
     # started in user sessions.
     mtr.enable = true;
     zsh.enable = true;
+  };
+
+  profiles = {
+    # custom networking settings
+    networking.enable = lib.mkDefault true;
 
     # makes dynamic binaries not built for NixOS work! :D
     # see: https://github.com/Mic92/nix-ld
-    nix-ld.enable = true;
+    nix-ld.enable = lib.mkDefault true;
   };
-
-  # custom networking settings
-  profiles.networking.enable = lib.mkDefault true;
 
   #### Services ####
 
