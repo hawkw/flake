@@ -77,7 +77,8 @@
   # provides a FUSE filesystem on `/bin` that includes everything in the `PATH`,
   # allowing shell scripts that have shebangs like `/bin/bash` to work on nixos.
   # see: https://github.com/mic92/envfs
-  services.envfs.enable = lib.mkDefault true;
+  # unfortunately, this doesn't actually seem to work for me...
+  # services.envfs.enable = lib.mkDefault true;
 
   # Enable the Docker daemon.
   virtualisation.docker = {
