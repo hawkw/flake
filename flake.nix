@@ -6,22 +6,38 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
 
     home = {
       url = "github:nix-community/home-manager?ref=release-23.11";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
     };
 
     nixos-hardware.url = "github:nixos/nixos-hardware/master";
 
-    utils.url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
+    utils = {
+      url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+
+    vu-server = {
+      url = "github:hawkw/vu-server-flake";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
 
     # for secureboot support on theseus
     lanzaboote = {
       url = "github:nix-community/lanzaboote/v0.3.0";
 
       # Optional but recommended to limit the size of your system closure.
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
     };
   };
 
@@ -40,7 +56,8 @@
         permittedInsecurePackages = [ "electron-25.9.0" ];
       };
       overlays = [ (import ./pkgs/overlay.nix) ];
-    in {
+    in
+    {
 
       lib = import ./lib;
 

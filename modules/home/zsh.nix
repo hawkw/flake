@@ -50,6 +50,8 @@
         # Ensure cargo binaries are on the PATH
         export PATH="$PATH:$HOME/.cargo/bin"
         export PATH="$PATH:$HOME/.linkerd2/bin"
+        # Tell direnv to use the Omicron nix flake.
+        export OMICRON_USE_FLAKE=1
       '';
 
       ### nicer autocomplete ###

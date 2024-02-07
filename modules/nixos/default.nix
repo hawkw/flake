@@ -72,7 +72,7 @@
 
     # makes dynamic binaries not built for NixOS work! :D
     # see: https://github.com/Mic92/nix-ld
-    nix-ld.enable = lib.mkDefault true;
+    # nix-ld.enable = lib.mkDefault true;
   };
 
   #### Services ####

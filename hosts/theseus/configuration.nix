@@ -56,6 +56,9 @@
 
     # For fingerprint support
     fprintd.enable = true;
+
+    # VU1 Dials server
+    vu-server.enable = true;
   };
 
   environment.systemPackages = [
