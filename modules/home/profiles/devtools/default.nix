@@ -1,6 +1,8 @@
 { config, lib, pkgs, ... }:
-let cfg = config.profiles.devtools;
-in {
+let
+  cfg = config.profiles.devtools;
+in
+{
   imports = [ ./gdb-dashboard.nix ];
 
   options.profiles.devtools = with lib; {
@@ -36,11 +38,9 @@ in {
         # docker stuff
         docker-compose
         docker-credential-helpers
-
-        # nix stuff
-        nil
-        nixpkgs-fmt
       ];
+
+      home.sessionPath = [ "$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin" ];
 
       # Dev tools with extra configuration
       programs = {
@@ -56,13 +56,8 @@ in {
           '';
         };
 
-        jq.enable = mkDefault true;
-
-        zsh = {
-          envExtra = ''
-            export PATH="$PATH:$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin"
-          '';
-        };
+        jq.enable = mkDefault
+          true;
 
         direnv = {
           enable = mkDefault true;
@@ -70,6 +65,7 @@ in {
         };
       };
     })
+
     (mkIf cfg.enablePython {
       home.packages = with pkgs;
         [ python39Packages.pip ];

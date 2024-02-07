@@ -1,7 +1,6 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.profiles.oxide-scripts;
-
   zshEnabled = config.programs.zsh.enable;
 in
 with lib; {

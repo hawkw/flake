@@ -18,6 +18,7 @@ rec {
     ./profiles/git.nix
     ./profiles/rusty.nix
     ./profiles/k8s.nix
+    ./profiles/nix-tools.nix
   ];
 
   home.stateVersion = "23.11";
@@ -25,32 +26,39 @@ rec {
   # https://github.com/nix-community/home-manager/issues/3342
   manual.manpages.enable = false;
 
-  home.sessionVariables = {
-    EDITOR = "code --wait";
-    BROWSER = "firefox";
-    TERMINAL = "alacritty";
+  home = {
+    sessionVariables = {
+      EDITOR = "code --wait";
+      BROWSER = "firefox";
+      TERMINAL = "alacritty";
+    };
+
+    sessionPath = [
+      "$HOME/.cargo/bin"
+      "$HOME/.linkerd2/bin"
+    ];
+
+    packages = with pkgs; [
+      ### networking tools ##
+      nmap
+      slurm
+      bandwhich
+      nghttp2
+      # assorted wiresharks
+      termshark
+      tcpdump
+
+      ### stuff ###
+      neofetch
+      dtrx # Do The Right eXtraction --- extract any kind of archive file
+      unzip
+
+      asciinema
+
+      ### "crypto" ###
+      gnupg
+    ];
   };
-
-  home.packages = with pkgs; [
-    ### networking tools ##
-    nmap
-    slurm
-    bandwhich
-    nghttp2
-    # assorted wiresharks
-    termshark
-    tcpdump
-
-    ### stuff ###
-    neofetch
-    dtrx # Do The Right eXtraction --- extract any kind of archive file
-    unzip
-
-    asciinema
-
-    ### "crypto" ###
-    gnupg
-  ];
 
   # automagically add zsh completions from packages
   xdg.configFile."zsh/vendor-completions".source = with pkgs;
@@ -75,6 +83,8 @@ rec {
       enableAliases = lib.mkDefault true;
     };
 
+    nix-tools.enable = lib.mkDefault true;
+
     # custom git configs
     git = {
       enable = lib.mkDefault true;
@@ -87,7 +97,7 @@ rec {
 
   programs = {
     nushell = {
-      enable = true;
+      enable = lib.mkDefault true;
       configFile.text = ''
         let $config = {
           pivot_mode: always
@@ -99,14 +109,14 @@ rec {
     };
 
     atuin = {
-      enable = true;
+      enable = lib.mkDefault true;
       settings = {
         dialect = "us";
         auto_sync = true;
       };
     };
 
-    zellij.enable = true;
+    zellij.enable = lib.mkDefault true;
 
     starship = {
       enable = true;
@@ -179,12 +189,8 @@ rec {
       };
     };
 
-    # this conflicts with `nix-index`, which is nicer imo
-    # command-not-found.enable = true;
-    direnv.enable = true;
-
     htop = {
-      enable = true;
+      enable = lib.mkDefault true;
       # settings = {
       #   highlight_base_name = true;
       #   highlight_threads = true;
@@ -216,7 +222,7 @@ rec {
     };
 
     alacritty = {
-      enable = true;
+      enable = lib.mkDefault true;
       settings = {
         # Configuration for Alacritty, the GPU enhanced terminal emulator
         # Live config reload (changes require restart)
@@ -256,7 +262,7 @@ rec {
     };
 
     tmux = {
-      enable = true;
+      enable = lib.mkDefault true;
       plugins = with pkgs.tmuxPlugins; [
         sensible
         cpu
@@ -301,10 +307,6 @@ rec {
       '';
     };
 
-    nix-index = {
-      enable = true;
-      enableZshIntegration = true;
-    };
 
     ssh = { enable = true; };
 
