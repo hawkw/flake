@@ -83,7 +83,11 @@ rec {
       enableAliases = lib.mkDefault true;
     };
 
-    nix-tools.enable = lib.mkDefault true;
+    nix-tools = {
+      enable = lib.mkDefault true;
+      # these are broken :(
+      enableNomAliases = lib.mkDefault false;
+    };
 
     # custom git configs
     git = {

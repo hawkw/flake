@@ -80,37 +80,12 @@ in with lib; {
       ]))
 
       # If aliases are enabled, alias common unix utils with their rustier replacements.
-      (mkIf cfg.enableAliases (mkMerge [
-        { programs.lsd.enableAliases = true; }
-
-        (mkIf zshEnabled {
-          programs.zsh.shellAliases = {
-            # hahaha get rekt tree
-            tree = "${pkgs.lsd}/bin/lsd --tree";
-            grep = "${pkgs.ripgrep}/bin/rg";
-          };
-        })
-        (mkIf bashEnabled {
-          programs.bash.shellAliases = {
-            # hahaha get rekt tree
-            tree = "${pkgs.lsd}/bin/lsd --tree";
-            grep = "${pkgs.ripgrep}/bin/rg";
-          };
-        })
-        (mkIf fishEnabled {
-          programs.bash.shellAliases = {
-            # hahaha get rekt tree
-            tree = "${pkgs.lsd}/bin/lsd --tree";
-            grep = "${pkgs.ripgrep}/bin/rg";
-          };
-        })
-      ]))
-
-      # # zellij
-      # (mkIf zellijEnabled (mkMerge [
-      #   (mkIf zshEnabled { programs.zellij.enableZshIntegration = true; })
-      #   (mkIf bashEnabled { programs.zellij.enableBashIntegration = true; })
-      #   (mkIf fishEnabled { programs.zellij.enableFishIntegration = true; })
-      # ]))
+      (mkIf cfg.enableAliases {
+        programs.lsd.enableAliases = true;
+        home.shellAliases = {
+          tree = "${pkgs.lsd}/bin/lsd --tree";
+          grep = "${pkgs.ripgrep}/bin/rg";
+        };
+      })
     ]);
 }
