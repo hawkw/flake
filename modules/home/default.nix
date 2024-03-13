@@ -145,6 +145,10 @@ rec {
           show_always = true;
         };
 
+        direnv = {
+          disabled = false;
+        };
+
         # nodejs.disabled = true;
 
         kubernetes = {
@@ -159,11 +163,16 @@ rec {
             # and renames every matching kube context into a more readable format (`gke-cluster-name`):
             "gke_.*_(?P<var_cluster>[\\w-]+)" = "gke-$var_cluster";
           };
-          detect_files = [ "*.yml" "*.yaml" ];
+          # detect_files = [ "*.yml" "*.yaml" ];
           detect_folders = [ "linkerd2" "linkerd2-proxy" ];
         };
 
-        rust.symbol = "⚙️ ";
+        rust = {
+          symbol = "⚙️ ";
+          # i don't like "via" as a way to state the toolchain version.
+          format = "using [$symbol($version )]($style)";
+        };
+
         # package.symbol = "";
 
         sudo.disabled = false;
