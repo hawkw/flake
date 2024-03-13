@@ -1,4 +1,4 @@
-{ nixos-hardware, lanzaboote, vu-server, ... }: {
+{ nixos-hardware, lanzaboote, vu-server, vupdaters, ... }: {
   system = "x86_64-linux";
 
   modules = [
@@ -6,6 +6,7 @@
     nixos-hardware.nixosModules.framework-13-7040-amd
     lanzaboote.nixosModules.lanzaboote
     vu-server.nixosModules.default
+    vupdaters.nixosModules.default
   ];
 
   home.modules = [ ./home.nix ];

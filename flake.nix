@@ -29,6 +29,14 @@
       };
     };
 
+    vupdaters = {
+      url = "github:hawkw/vupdaters";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        vu-server.follows = "vu-server";
+      };
+    };
+
     # for secureboot support on theseus
     lanzaboote = {
       url = "github:nix-community/lanzaboote/v0.3.0";
