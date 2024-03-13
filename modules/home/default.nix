@@ -13,7 +13,7 @@ rec {
     ./zsh.nix
     ./profiles/desktop
     ./profiles/devtools
-    ./profiles/oxide-scripts
+    ./profiles/oxide
     ./profiles/games.nix
     ./profiles/git.nix
     ./profiles/rusty.nix
