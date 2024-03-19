@@ -10,6 +10,7 @@
     ./profiles/nix-ld.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
+    ./profiles/st-link.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];

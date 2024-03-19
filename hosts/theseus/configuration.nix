@@ -15,6 +15,7 @@
       enable = true;
       gnome3.enable = true;
     };
+    st-link.enable = true;
   };
 
   #### System configuration ####
@@ -111,6 +112,11 @@
     # For debugging and troubleshooting Secure Boot.
     sbctl
   ];
+
+  programs = {
+    # Used specifically for its (quite magical) "copy as html" function.
+    gnome-terminal.enable = true;
+  };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
