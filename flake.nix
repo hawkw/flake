@@ -9,10 +9,8 @@
     flake-utils.url = "github:numtide/flake-utils";
 
     home = {
-      url = "github:nix-community/home-manager?ref=release-23.11";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nixos-hardware.url = "github:nixos/nixos-hardware/master";
@@ -61,7 +59,7 @@
         #
         # TODO: remove this once https://github.com/NixOS/nixpkgs/issues/263764
         # is resolved...
-        permittedInsecurePackages = [ "electron-25.9.0" ];
+        permittedInsecurePackages = [ "electron-26.3.0" ];
       };
       overlays = [ (import ./pkgs/overlay.nix) ];
     in

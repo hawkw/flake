@@ -50,6 +50,7 @@ rec {
 
       ### stuff ###
       neofetch
+      pfetch
       dtrx # Do The Right eXtraction --- extract any kind of archive file
       unzip
       btop

@@ -50,7 +50,7 @@
       ### nicer autocomplete ###
       # these has to be explicitly disabled for things to work nicely
       enableCompletion = false;
-      enableAutosuggestions = false;
+      autosuggestion.enable = false;
       plugins = [{
         # will source zsh-autocomplete.plugin.zsh
         name = "zsh-autocomplete";

@@ -9,7 +9,7 @@ let
     # a nicer application menu for gnome
     arc-menu
     # displays system status in the gnome-shell status bar
-    system-monitor
+    # system-monitor
     # displays system temperatures, fan RPMs, and voltages
     # freon
     # allows selecting the sound output device in the sound menu
