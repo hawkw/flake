@@ -10,7 +10,11 @@
       enable = true;
       enablePython = true;
     };
-    oxide.enable = true;
+    oxide = {
+      enable = true;
+      humility.enable = true;
+      looker.enable = true;
+    };
   };
 
   home.packages = with pkgs; [
