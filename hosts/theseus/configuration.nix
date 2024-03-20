@@ -126,6 +126,10 @@
   # necessary to enable 802.11ax for the MEDIATEK WiFi chipset, as per:
   # https://community.frame.work/t/framework-nixos-linux-users-self-help/31426/77
   hardware.wirelessRegulatoryDatabase = true;
+
+  # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
+  networking.wireless.enable = lib.mkForce false;
+
   boot.extraModprobeConfig = ''
     options cfg80211 ieee80211_regdom="US"
   '';
