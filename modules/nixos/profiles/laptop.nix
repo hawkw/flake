@@ -35,36 +35,34 @@ in {
     # };
   };
 
-  config = lib.mkIf cfg.enable {
-    # Enabling the laptop profile automatically enables the
-    # desktop profile too.
-    profiles.desktop.enable = lib.mkDefault true;
+  config = with lib; mkIf cfg.enable
+    {
+      # Enabling the laptop profile automatically enables the
+      # desktop profile too.
+      profiles.desktop.enable = mkDefault true;
 
-    services = {
-      # Enable UPower to watch battery stats.
-      upower.enable = true;
+      services = {
+        # Enable UPower to watch battery stats.
+        upower.enable = true;
 
-      # Enable thermald
-      thermald.enable = true;
-      # AMD has better battery life with PPD over TLP:
-      # https://community.frame.work/t/responded-amd-7040-sleep-states/38101/13
-      power-profiles-daemon.enable = lib.mkDefault true;
+        # Enable thermald
+        thermald.enable = true;
+      };
+
+      # Enable light to control backlight.
+      programs.light.enable = true;
+
+      # Setup suspend then hibernate.
+      services.logind.lidSwitch =
+        if cfg.suspendThenHibernate.enable then
+          "suspend-then-hibernate"
+        else
+          "suspend";
+      systemd.sleep.extraConfig =
+        lib.optionalString cfg.suspendThenHibernate.enable ''
+          HibernateDelaySec=${
+            builtins.toString cfg.suspendThenHibernate.delayHours
+          }h
+        '';
     };
-
-    # Enable light to control backlight.
-    programs.light.enable = true;
-
-    # Setup suspend then hibernate.
-    services.logind.lidSwitch =
-      if cfg.suspendThenHibernate.enable then
-        "suspend-then-hibernate"
-      else
-        "suspend";
-    systemd.sleep.extraConfig =
-      lib.optionalString cfg.suspendThenHibernate.enable ''
-        HibernateDelaySec=${
-          builtins.toString cfg.suspendThenHibernate.delayHours
-        }h
-      '';
-  };
 }
