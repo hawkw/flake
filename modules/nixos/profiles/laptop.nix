@@ -3,11 +3,6 @@ let cfg = config.profiles.laptop;
 in {
   options.profiles.laptop = with lib; {
     enable = mkEnableOption "laptop profile";
-    preferTLP = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Whether to use TLP instead of power profiles daemon.";
-    };
     suspendThenHibernate = {
       enable = mkOption {
         type = types.bool;
@@ -51,6 +46,9 @@ in {
 
       # Enable thermald
       thermald.enable = true;
+      # AMD has better battery life with PPD over TLP:
+      # https://community.frame.work/t/responded-amd-7040-sleep-states/38101/13
+      power-profiles-daemon.enable = lib.mkDefault true;
     };
 
     # Enable light to control backlight.
