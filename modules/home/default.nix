@@ -270,7 +270,7 @@ rec {
         };
 
         # When true, bold text is drawn using the bright variant of colors.
-        draw_bold_text_with_bright_colors = true;
+        colors.draw_bold_text_with_bright_colors = true;
 
         # Fonts are configured in fonts.nix
       };
