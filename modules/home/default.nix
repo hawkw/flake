@@ -252,7 +252,7 @@ rec {
           };
 
           # Adds this many blank pixels of padding around the window
-          # Units are physical pixels; this is not DPI aware.
+          # This is DPI-aware.
           # (change requires restart)
           padding = {
             x = 30;
@@ -262,10 +262,17 @@ rec {
           # Window decorations
           # Setting this to false will result in window without borders and title bar.
           # decorations: false
-          window.decorations_theme_variant = "dark";
+          decorations_theme_variant = "Dark";
           class = {
             instance = "Alacritty";
             general = "Alacritty";
+          };
+        };
+
+        cursor = {
+          style = {
+            blinking = "On";
+            shape = "Block";
           };
         };
 
