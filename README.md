@@ -11,9 +11,11 @@
         * [`modules/home/profiles/`](./modules/home/profiles) &mdash; home-manager
           profiles (containing my personal preferences)
     + [`modules/nixos/`](./modules/nixos) &mdash; NixOS modules
+        * [`modules/nixos/hardware/`](./modules/nixos/hardware) &mdash; NixOS modules
+          for hardware devices (generic and unopinionated)
         * [`modules/nixos/profiles/`](./modules/nixos/profiles) &mdash; NixOS
           profiles (containing my personal preferences)
         * [`modules/nixos/programs/`](./modules/nixos/programs) &mdash; NixOS modules
-          for configuring specific programs (generic and unopinionated )
+          for configuring specific programs (generic and unopinionated)
 - [`pkgs/`](./pkgs) &mdash; overlay with packages for stuff not currently in nixpkgs
 ```

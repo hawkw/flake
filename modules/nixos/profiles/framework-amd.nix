@@ -33,7 +33,7 @@ in with lib; {
       };
 
       # enable the TPM profile
-      profiles.tpm.enable = lib.mkDefault true;
+      hardware.tpm.enable = lib.mkDefault true;
 
       ### misc hardware support tweaks ###
 

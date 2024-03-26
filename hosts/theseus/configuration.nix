@@ -16,6 +16,9 @@
       enable = true;
       gnome3.enable = true;
     };
+  };
+
+  hardware = {
     st-link.enable = true;
   };
 

@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
-let cfg = config.profiles.st-link;
+let cfg = config.hardware.st-link;
 in with lib; {
-  options.profiles.st-link = {
+  options.hardware.st-link = {
     enable = mkEnableOption "udev rules for ST-Link debug probes";
   };
 

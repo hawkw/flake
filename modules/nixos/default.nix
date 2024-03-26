@@ -2,6 +2,8 @@
 
 {
   imports = [
+    ./hardware/tpm.nix
+    ./hardware/st-link.nix
     ./profiles/desktop
     ./profiles/docs.nix
     ./profiles/games.nix
@@ -10,9 +12,7 @@
     ./profiles/nix-ld.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
-    ./profiles/st-link.nix
     ./profiles/framework-amd.nix
-    ./profiles/tpm.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];
