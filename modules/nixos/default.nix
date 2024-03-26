@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./hardware/ergodox.nix
     ./hardware/tpm.nix
     ./hardware/st-link.nix
     ./profiles/desktop

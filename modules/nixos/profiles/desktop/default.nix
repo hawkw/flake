@@ -47,16 +47,13 @@ in {
       # Enable CUPS to print documents.
       printing.enable = lib.mkDefault true;
 
-      udev.extraRules = ''
-        # Rule for the Ergodox EZ Original / Shine / Glow
-        SUBSYSTEM=="usb", ATTR{idVendor}=="feed", ATTR{idProduct}=="1307", TAG+="uaccess"
-        # Rule for the Planck EZ Standard / Glow
-        SUBSYSTEM=="usb", ATTR{idVendor}=="feed", ATTR{idProduct}=="6060", TAG+="uaccess"
-      '';
     };
 
     ### hardware ###
-    hardware = { bluetooth.enable = lib.mkDefault true; };
+    hardware = {
+      bluetooth.enable = lib.mkDefault true;
+      ergodox.enable = lib.mkDefault true;
+    };
 
     ### programs ###
     programs = {
