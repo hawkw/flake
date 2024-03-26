@@ -1,7 +1,8 @@
+# Configuration to enable TPM on machines that have one.
 { lib, config, ... }:
 let cfg = config.profiles.tpm;
 in {
-  options.profiles.tpm = with lib; { enable = mkEnableOption "tpm profile"; };
+  options.profiles.tpm = with lib; { enable = mkEnableOption "TPM profile"; };
 
   config = lib.mkIf cfg.enable (
     let

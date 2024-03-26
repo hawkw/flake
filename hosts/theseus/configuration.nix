@@ -11,6 +11,7 @@
   profiles = {
     docs.enable = true;
     laptop.enable = true;
+    framework-amd.enable = true;
     desktop = {
       enable = true;
       gnome3.enable = true;
@@ -30,16 +31,8 @@
     initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
       "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
 
-    kernelParams = [
-      # Disable AMD GPU scatter-gather buffer.
-      # this (hopefully) fixes white screen issues when driving a thunderbolt
-      # display. see here for details:
-      # https://community.frame.work/t/tracking-graphical-corruption-in-fedora-39-amd-3-03-bios/39073/52
-      "amdgpu.sg_display=0"
-    ];
-
     ### secureboot using Lanzaboote ###
-
+    # TODO: move this to a module?
     lanzaboote = {
       enable = true;
       pkiBundle = "/etc/secureboot";
@@ -51,13 +44,12 @@
     loader.systemd-boot.enable = lib.mkForce false;
   };
 
+  environment.systemPackages = with pkgs; [
+    # For debugging and troubleshooting Secure Boot.
+    sbctl
+  ];
+
   services = {
-    # use `fwupdmgr` for updating Framework firmware
-    fwupd.enable = true;
-
-    # For fingerprint support
-    fprintd.enable = true;
-
     # VU1 Dials server
     vu-dials = {
       server = {
@@ -108,11 +100,6 @@
     };
   };
 
-  environment.systemPackages = with pkgs; [
-    # For debugging and troubleshooting Secure Boot.
-    sbctl
-  ];
-
   programs = {
     # Used specifically for its (quite magical) "copy as html" function.
     gnome-terminal.enable = true;
@@ -123,16 +110,8 @@
   services.gnome.gnome-keyring.enable = lib.mkForce false;
   security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
 
-  # necessary to enable 802.11ax for the MEDIATEK WiFi chipset, as per:
-  # https://community.frame.work/t/framework-nixos-linux-users-self-help/31426/77
-  hardware.wirelessRegulatoryDatabase = true;
-
   # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
   networking.wireless.enable = lib.mkForce false;
-
-  boot.extraModprobeConfig = ''
-    options cfg80211 ieee80211_regdom="US"
-  '';
 
   # As of firmware v03.03, a bug in the EC causes the system to wake if AC is
   # connected despite the lid being closed. The following works around this,
