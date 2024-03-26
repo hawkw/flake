@@ -14,6 +14,6 @@ jobs:
       - uses: "DeterminateSystems/nix-installer-action@main"
       - uses: "DeterminateSystems/flakehub-push@main"
         with:
-          name: "hawkw/flake"
+          name: "mycoliza/flake"
           rolling: true
           visibility: "public"
