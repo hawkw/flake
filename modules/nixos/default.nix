@@ -141,7 +141,11 @@
     shell = pkgs.zsh;
   };
 
-  security.sudo.configFile = ''
-    Defaults    env_reset,pwfeedback
-  '';
+  security.sudo-rs = {
+    # Use sudo-rs rather than normal sudo.
+    enable = lib.mkDefault true;
+    # configFile = ''
+    #   Defaults    env_reset,pwfeedback
+    # '';
+  };
 }
