@@ -39,7 +39,11 @@
     lanzaboote = {
       enable = true;
       pkiBundle = "/etc/secureboot";
+      # don't keep more than 8 old configurations, to keep the /boot partition
+      # from filling up.
+      configurationLimit = 8;
     };
+
     # Lanzaboote currently replaces the systemd-boot module.
     # This setting is usually set to true in configuration.nix
     # generated at installation time. So we force it to false
