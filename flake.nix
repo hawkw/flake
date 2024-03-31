@@ -5,10 +5,7 @@
   #### INPUTS ################################################################
   inputs = {
     nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
-    # nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
-    # temporarily use staging-next until #300028 is on unstable:
-    # https://nixpk.gs/pr-tracker.html?pr=300028 
-    nixpkgs.url = "github:NixOS/nixpkgs/staging-next";
+    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
     home = {
