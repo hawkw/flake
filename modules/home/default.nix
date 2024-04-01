@@ -177,7 +177,9 @@ rec {
 
         # package.symbol = "";
 
-        sudo.disabled = false;
+        # unfortunately, the `sudo` module for starship doesn't work nicely with
+        # sudo-rs :(
+        sudo.disabled = true;
 
         nix_shell = {
           symbol = "❄️ ";
