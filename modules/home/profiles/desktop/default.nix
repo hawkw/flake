@@ -56,7 +56,7 @@ in {
         kbfs
 
         ### chat clients & stuff
-        (element-desktop.override { electron = electron_26; })
+        element-desktop
       ] ++ unfreePkgs);
     #############################################################################
     ## Programs                                                                 #
