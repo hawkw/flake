@@ -52,9 +52,6 @@ in {
         torrential
         usbutils
 
-        ### "crypto" ###
-        kbfs
-
         ### chat clients & stuff
         element-desktop
       ] ++ unfreePkgs);
@@ -75,8 +72,6 @@ in {
     ## Services                                                                 #
     #############################################################################
     services = {
-      kbfs.enable = true;
-      keybase.enable = true;
       gpg-agent.enable = true;
     };
 
