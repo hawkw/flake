@@ -2,36 +2,26 @@
 { lib, config, pkgs, ... }:
 let cfg = config.hardware.tpm;
 in with lib; {
-  options.hardware.tpm = { enable = mkEnableOption "TPM profile"; };
+  options.hardware.tpm = { enable = mkEnableOption "TPM2 profile"; };
 
   config = mkIf cfg.enable (
     let
       tss = "tss";
       uhid = "uhid";
-      tpmRules = pkgs.writeTextFile {
-        name = "tpm-udev-rules";
-        text = ''
-          # tpm devices can only be accessed by the tss user but the tss
-          # group members can access tpmrm devices
-          KERNEL=="tpm[0-9]*", TAG+="systemd", MODE="0660", OWNER="${tss}"
-          KERNEL=="tpmrm[0-9]*", TAG+="systemd", MODE="0660", OWNER="${tss}", GROUP="${tss}"
-
-          # uhid group can access /dev/uhid
-          KERNEL=="${uhid}", SUBSYSTEM=="misc", MODE="0660", GROUP="${uhid}"
-        '';
-        destination = "/etc/udev/rules.d/99-tpm.rules";
-      };
-
     in
     {
+      security.tpm2 = {
+        enable = true;
+        tssUser = tss;
+        tssGroup = tss;
+        applyUdevRules = true;
+        abrmd.enable = true;
+        pkcs11.enable = true;
+      };
       boot.kernelModules = [ uhid ];
-
-      users.groups.tss.name = tss;
-      users.groups.uhid.name = tss;
-
       users.users.eliza.extraGroups = [ tss uhid ];
 
-      services.udev.packages = [ tpmRules ];
+      environment.systemPackages = with pkgs; [ tpm2-tools tpm2-tss tpm2-abrmd ];
     }
   );
 }
