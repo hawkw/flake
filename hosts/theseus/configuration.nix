@@ -41,7 +41,7 @@
       pkiBundle = "/etc/secureboot";
       # don't keep more than 8 old configurations, to keep the /boot partition
       # from filling up.
-      configurationLimit = 8;
+      configurationLimit = 32;
     };
 
     # Lanzaboote currently replaces the systemd-boot module.
@@ -110,6 +110,8 @@
   programs = {
     # Used specifically for its (quite magical) "copy as html" function.
     gnome-terminal.enable = true;
+
+    xfel.enable = true;
   };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
