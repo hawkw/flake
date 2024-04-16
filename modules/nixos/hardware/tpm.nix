@@ -12,8 +12,6 @@ in with lib; {
     {
       security.tpm2 = {
         enable = true;
-        tssUser = tss;
-        tssGroup = tss;
         applyUdevRules = true;
         abrmd.enable = true;
         pkcs11.enable = true;
