@@ -52,6 +52,8 @@ in {
       # Enable light to control backlight.
       programs.light.enable = true;
 
+      environment.systemPackages = with pkgs; [ powertop ];
+
       # Setup suspend then hibernate.
       services.logind.lidSwitch =
         if cfg.suspendThenHibernate.enable then
