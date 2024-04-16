@@ -1,4 +1,4 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 let cfg = config.profiles.laptop;
 in {
   options.profiles.laptop = with lib; {
@@ -43,14 +43,16 @@ in {
 
       services = {
         # Enable UPower to watch battery stats.
-        upower.enable = true;
+        upower.enable = mkDefault true;
 
         # Enable thermald
-        thermald.enable = true;
+        thermald.enable = mkDefault true;
       };
 
       # Enable light to control backlight.
-      programs.light.enable = true;
+      programs.light.enable = mkDefault true;
+
+      powerManagement.powertop.enable = mkDefault true;
 
       environment.systemPackages = with pkgs; [ powertop ];
 

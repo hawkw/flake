@@ -3,7 +3,7 @@
 # See also the `nixos-hardware` modules for Framework:
 # https://github.com/NixOS/nixos-hardware/blob/33a97b5814d36ddd65ad678ad07ce43b1a67f159/framework/README.md
 
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 let cfg = config.hardware.framework-amd;
 in with lib; {
 
