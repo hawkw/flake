@@ -53,6 +53,10 @@ in with lib; {
       boot.extraModprobeConfig = ''
         options cfg80211 ieee80211_regdom="US"
       '';
+
+      environment.systemPackages = with pkgs; [
+        fw-ectool
+      ];
     };
 
 }

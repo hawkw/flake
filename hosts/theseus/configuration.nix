@@ -20,6 +20,7 @@
 
   hardware = {
     st-link.enable = true;
+    tpm.enable = true;
   };
 
   #### System configuration ####
