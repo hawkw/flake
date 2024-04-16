@@ -3,6 +3,7 @@
 {
   imports = [
     ./hardware/ergodox.nix
+    ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/st-link.nix
     ./profiles/desktop
@@ -13,7 +14,6 @@
     ./profiles/nix-ld.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
-    ./profiles/framework-amd.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];

@@ -11,7 +11,6 @@
   profiles = {
     docs.enable = true;
     laptop.enable = true;
-    framework-amd.enable = true;
     desktop = {
       enable = true;
       gnome3.enable = true;
@@ -21,6 +20,7 @@
   hardware = {
     st-link.enable = true;
     tpm.enable = true;
+    framework-amd.enable = true;
   };
 
   #### System configuration ####

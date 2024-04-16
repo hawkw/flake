@@ -4,10 +4,10 @@
 # https://github.com/NixOS/nixos-hardware/blob/33a97b5814d36ddd65ad678ad07ce43b1a67f159/framework/README.md
 
 { lib, config, ... }:
-let cfg = config.profiles.framework-amd;
+let cfg = config.hardware.framework-amd;
 in with lib; {
 
-  options.profiles.framework-amd = {
+  options.hardware.framework-amd = {
     enable = mkEnableOption "Framework laptop profile";
   };
 
