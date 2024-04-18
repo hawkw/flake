@@ -19,6 +19,26 @@ with lib; {
         default = true;
         description = "Whether to enable Humility, the Hubris debugger.";
       };
+      environment = mkOption
+        {
+          description = "Generates a Humility environment file.";
+          type = with types;
+            attrsOf (submodule {
+              options = {
+                probe = mkOption {
+                  type = strMatching ''[0-9a-fA-F]{4}:[0-9a-fA-F]{4}:.+'';
+                  description = "The probe ID for this target.";
+                  example = "0483:374e:002A00174741500520383733";
+                };
+                archive = mkOption {
+                  type = either (attrsOf path) path;
+                  description = "Archive path(s) for this target";
+                  example = "/gimlet/hubris/archives/grimey/build-gimlet.zip";
+                };
+              };
+            });
+          default = { };
+        };
     };
   };
 
@@ -77,11 +97,19 @@ with lib; {
         { home.packages = [ looker ]; }
       ))
       # humility package
-      (mkIf cfg.humility.enable
-        (
-          {
-            home.packages = [ (pkgs.callPackage ./humility.nix { }) ];
-          }
-        ))
+      (mkIf cfg.humility.enable (mkMerge [
+        {
+          home.packages = [ (pkgs.callPackage ./humility.nix { }) ];
+        }
+        (mkIf (cfg.humility.environment != { }) {
+          xdg.configFile."humility/environment.json".text = builtins.toJSON cfg.humility.environment;
+          programs.zsh.initExtra = ''
+            export HUMILITY_ENVIRONMENT=${config.xdg.configHome}/humility/environment.json;
+          '';
+          home.sessionVariables = {
+            HUMILITY_ENVIRONMENT = "${config.xdg.configHome}/humility/environment.json";
+          };
+        })
+      ]))
     ]);
 }

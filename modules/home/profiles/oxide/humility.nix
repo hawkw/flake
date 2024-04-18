@@ -3,13 +3,13 @@
 with pkgs;
 let
   pname = "humility";
-  rev = "d0a6e0317ba502a44e1e0bc4372e065dd6ecd2fe";
+  rev = "e94bc0d65b5c99753511c060027fc2a220cf5987";
   src = fetchFromGitHub
     {
       owner = "oxidecomputer";
       repo = pname;
       inherit rev;
-      hash = "sha256-YGfMqhIv2JQDOBpHWitGqAtgxg8dMlY893RZ7fnU0Ws=";
+      hash = "sha256-Hq8cddJFJp0WgGBMPFu9jMDCxCradATzq1HcnOsPMCM=";
     };
   # use the Rust toolchain specified in the project's rust-toolchain.toml
   configuredRustPlatform =
@@ -33,7 +33,7 @@ configuredRustPlatform.buildRustPackage {
     outputHashes = {
       "capstone-0.10.0" = "sha256-x0p005W6u3QsTKRupj9HEg+dZB3xCXlKb9VCKv+LJ0U=";
       "gimlet-inspector-protocol-0.1.0" = "sha256-NLKiYL1CMkQaaTP0ePwEK49Y9lckkOrzw7371SHHEWQ=";
-      "hidapi-1.4.1" = "sha256-2SBQu94ArGGwPU3wJYV0vwwVOXMCCq+jbeBHfKuE+pA=";
+      "hidapi-1.4.1" = "sha256-5ioUq/2EvJzIoFYUOD27c9gjwdGUpYaehZSCnTvYKFE=";
       "hif-0.3.1" = "sha256-o3r1akaSARfqIzuP86SJc6/s0b2PIkaZENjYO3DPAUo=";
       "humpty-0.1.3" = "sha256-efeb+RaAjQs9XU3KkfVo8mVK2dGyv+2xFKSVKS0vyTc=";
       "idol-0.3.0" = "sha256-s6ZM/EyBE1eOySPah5GtT0/l7RIQKkeUPybMmqUpmt8=";
