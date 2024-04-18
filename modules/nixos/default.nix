@@ -5,7 +5,7 @@
     ./hardware/ergodox.nix
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
-    ./hardware/st-link.nix
+    ./hardware/probes.nix
     ./profiles/desktop
     ./profiles/docs.nix
     ./profiles/games.nix
