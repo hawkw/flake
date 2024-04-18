@@ -45,11 +45,20 @@
         flake-utils.follows = "flake-utils";
       };
     };
+
+    # for building Rust packages
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, nixos-hardware, home, utils, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home, utils, rust-overlay, ... }@inputs:
     let
       config = {
         allowUnfree = true;
@@ -61,7 +70,7 @@
         # is resolved...
         permittedInsecurePackages = [ "electron-26.3.0" ];
       };
-      overlays = [ (import ./pkgs/overlay.nix) ];
+      overlays = [ (import ./pkgs/overlay.nix) rust-overlay.overlays.default ];
     in
     {
 

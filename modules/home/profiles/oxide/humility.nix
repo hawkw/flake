@@ -11,8 +11,19 @@ let
       inherit rev;
       hash = "sha256-YGfMqhIv2JQDOBpHWitGqAtgxg8dMlY893RZ7fnU0Ws=";
     };
+  # use the Rust toolchain specified in the project's rust-toolchain.toml
+  configuredRustPlatform =
+    let
+      file = src + "/rust-toolchain.toml";
+      rustToolchain = rust-bin.fromRustupToolchainFile file;
+    in
+    makeRustPlatform {
+      cargo = rustToolchain;
+      rustc = rustToolchain;
+    };
+
 in
-rustPlatform.buildRustPackage {
+configuredRustPlatform.buildRustPackage {
   inherit src pname;
   version = rev;
   cargoLock = {
