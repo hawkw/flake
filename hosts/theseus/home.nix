@@ -20,15 +20,15 @@
           in
           {
             "gimletlet" = {
-              probe = "0483:375e:0483:000B00154lsusD46501520383832";
+              probe = "0483:3754:000B00154D46501520383832";
               archive = "${basePath}/gimletlet/dist/default/build-gimletlet-image-default.zip";
             };
             "nucleo" = {
-              probe = "0483:3754:0030003C3431511237393330";
+              probe = "0483:374e:0030003C3431511237393330";
               archive = "${basePath}/demo-stm32h753-nucleo/dist/default/build-demo-stm32h753-nucleo-image-default.zip";
             };
             "rot" = {
-              probe = "0143:1fc9:53BKD0YYVRBPB";
+              probe = "1fc9:0143:53BKD0YYVRBPB";
               archive = {
                 "a" = "${basePath}/rot-carrier/dist/a/build-rot-carrier-image-a.zip";
                 "b" = "${basePath}/rot-carrier/dist/b/build-rot-carrier-image-b.zip";
