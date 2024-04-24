@@ -45,7 +45,22 @@ in
             refresh_interval = "5m";
           }];
         }
+        # local node exporter
+        {
+          job_name = "${config.networking.hostName}";
+          static_configs = [{
+            targets = [ "127.0.0.1:${toString config.services.prometheus.exporters.node.port}"];
+          }];
+        }
       ];
+
+      exporters = {
+        node = {
+          enable = true;
+          enabledCollectors = ["systemd"];
+          port = 9002;
+        };
+      };
     };
 
     systemd.services.prometheus-mdns = {
