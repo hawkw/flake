@@ -5,7 +5,7 @@
   boot = {
     supportedFilesystems = [ "zfs" "xfs" ];
     kernelParams = [ "elevator=none" ];
-    zfs.enableUnstable = true;
+    # zfs.enableUnstable = true;
   };
 
   # ZFS configuration
