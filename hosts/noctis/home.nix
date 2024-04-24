@@ -17,12 +17,12 @@
     };
   };
 
-  home.packages = with pkgs; [ sensors wally-cli conky ];
+  home.packages = with pkgs; [ lm_sensors wally-cli conky ];
 
   services = {
     gpg-agent = {
       enable = true;
-      pinentryFlavor = "gnome3";
+      # pinentryFlavor = "gnome3";
     };
   };
 }
