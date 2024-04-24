@@ -5,47 +5,11 @@ in
 with lib; {
 
   options.profiles.oxide = {
-    enable = mkEnableOption "Profile with various Oxide stuff";
-    looker = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to enable Looker, a Bunyan log viewer";
-      };
-    };
-    humility = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to enable Humility, the Hubris debugger.";
-      };
-      environment = mkOption
-        {
-          description = "Generates a Humility environment file.";
-          type = with types;
-            attrsOf (submodule {
-              options = {
-                probe = mkOption {
-                  type = strMatching ''[0-9a-fA-F]{4}:[0-9a-fA-F]{4}:.+'';
-                  description = "The probe ID for this target.";
-                  example = "0483:374e:002A00174741500520383733";
-                };
-                archive = mkOption {
-                  type = either (attrsOf path) path;
-                  description = "Archive path(s) for this target";
-                  example = "/gimlet/hubris/archives/grimey/build-gimlet.zip";
-                };
-              };
-            });
-          default = { };
-        };
-    };
+    enable = mkEnableOption "personal configuration for Oxide utilities";
   };
 
   config =
-    mkIf cfg.enable (mkMerge [
-      # scripts and env vars
-      {
+    mkIf cfg.enable {
         home.packages = with pkgs;
           let
             atrium-sync = writeShellApplication
@@ -62,54 +26,43 @@ with lib; {
               };
           in
           [ atrium-sync atrium-run ];
+
+        # use Nix flake in the Omicron repo.
         programs.zsh.initExtra = ''
           export OMICRON_USE_FLAKE=1;
         '';
+
         home.sessionVariables = {
           # Tell direnv to opt in to using the Nix flake for Omicron.
           OMICRON_USE_FLAKE = " 1 ";
         };
-      }
-      # looker package
-      (mkIf cfg.looker.enable (
-        let
-          looker = with pkgs;
+
+      programs.oxide = {
+        looker.enable = true;
+        humility = {
+          enable = true;
+          environment =
             let
-              pname = "looker";
-              rev = "173a93c92ac78068569b252d3ec8a1cef4be1de6";
-              src = fetchFromGitHub
-                {
-                  owner = "oxidecomputer";
-                  repo = pname;
-                  inherit rev;
-                  hash = "sha256-V5hnr3e+GyxejcQSoqo+R/2tAXM3mfUtXR2ezKKVV7Q=";
-                };
+              basePath = "/home/eliza/Code/oxide/hubris/target";
             in
-            rustPlatform.buildRustPackage
-              {
-                inherit src pname;
-                version = rev;
-                cargoLock = {
-                  lockFile = "${src}/Cargo.lock";
+            {
+              "gimletlet" = {
+                probe = "0483:3754:000B00154D46501520383832";
+                archive = "${basePath}/gimletlet/dist/default/build-gimletlet-image-default.zip";
+              };
+              "nucleo" = {
+                probe = "0483:374e:0030003C3431511237393330";
+                archive = "${basePath}/demo-stm32h753-nucleo/dist/default/build-demo-stm32h753-nucleo-image-default.zip";
+              };
+              "rot" = {
+                probe = "1fc9:0143:53BKD0YYVRBPB";
+                archive = {
+                  "a" = "${basePath}/rot-carrier/dist/a/build-rot-carrier-image-a.zip";
+                  "b" = "${basePath}/rot-carrier/dist/b/build-rot-carrier-image-b.zip";
                 };
               };
-        in
-        { home.packages = [ looker ]; }
-      ))
-      # humility package
-      (mkIf cfg.humility.enable (mkMerge [
-        {
-          home.packages = [ (pkgs.callPackage ./humility.nix { }) ];
-        }
-        (mkIf (cfg.humility.environment != { }) {
-          xdg.configFile."humility/environment.json".text = builtins.toJSON cfg.humility.environment;
-          programs.zsh.initExtra = ''
-            export HUMILITY_ENVIRONMENT=${config.xdg.configHome}/humility/environment.json;
-          '';
-          home.sessionVariables = {
-            HUMILITY_ENVIRONMENT = "${config.xdg.configHome}/humility/environment.json";
-          };
-        })
-      ]))
-    ]);
+            };
+        };
+      };
+    };
 }

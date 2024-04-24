@@ -11,14 +11,8 @@ rec {
     ./fonts.nix
     ./ssh.nix
     ./zsh.nix
-    ./profiles/desktop
-    ./profiles/devtools
-    ./profiles/oxide
-    ./profiles/games.nix
-    ./profiles/git.nix
-    ./profiles/rusty.nix
-    ./profiles/k8s.nix
-    ./profiles/nix-tools.nix
+    ./profiles
+    ./programs
   ];
 
   home.stateVersion = "23.11";
