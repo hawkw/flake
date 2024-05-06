@@ -14,6 +14,7 @@
     ./profiles/nix-ld.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
+    ./profiles/vu-dials.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
   ];

@@ -556,17 +556,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1713117126,
-        "narHash": "sha256-2M8e5JaHIQzDbv9ipEZmTT59iEprI3WQjc/+gV28MAU=",
-        "owner": "hawkw",
-        "repo": "vupdaters",
-        "rev": "6d562ee2ea8e441aa3249e136fe50b1d801115a6",
-        "type": "github"
+        "lastModified": 1715008989,
+        "narHash": "sha256-vcV4ysCZB3LxTwsqTAUpVgGb2l0Aj83Mw/PSKiUEMCA=",
+        "rev": "6b1864837a0207082fc2be2b20407ecb73e3a342",
+        "revCount": 112,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/mycoliza/vupdaters/0.1.112%2Brev-6b1864837a0207082fc2be2b20407ecb73e3a342/018f4e81-4d11-79cc-a2ee-5360994c176f/source.tar.gz"
       },
       "original": {
-        "owner": "hawkw",
-        "repo": "vupdaters",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://flakehub.com/f/mycoliza/vupdaters/0.1.112.tar.gz"
       }
     }
   },

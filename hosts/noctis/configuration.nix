@@ -15,6 +15,7 @@
     observability.enable = true;
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
+    vu-dials.enable = true;
   };
 
   hardware = {
@@ -88,54 +89,6 @@
   services = {
     openrgb.enable = true;
     # logid.enable = true;
-    # VU1 Dials server
-    vu-dials = {
-      server = {
-        enable = true;
-        logLevel = "info";
-      };
-      vupdated = {
-        enable = true;
-        enableHotplug = true;
-        logFilter = "info,vupdated=debug";
-        dials =
-          let
-            backlight =
-              {
-                mode = {
-                  static = {
-                    red = 100;
-                    green = 65;
-                    blue = 0;
-                  };
-                };
-              };
-            update-interval = "1s";
-          in
-          {
-            "CPU Load" = {
-              index = 0;
-              metric = "cpu-load";
-              inherit update-interval backlight;
-            };
-            "CPU Temp" = {
-              index = 1;
-              metric = "cpu-temp";
-              inherit update-interval backlight;
-            };
-            "Memory Usage" = {
-              index = 2;
-              metric = "mem";
-              inherit update-interval backlight;
-            };
-            "Swap Usage" = {
-              index = 3;
-              metric = "swap";
-              inherit update-interval backlight;
-            };
-          };
-      };
-    };
   };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets

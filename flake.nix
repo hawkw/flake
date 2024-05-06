@@ -28,7 +28,7 @@
     };
 
     vupdaters = {
-      url = "https://flakehub.com/f/mycoliza/vupdaters/0.1.112.tar.gz";
+      url = "https://flakehub.com/f/mycoliza/vupdaters/0.1.113.tar.gz";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         vu-server.follows = "vu-server";
