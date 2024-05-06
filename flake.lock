@@ -147,6 +147,26 @@
         "type": "github"
       }
     },
+    "fw-ectool": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1703923686,
+        "narHash": "sha256-OKwWIDm6GxMwoI0+mw0dAdeTC5i7VaZEZcIu+ALy+oc=",
+        "owner": "tlvince",
+        "repo": "ectool.nix",
+        "rev": "441b9b2534cc92cb69cf2b17c977ec8ccab13668",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tlvince",
+        "repo": "ectool.nix",
+        "type": "github"
+      }
+    },
     "gitignore": {
       "inputs": {
         "nixpkgs": [
@@ -339,6 +359,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "fw-ectool": "fw-ectool",
         "home": "home",
         "lanzaboote": "lanzaboote",
         "nixos-hardware": "nixos-hardware",

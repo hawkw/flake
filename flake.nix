@@ -28,7 +28,7 @@
     };
 
     vupdaters = {
-      url = "github:hawkw/vupdaters";
+      url = "https://flakehub.com/f/mycoliza/vupdaters/0.1.112.tar.gz";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         vu-server.follows = "vu-server";
@@ -54,6 +54,13 @@
         flake-utils.follows = "flake-utils";
       };
     };
+
+
+    # fw ectool as configured for FW13 7040 AMD (until patch is upstreamed)
+    fw-ectool = {
+      url = "github:tlvince/ectool.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   ############################################################################
@@ -70,7 +77,13 @@
         # is resolved...
         permittedInsecurePackages = [ "electron-26.3.0" ];
       };
-      overlays = [ (import ./pkgs/overlay.nix) rust-overlay.overlays.default ];
+      overlays = [
+        (import ./pkgs/overlay.nix)
+        rust-overlay.overlays.default
+        # TODO(eliza): it would be nice if this was only added for the framework
+        # system config...
+        (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
+      ];
     in
     {
 
