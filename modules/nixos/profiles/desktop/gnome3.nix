@@ -10,6 +10,7 @@ in {
     profiles.desktop.enable = lib.mkDefault true;
 
     services = {
+      displayManager.defaultSession = "gnome";
       xserver = {
         # Enable the GNOME Desktop Environment.
         desktopManager.gnome.enable = true;
@@ -18,7 +19,6 @@ in {
             enable = true;
             wayland = true;
           };
-          defaultSession = "gnome";
         };
       };
 
