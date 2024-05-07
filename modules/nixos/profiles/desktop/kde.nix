@@ -27,7 +27,7 @@ in {
         desktopManager.plasma5.enable = true;
       };
       # It's necessary to enable Gnome keyring to make VS Code happy...
-      gnome3.gnome-keyring.enable = true;
+      gnome.gnome-keyring.enable = true;
     };
     security.pam.services = {
       sddm.enableGnomeKeyring = true;
