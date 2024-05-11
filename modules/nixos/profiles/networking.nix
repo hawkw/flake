@@ -32,6 +32,10 @@ in {
       # Strict reverse path filtering breaks Tailscale exit node use and some
       # subnet routing setups.
       firewall.checkReversePath = "loose";
+
+      # enable mdns resolution for resolved on all connections
+      # see https://man.archlinux.org/man/NetworkManager.conf.5#CONNECTION_SECTION
+      networkmanager.connectionConfig."connection.mdns" = 2;
     };
 
     services = {
@@ -45,9 +49,9 @@ in {
       avahi = {
         enable = true;
         # allow local applications to resolve `local.` domains using avahi.
-        nssmdns4 = true;
+        # nssmdns4 = true;
         ipv4 = true;
-        ipv6 = true;
+        # ipv6 = true;
         # publish this machine on mDNS.
         publish = {
           enable = true;

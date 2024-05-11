@@ -12,7 +12,10 @@
     desktop = {
       gnome3.enable = true;
     };
-    observability.enable = true;
+    observability = {
+      enable = true;
+      observer = true;
+    };
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
     vu-dials.enable = true;

@@ -16,6 +16,7 @@
       gnome3.enable = true;
     };
     vu-dials.enable = true;
+    observability.enable = true;
   };
 
   hardware = {
