@@ -1,9 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  mdnsJson = "/var/prometheus/mdns-sd.json";
+  mdnsJson = "/etc/prometheus/mdns-sd.json";
   cfg = config.profiles.observability;
-  hostName = config.networking.hostName;
   nodeExporterPort = config.services.prometheus.exporters.node.port;
 in
 with lib;
@@ -51,6 +50,12 @@ with lib;
           services.grafana = {
             enable = true;
             settings = {
+              # auth.disable_login_form = true;
+              "auth.anonymous".enable = true;
+              "auth.anonymous".enabled = true;
+              "auth.anonymous".org_name = "randos";
+              "auth.anonymous".org_role = "Viewer";
+
               server = {
                 domain = "grafana.elizas.website";
                 serve_from_sub_path = true;
@@ -81,7 +86,28 @@ with lib;
                   refresh_interval = "5m";
                 }];
               }
+              {
+                job_name = "${config.networking.hostName}";
+                static_configs = [{
+                  targets = [
+                    "127.0.0.1:${toString config.services.prometheus.exporters.node.port}"
+                    "127.0.0.1:${toString config.services.prometheus.exporters.nginx.port}"
+                  ];
+                }];
+
+              }
             ];
+            exporters = {
+              nginx = {
+                enable = true;
+                port = 9113;
+              };
+              node = {
+                enable = true;
+                enabledCollectors = [ "systemd" "zfs" ];
+                port = mkDefault 9002;
+              };
+            };
           };
 
           systemd.services.prometheus-mdns = {
