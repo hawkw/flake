@@ -20,6 +20,7 @@ with lib;
           enable = true;
           enabledCollectors = [ "systemd" "zfs" ];
           port = mkDefault 9002;
+          openFirewall = mkDefault true;
         };
       };
       services.avahi.extraServiceFiles.node-exporter =
@@ -33,7 +34,6 @@ with lib;
     <port>${toString nodeExporterPort}</port>
   </service>
 </service-group>'';
-      networking.firewall.allowedTCPPorts = [ nodeExporterPort ];
     })
     (mkIf
       cfg.observer
@@ -92,6 +92,7 @@ with lib;
                   targets = [
                     "127.0.0.1:${toString config.services.prometheus.exporters.node.port}"
                     "127.0.0.1:${toString config.services.prometheus.exporters.nginx.port}"
+                    "127.0.0.1:${toString config.services.prometheus.exporters.nginxlog.port}"
                   ];
                 }];
 
@@ -101,12 +102,9 @@ with lib;
               nginx = {
                 enable = true;
                 port = 9113;
+                scrapeUri = "http://localhost/nginx_status";
               };
-              node = {
-                enable = true;
-                enabledCollectors = [ "systemd" "zfs" ];
-                port = mkDefault 9002;
-              };
+              nginxlog.enable = true;
             };
           };
 
