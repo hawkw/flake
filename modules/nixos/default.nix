@@ -17,6 +17,7 @@
     ./profiles/vu-dials.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
+    ./services/dashy.nix
   ];
 
   # Set your time zone.
@@ -56,6 +57,7 @@
       pciutils
       home-manager
       lm_sensors
+      smartmontools
     ];
 
     # "Don't forget to add `environment.pathsToLink = [ "/share/zsh" ];` to your
@@ -102,6 +104,9 @@
     # https://github.com/armbian/build/issues/5586#issuecomment-1677708996
     # or i could try podman...
     package = pkgs.docker_24;
+  };
+  virtualisation.oci-containers = {
+    backend = "docker";
   };
 
   #### nix configurations ####

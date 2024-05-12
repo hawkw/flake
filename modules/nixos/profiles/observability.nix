@@ -1,11 +1,33 @@
 { config, lib, pkgs, ... }:
 
+with lib;
 let
   mdnsJson = "/etc/prometheus/mdns-sd.json";
   cfg = config.profiles.observability;
-  nodeExporterPort = config.services.prometheus.exporters.node.port;
+  cfgExporters = config.services.prometheus.exporters;
+  # An attrset of all Prometheus exporters that are enabled.
+  enabledExporters = attrsets.filterAttrs
+    (_: cfg: if isAttrs cfg then cfg.enable else false)
+    cfgExporters;
+
+  mkAvahiService = { name, port, type }:
+    ''
+      <?xml version="1.0" standalone='no'?>
+      <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+      <service-group>
+        <name replace-wildcards="yes">${name} on %h</name>
+        <service>
+          <type>${type}</type>
+          <port>${toString port}</port>
+        </service>
+      </service-group>
+    '';
+  mkPromExporterAvahiService = (name: mkAvahiService {
+    name = "Prometheus ${name}-exporter";
+    type = "_prometheus-http._tcp";
+    port = cfgExporters.${name}.port;
+  });
 in
-with lib;
 {
   options.profiles.observability = {
     enable = mkEnableOption "observability";
@@ -17,29 +39,30 @@ with lib;
     (mkIf cfg.enable {
       services.prometheus.exporters = {
         node = {
-          enable = true;
+          enable = mkDefault true;
           enabledCollectors = [ "systemd" "zfs" ];
           port = mkDefault 9002;
           openFirewall = mkDefault true;
         };
+        smartctl = {
+          enable = mkDefault true;
+          openFirewall = mkDefault true;
+        };
       };
-      services.avahi.extraServiceFiles.node-exporter =
-        ''<?xml version = "1.0" standalone='no'?><!--*-nxml-*-->
-<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 
-<service-group>
-  <name replace-wildcards="yes">node-exporter on %h</name>
-  <service>
-    <type>_prometheus-http._tcp</type>
-    <port>${toString nodeExporterPort}</port>
-  </service>
-</service-group>'';
+      # make an Avahi mDNS service for each enabled Prometheus exporter.
+      services.avahi.extraServiceFiles = attrsets.mapAttrs'
+        (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
+        enabledExporters;
     })
+
     (mkIf
       cfg.observer
       (
         let
-          grafanaPort = config.services.grafana.port;
+          grafanaPort = config.services.grafana.settings.server.http_port;
+          grafanaDomain = config.services.grafana.settings.server.domain;
+          promDomain = "prometheus.elizas.website";
           promPort = config.services.prometheus.port;
         in
         {
@@ -67,6 +90,14 @@ with lib;
                 admin_password = "admin";
               };
             };
+            provision.datasources.settings.datasources = [
+              {
+                name = "Prometheus";
+                type = "prometheus";
+                access = "proxy";
+                url = "http://127.0.0.1:${toString promPort}";
+              }
+            ];
           };
 
           # prometheus
@@ -89,11 +120,9 @@ with lib;
               {
                 job_name = "${config.networking.hostName}";
                 static_configs = [{
-                  targets = [
-                    "127.0.0.1:${toString config.services.prometheus.exporters.node.port}"
-                    "127.0.0.1:${toString config.services.prometheus.exporters.nginx.port}"
-                    "127.0.0.1:${toString config.services.prometheus.exporters.nginxlog.port}"
-                  ];
+                  targets = attrsets.mapAttrsToList
+                    (_: exporter: "127.0.0.1:${toString exporter.port}")
+                    enabledExporters;
                 }];
 
               }
@@ -124,6 +153,48 @@ with lib;
             wantedBy = [ "multi-user.target" ];
           };
 
+          services.dashy = {
+            enable = true;
+            settings = {
+              pageInfo = {
+                title = "home.elizas.website";
+              };
+              appConfig = {
+                # theme = "nord-frost";
+                layout = "auto";
+                iconSize = "medium";
+                language = "en";
+                statusCheck = true;
+                hideComponents.hideSettings = false;
+              };
+              sections = [
+                {
+                  name = "overview";
+                  widgets = [
+                    { type = "system-info"; }
+                  ];
+                }
+                {
+                  name = "monitoring";
+                  icon = "fas fa-monitor-heart-rate";
+                  items = [
+                    {
+                      title = "Grafana";
+                      icon = "hl-grafana";
+                      url = "https://${grafanaDomain}";
+                    }
+                    {
+                      title = "Prometheus";
+                      icon = "hl-prometheus";
+                      url = "https://${promDomain}";
+                    }
+                  ];
+                }
+              ];
+
+            };
+          };
+
           services.avahi.extraServiceFiles = {
             nginx =
               ''<?xml version = "1.0" standalone='no'?><!--*-nxml-*-->
@@ -143,7 +214,8 @@ with lib;
           };
 
           # open firewall ports
-          networking.firewall.allowedTCPPorts = [ 80 443 ];
+          networking.firewall.allowedTCPPorts =
+            [ 80 443 ];
 
           # nginx reverse proxy config to expose grafana
           security.acme.acceptTerms = true;
@@ -161,13 +233,13 @@ with lib;
             virtualHosts."home.elizas.website" = {
               forceSSL = true;
               enableACME = true;
-              serverAliases = [ config.services.grafana.domain "prometheus.elizas.website" ];
+              serverAliases = [ grafanaDomain promDomain ];
               locations."/" = {
-                root = "/var/www";
+                proxyPass = "http://127.0.0.1:${toString config.services.dashy.port}/";
               };
             };
 
-            virtualHosts.${config.services.grafana.domain} = {
+            virtualHosts.${grafanaDomain} = {
               forceSSL = true;
               useACMEHost = "home.elizas.website";
               locations."/" = {
@@ -180,12 +252,9 @@ with lib;
               };
             };
 
-            virtualHosts."prometheus.elizas.website" = {
+            virtualHosts.${promDomain} = {
               forceSSL = true;
               useACMEHost = "home.elizas.website";
-              locations."/" = {
-                root = "/var/www";
-              };
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
                 proxyWebsockets = true;
@@ -201,11 +270,6 @@ with lib;
               };
               locations."/prometheus/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
-                proxyWebsockets = true;
-                extraConfig = "proxy_redirect default;";
-              };
-              locations."/metrics/" = {
-                proxyPass = "http://127.0.0.1:${toString nodeExporterPort}/";
                 proxyWebsockets = true;
                 extraConfig = "proxy_redirect default;";
               };
