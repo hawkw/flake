@@ -14,7 +14,7 @@
     };
     observability = {
       enable = true;
-      observer = true;
+      observer.enable = true;
     };
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
