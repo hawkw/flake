@@ -77,7 +77,7 @@ in
     })
 
     (mkIf
-      cfg.observer
+      cfg.observer.enable
       (
         let
           grafanaPort = config.services.grafana.settings.server.http_port;
