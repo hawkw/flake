@@ -222,9 +222,11 @@ in
             };
           };
 
-          services.uptimeKuma = {
+          services.uptime-kuma = {
             enable = true;
-            port = uptimeKumaPort;
+            settings = {
+              PORT = uptimeKumaPort;
+            };
           };
 
           services.avahi.extraServiceFiles = {
