@@ -277,14 +277,10 @@ in
             virtualHosts.${grafanaDomain} = {
               forceSSL = true;
               useACMEHost = "home.${cfg.observer.rootDomain}";
-              locations."/" = { };
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
                 proxyWebsockets = true;
-                extraConfig = ''
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Forwarded-Host $host;
-                '';
+
               };
             };
 
@@ -294,10 +290,6 @@ in
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
                 proxyWebsockets = true;
-                extraConfig = ''
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Forwarded-Host $host;
-                '';
               };
             };
 
@@ -307,10 +299,6 @@ in
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
                 proxyWebsockets = true;
-                extraConfig = ''
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Forwarded-Host $host;
-                '';
               };
             };
 
@@ -321,8 +309,8 @@ in
                 proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
                 proxyWebsockets = true;
                 extraConfig = ''
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Forwarded-Host $host;
+                  proxy_set_header Host status.${cfg.observer.rootDomain};
+                  proxy_set_header X-Forwarded-Host status.${cfg.observer.rootDomain};
                 '';
               };
             };
