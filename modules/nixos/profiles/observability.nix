@@ -225,7 +225,7 @@ in
           services.uptime-kuma = {
             enable = true;
             settings = {
-              PORT = uptimeKumaPort;
+              PORT = toString uptimeKumaPort;
             };
           };
 
