@@ -54,7 +54,18 @@ in
         # nginx reverse proxy config
         security.acme = {
           acceptTerms = true;
-          defaults.email = lib.mkDefault "acme@${cfg.domain}";
+          defaults.email = lib.mkDefault "acme@elizas.website";
+          certs.${acmeDomain} = {
+            domain = "${acmeDomain}";
+            extraDomainNames = trivial.pipe config.services.nginx.virtualHosts [
+              # include any configured NGINX virtual host that's configured to
+              # use the root domain ACME host.
+              (attrsets.filterAttrs
+                (_: attrsets.matchAttrs { useACMEHost = "${acmeDomain}"; }))
+              # just get the names of the virtual hosts.
+              attrNames
+            ];
+          };
         };
         services.nginx = {
           enable = true;
@@ -70,14 +81,6 @@ in
           virtualHosts."${acmeDomain}" = {
             forceSSL = true;
             enableACME = true;
-            serverAliases = trivial.pipe config.services.nginx.virtualHosts [
-              # include any configured NGINX virtual host that's configured to
-              # use the root domain ACME host.
-              (attrsets.filterAttrs
-                (_: attrsets.matchAttrs { useACMEHost = "${acmeDomain}"; }))
-              # just get the names of the virtual hosts.
-              attrNames
-            ];
           };
         };
       }
