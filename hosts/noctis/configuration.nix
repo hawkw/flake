@@ -6,7 +6,7 @@
 
   system.stateVersion = "22.11";
 
-  profiles = {
+  profiles = let rootDomain = "elizas.website"; in {
     docs.enable = true;
     games.enable = true;
     desktop = {
@@ -14,7 +14,15 @@
     };
     observability = {
       enable = true;
-      observer.enable = true;
+      observer = {
+        enable = true;
+        inherit rootDomain;
+      };
+    };
+    nginx = {
+      enable = true;
+      domain = rootDomain;
+      acmeSubdomain = "home";
     };
     # enable the correct perf tools for this kernel version
     perftools.enable = true;

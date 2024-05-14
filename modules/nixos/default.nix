@@ -12,6 +12,7 @@
     ./profiles/laptop.nix
     ./profiles/networking.nix
     ./profiles/nix-ld.nix
+    ./profiles/nginx.nix
     ./profiles/observability.nix
     ./profiles/perftools.nix
     ./profiles/vu-dials.nix
