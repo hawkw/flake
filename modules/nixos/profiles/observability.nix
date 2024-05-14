@@ -7,7 +7,16 @@ let
   cfgExporters = config.services.prometheus.exporters;
   # An attrset of all Prometheus exporters that are enabled.
   enabledExporters = attrsets.filterAttrs
-    (_: cfg: if isAttrs cfg then cfg.enable else false)
+    (name: cfg:
+      if
+      # The attribute named `unifi-poller` is deprecated in favor of
+      # `unipoller`, and accessing the config for it emits a warning, so we
+      # skip it to avoid that.
+        name != "unifi-poller" &&
+        # A couple of exporters are lists rather than attrsets, so avoid
+        # touching those, since it would be a type error.
+        isAttrs cfg
+      then cfg.enable else false)
     cfgExporters;
 
   mkAvahiService = { name, port, type }:
@@ -45,6 +54,10 @@ in
           openFirewall = mkDefault true;
         };
         smartctl = {
+          enable = mkDefault true;
+          openFirewall = mkDefault true;
+        };
+        systemd = {
           enable = mkDefault true;
           openFirewall = mkDefault true;
         };
