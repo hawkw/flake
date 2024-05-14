@@ -82,10 +82,10 @@ in
         let
           grafanaPort = config.services.grafana.settings.server.http_port;
           grafanaDomain = config.services.grafana.settings.server.domain;
-          promDomain = "prometheus.${rootDomain}";
+          promDomain = "prometheus.${cfg.observer.rootDomain}";
           promPort = config.services.prometheus.port;
           uptimeKumaPort = 3001;
-          uptimeKumaDomain = "uptime.${rootDomain}";
+          uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
         in
         {
           environment.systemPackages = with pkgs;
@@ -102,7 +102,7 @@ in
               "auth.anonymous".org_role = "Viewer";
 
               server = {
-                domain = "grafana.${rootDomain}";
+                domain = "grafana.${cfg.observer.rootDomain}";
                 serve_from_sub_path = true;
                 http_port = mkDefault 9094;
                 http_addr = "127.0.0.1";
@@ -179,7 +179,7 @@ in
             enable = true;
             settings = {
               pageInfo = {
-                title = "home.${rootDomain}";
+                title = "home.${cfg.observer.rootDomain}";
               };
               appConfig = {
                 # theme = "nord-frost";
@@ -253,7 +253,7 @@ in
 
           # nginx reverse proxy config to expose grafana
           security.acme.acceptTerms = true;
-          security.acme.defaults.email = "acme@${rootDomain}";
+          security.acme.defaults.email = "acme@${cfg.observer.rootDomain}";
           services.nginx = {
             enable = true;
             statusPage = true;
@@ -264,7 +264,7 @@ in
             recommendedProxySettings = true;
             recommendedTlsSettings = true;
 
-            virtualHosts."home.${rootDomain}" = {
+            virtualHosts."home.${cfg.observer.rootDomain}" = {
               forceSSL = true;
               enableACME = true;
               serverAliases = [ grafanaDomain promDomain ];
@@ -276,7 +276,7 @@ in
 
             virtualHosts.${grafanaDomain} = {
               forceSSL = true;
-              useACMEHost = "home.${rootDomain}";
+              useACMEHost = "home.${cfg.observer.rootDomain}";
               locations."/" = { };
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
@@ -290,7 +290,7 @@ in
 
             virtualHosts.${promDomain} = {
               forceSSL = true;
-              useACMEHost = "home.${rootDomain}";
+              useACMEHost = "home.${cfg.observer.rootDomain}";
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
                 proxyWebsockets = true;
@@ -303,7 +303,7 @@ in
 
             virtualHosts.${uptimeKumaDomain} = {
               forceSSL = true;
-              useACMEHost = "home.${rootDomain}";
+              useACMEHost = "home.${cfg.observer.rootDomain}";
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
                 proxyWebsockets = true;
@@ -314,9 +314,9 @@ in
               };
             };
 
-            virtualHosts."status.${rootDomain}" = {
+            virtualHosts."status.${cfg.observer.rootDomain}" = {
               forceSSL = true;
-              useACMEHost = "home.${rootDomain}";
+              useACMEHost = "home.${cfg.observer.rootDomain}";
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
                 proxyWebsockets = true;
