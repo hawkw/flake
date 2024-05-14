@@ -27,8 +27,6 @@
       espressif.enable = true;
       st-link.enable = true;
     };
-    tpm.enable = true;
-    framework-amd.enable = true;
   };
 
   #### Boot configuration ####
