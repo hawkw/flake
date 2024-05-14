@@ -40,7 +40,14 @@ in
 {
   options.profiles.observability = {
     enable = mkEnableOption "observability";
-    observer = mkEnableOption "observability collector";
+    observer = {
+      enable = mkEnableOption "observability collector";
+      rootDomain = mkOption {
+        type = types.str;
+        default = "elizas.website";
+        description = "The root domain for observability services.";
+      };
+    };
   };
 
   config = mkMerge [
@@ -75,7 +82,7 @@ in
         let
           grafanaPort = config.services.grafana.settings.server.http_port;
           grafanaDomain = config.services.grafana.settings.server.domain;
-          promDomain = "prometheus.elizas.website";
+          promDomain = "prometheus.${rootDomain}";
           promPort = config.services.prometheus.port;
         in
         {
@@ -93,7 +100,7 @@ in
               "auth.anonymous".org_role = "Viewer";
 
               server = {
-                domain = "grafana.elizas.website";
+                domain = "grafana.${rootDomain}";
                 serve_from_sub_path = true;
                 http_port = mkDefault 9094;
                 http_addr = "127.0.0.1";
@@ -143,7 +150,7 @@ in
             exporters = {
               nginx = {
                 enable = true;
-                port = 9113;
+                port = mkDefault 9113;
                 scrapeUri = "http://localhost/nginx_status";
               };
               nginxlog.enable = true;
@@ -170,7 +177,7 @@ in
             enable = true;
             settings = {
               pageInfo = {
-                title = "home.elizas.website";
+                title = "home.${rootDomain}";
               };
               appConfig = {
                 # theme = "nord-frost";
@@ -232,7 +239,7 @@ in
 
           # nginx reverse proxy config to expose grafana
           security.acme.acceptTerms = true;
-          security.acme.defaults.email = "eliza@elizas.website";
+          security.acme.defaults.email = "acme@${rootDomain}";
           services.nginx = {
             enable = true;
             statusPage = true;
@@ -243,7 +250,7 @@ in
             recommendedProxySettings = true;
             recommendedTlsSettings = true;
 
-            virtualHosts."home.elizas.website" = {
+            virtualHosts."home.${rootDomain}" = {
               forceSSL = true;
               enableACME = true;
               serverAliases = [ grafanaDomain promDomain ];
@@ -254,10 +261,8 @@ in
 
             virtualHosts.${grafanaDomain} = {
               forceSSL = true;
-              useACMEHost = "home.elizas.website";
-              locations."/" = {
-                root = "/var/www";
-              };
+              useACMEHost = "home.${rootDomain}";
+              locations."/" = { };
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
                 proxyWebsockets = true;
@@ -267,7 +272,7 @@ in
 
             virtualHosts.${promDomain} = {
               forceSSL = true;
-              useACMEHost = "home.elizas.website";
+              useACMEHost = "home.${rootDomain}";
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
                 proxyWebsockets = true;
