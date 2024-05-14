@@ -16,13 +16,9 @@ in
       addKeysToAgent = "yes";
       extraConfig = lib.optionalString _1passwordAgent.enable
         ''
-          # override IdentityAgent parameter for all hosts if forwarded SSH agent is present
-          Match host * exec "test -S ~/.ssh/ssh_auth_sock"
-              IdentityAgent ~/.ssh/ssh_auth_sock
-
-          # use 1password ssh agent as default
-          Match host *
-              IdentityAgent ${_1passwordAgent.path}
+          # Use 1password ssh agent if not on a SSH connection.
+          Match host * exec "test -Z $SSH_TTY"
+            IdentityAgent ${_1passwordAgent.path}
         '';
     };
   };
