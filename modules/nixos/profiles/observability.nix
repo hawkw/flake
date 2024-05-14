@@ -84,6 +84,8 @@ in
           grafanaDomain = config.services.grafana.settings.server.domain;
           promDomain = "prometheus.${rootDomain}";
           promPort = config.services.prometheus.port;
+          uptimeKumaPort = 3001;
+          uptimeKumaDomain = "uptime.${rootDomain}";
         in
         {
           environment.systemPackages = with pkgs;
@@ -208,11 +210,21 @@ in
                       icon = "hl-prometheus";
                       url = "https://${promDomain}";
                     }
+                    {
+                      title = "Uptime Kuma";
+                      icon = "hl-uptime-kuma";
+                      url = "https://${uptimeKumaDomain}";
+                    }
                   ];
                 }
               ];
 
             };
+          };
+
+          services.uptimeKuma = {
+            enable = true;
+            port = uptimeKumaPort;
           };
 
           services.avahi.extraServiceFiles = {
@@ -256,6 +268,7 @@ in
               serverAliases = [ grafanaDomain promDomain ];
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString config.services.dashy.port}/";
+
               };
             };
 
@@ -266,7 +279,10 @@ in
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
                 proxyWebsockets = true;
-                # extraConfig = "proxy_redirect default;";
+                extraConfig = ''
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-Host $host;
+                '';
               };
             };
 
@@ -276,7 +292,36 @@ in
               locations."/" = {
                 proxyPass = "http://127.0.0.1:${toString promPort}/";
                 proxyWebsockets = true;
-                # extraConfig = "proxy_redirect default;";
+                extraConfig = ''
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-Host $host;
+                '';
+              };
+            };
+
+            virtualHosts.${uptimeKumaDomain} = {
+              forceSSL = true;
+              useACMEHost = "home.${rootDomain}";
+              locations."/" = {
+                proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
+                proxyWebsockets = true;
+                extraConfig = ''
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-Host $host;
+                '';
+              };
+            };
+
+            virtualHosts."status.${rootDomain}" = {
+              forceSSL = true;
+              useACMEHost = "home.${rootDomain}";
+              locations."/" = {
+                proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
+                proxyWebsockets = true;
+                extraConfig = ''
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-Host $host;
+                '';
               };
             };
 
