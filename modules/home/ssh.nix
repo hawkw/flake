@@ -5,21 +5,27 @@ let
     path = "${config.home.homeDirectory}/.1password/agent.sock";
   };
 in
+with lib;
 {
   options.programs._1password-gui.enableSshAgent =
-    lib.mkEnableOption "Enable 1Password SSH Agent";
+    mkEnableOption "Enable 1Password SSH Agent";
 
-  config = {
+  config = mkIf _1passwordAgent.enable {
     programs.ssh = {
       enable = true;
       forwardAgent = _1passwordAgent.enable;
       addKeysToAgent = "yes";
-      extraConfig = lib.optionalString _1passwordAgent.enable
-        ''
-          # Use 1password ssh agent if not on a SSH connection.
-          Match host * exec "test -Z $SSH_TTY"
-            IdentityAgent ${_1passwordAgent.path}
-        '';
+      matchBlocks = {
+        "notSsh" = {
+          match = ''host * exec "test -z $SSH_CONNECTION"'';
+          extraOptions = {
+            IdentityAgent = _1passwordAgent.path;
+          };
+        };
+        "noctis" = {
+          host = "noctis";
+        };
+      };
     };
   };
 }
