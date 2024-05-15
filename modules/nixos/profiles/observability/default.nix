@@ -362,18 +362,18 @@ in
                 configuration = {
                   # TODO(eliza): auth?
                   auth_enabled = false;
-                  server = {
-                    http_listen_port = cfg.loki.port;
-                  };
-                  ingester = {
-                    lifecycler = {
-                      address = "0.0.0.0";
-                      ring = {
-                        kvstore.store = "inmemory";
-                        replication_factor = 1;
-                      };
-                      final_sleep = "0s";
+                  server.http_listen_port = cfg.loki.port;
+
+                  common = {
+                    ring = {
+                      instance_addr = "0.0.0.0";
+                      kvstore.store = "inmemory";
                     };
+                    replication_factor = 1;
+                    path_prefix = dataDir;
+                  };
+
+                  ingester = {
                     # Any chunk not receiving new logs in this time will be flushed
                     chunk_idle_period = "1h";
                     # All chunks will be flushed when they hit this age, default is 1h
@@ -387,6 +387,22 @@ in
                     # # Chunk transfers disabled
                     # max_transfer_retries = 0;
                   };
+
+                  schema_config =
+                    {
+                      configs = [
+                        {
+                          from = "2020-01-01";
+                          store = "boltdb-shipper";
+                          object_store = "filesystem";
+                          schema = "v13";
+                          index = {
+                            prefix = "index_";
+                            period = "168h";
+                          };
+                        }
+                      ];
+                    };
 
                   storage_config = {
                     boltdb_shipper = {
