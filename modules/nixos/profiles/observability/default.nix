@@ -42,7 +42,11 @@ in
     enable = mkEnableOption "observability";
 
     loki = {
-      enable = mkEnableOption "loki";
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable the Loki log aggregation service.";
+      };
       port = mkOption {
         type = types.int;
         default = 3100;
