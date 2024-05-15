@@ -102,7 +102,7 @@ in
           };
 
           clients = {
-            url = "http://noctis.local:${cfg.loki.port}/loki/api/v1/push";
+            url = "http://noctis.local:${toString cfg.loki.port}/loki/api/v1/push";
           };
 
           scrape_configs = {
