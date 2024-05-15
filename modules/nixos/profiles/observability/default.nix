@@ -84,7 +84,7 @@ in
       enabledExporters;
   }
 
-    (mkIf loki.enable {
+    (mkIf cfg.loki.enable {
       services.promtail = {
         enable = true;
         configuration = {
