@@ -396,7 +396,7 @@ in
                       schema = "v13";
                       index = {
                         prefix = "index_";
-                        period = "168h";
+                        period = "24h";
                       };
                     }
                   ];
