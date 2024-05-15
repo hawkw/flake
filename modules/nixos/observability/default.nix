@@ -41,9 +41,18 @@ in
 
   options.profiles.observability = {
     enable = mkEnableOption "observability";
+
+    loki = {
+      enable = mkEnableOption "loki";
+      port = mkOption {
+        type = types.int;
+        default = 3100;
+        description = "The port to run the Loki service on.";
+      };
+    };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf cfg.enable (mkMerge [{
     services.prometheus.exporters = {
       node = {
         enable = mkDefault true;
@@ -65,5 +74,40 @@ in
     services.avahi.extraServiceFiles = attrsets.mapAttrs'
       (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
       enabledExporters;
-  };
+  }
+    (mkIf loki.enable {
+      services.promtail = {
+        enable = true;
+        configuration = {
+          server = {
+            http_listen_port = 28183;
+            grpc_listen_port = 0;
+          };
+
+          positions = {
+            filename = "/tmp/positions.yaml";
+          };
+
+          clients = {
+            url = "http://noctis.local:${cfg.loki.port}/loki/api/v1/push";
+          };
+
+          scrape_configs = {
+            job_name = "journal";
+            journal = {
+              max_age = "12h";
+              labels = {
+                job = "systemd-journal";
+                host = config.networking.hostName;
+              };
+            };
+
+            relabel_configs = {
+              source_labels = [ "__journal__systemd_unit" ];
+              target_label = "unit";
+            };
+          };
+        };
+      };
+    })]);
 }
