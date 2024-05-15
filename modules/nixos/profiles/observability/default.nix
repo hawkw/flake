@@ -384,8 +384,8 @@ in
                     # Must be greater than index read cache TTL if using an index cache
                     # (Default index read cache TTL is 5m)
                     chunk_retain_period = "30s";
-                    # Chunk transfers disabled
-                    max_transfer_retries = 0;
+                    # # Chunk transfers disabled
+                    # max_transfer_retries = 0;
                   };
 
                   storage_config = {
@@ -406,9 +406,9 @@ in
                     reject_old_samples_max_age = "168h";
                   };
 
-                  chunk_store_config = {
-                    max_look_back_period = "0s";
-                  };
+                  # chunk_store_config = {
+                  #   max_look_back_period = "0s";
+                  # };
 
                   table_manager = {
                     retention_deletes_enabled = false;
