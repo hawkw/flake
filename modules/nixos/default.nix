@@ -13,7 +13,7 @@
     ./profiles/networking.nix
     ./profiles/nix-ld.nix
     ./profiles/nginx.nix
-    ./profiles/observability.nix
+    ./profiles/observability
     ./profiles/perftools.nix
     ./profiles/vu-dials.nix
     ./programs/openrgb.nix
