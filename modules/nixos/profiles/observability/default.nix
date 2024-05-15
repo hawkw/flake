@@ -342,7 +342,18 @@ in
 
           (mkIf cfg.loki.enable (
             let dataDir = config.services.loki.dataDir; in {
+
               networking.firewall.allowedTCPPorts = [ cfg.loki.port ];
+
+              services.grafana.provision.datasources.settings.datasources = [
+                {
+                  name = "Loki";
+                  type = "loki";
+                  access = "proxy";
+                  url = "http://127.0.0.1:${toString cfg.loki.port}";
+                }
+              ];
+
               services.loki = {
                 enable = true;
                 dataDir = mkDefault "/var/lib/loki";
