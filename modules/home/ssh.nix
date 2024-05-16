@@ -17,7 +17,7 @@ with lib;
       addKeysToAgent = "yes";
       matchBlocks = {
         "notSsh" = {
-          match = ''host * exec "test -z $SSH_CONNECTION"'';
+          # match = ''host * exec "test -z $SSH_CONNECTION"'';
           extraOptions = {
             IdentityAgent = _1passwordAgent.path;
           };
