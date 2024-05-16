@@ -426,16 +426,16 @@ in
                       }
                       {
                         labels = {
-                          remote_addr = { };
-                          remote_user = { };
-                          time_local = { };
-                          method = { };
-                          request = { };
-                          protocol = { };
-                          status = { };
-                          body_bytes_sent = { };
-                          http_referer = { };
-                          http_user_agent = { };
+                          remote_addr = "remote_addr";
+                          remote_user = "remote_user";
+                          time_local = "time_local";
+                          method = "method";
+                          request = "request";
+                          protocol = "protocol";
+                          status = "status";
+                          body_bytes_sent = "body_bytes_sent";
+                          http_referer = "http_referer";
+                          http_user_agent = "http_user_agent";
                         };
                       }
                     ];
