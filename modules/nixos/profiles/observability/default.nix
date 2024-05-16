@@ -18,22 +18,21 @@ let
       then cfg.enable else false)
     cfgExporters;
 
-  mkAvahiService = { name, port, type }:
+  mkPromAvahiService = { name, port }:
     ''
       <?xml version="1.0" standalone='no'?>
       <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
       <service-group>
-        <name replace-wildcards="yes">${name} on %h</name>
-        <service>
-          <type>${type}</type>
+        <name replace-wildcards="yes">Prometheus ${name}-exporter on %h</name>
+        <service protocol="any">
+          <type>_prometheus-http._tcp</type>
           <port>${toString port}</port>
         </service>
+        <txt-record>service=${name}</txt-record>
       </service-group>
     '';
-  promMdnsType = "_prometheus-http._tcp";
-  mkPromExporterAvahiService = (name: mkAvahiService {
-    name = "Prometheus ${name}-exporter";
-    type = promMdnsType;
+  mkPromExporterAvahiService = (name: mkPromAvahiService {
+    inherit name;
     port = cfgExporters.${name}.port;
   });
 in
@@ -150,11 +149,10 @@ in
       };
 
       # make an Avahi mDNS service for the Promtail metrics endpoint
-      services.avahi.extraServiceFiles.promtail-metrics = mkAvahiService
+      services.avahi.extraServiceFiles.promtail-metrics = mkPromAvahiService
         {
-          name = "Prometheus Promtail metrics";
+          name = "promtail";
           port = cfg.loki.promtailPort;
-          type = promMdnsType;
         };
 
       networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
@@ -223,14 +221,27 @@ in
                     files = [ mdnsJson ];
                     refresh_interval = "5m";
                   }];
+                  relabel_configs = [{
+                    source_labels = [ "__meta_service" ];
+                    target_label = "service";
+                  }];
                 }
+                # local services
                 {
                   job_name = "${config.networking.hostName}";
-                  static_configs = [{
-                    targets = attrsets.mapAttrsToList
-                      (_: exporter: "127.0.0.1:${toString exporter.port}")
-                      enabledExporters;
-                  }];
+                  static_configs = (attrsets.mapAttrsToList
+                    (name: exporter: {
+                      targets = [ "127.0.0.1:${toString exporter.port}" ];
+                      labels = {
+                        service = "${name}";
+                      };
+                    })
+                    enabledExporters) ++ [
+                    {
+                      targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
+                      labels = { service = "loki"; };
+                    }
+                  ];
 
                 }
               ];
