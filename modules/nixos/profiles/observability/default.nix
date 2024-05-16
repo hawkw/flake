@@ -409,14 +409,14 @@ in
             services.promtail.configuration.scrape_configs = [
               {
                 job_name = "nginx";
-                static_configs = {
+                static_configs = [{
                   targets = [ "localhost" ];
                   labels = {
                     __path__ = "/var/log/nginx/*.log";
                     host = config.networking.hostName;
                     job = "nginx";
                   };
-                };
+                }];
                 pipeline_stages = [{
                   match = {
                     selector = ''{__path__="/var/log/nginx/access.log"}'';
