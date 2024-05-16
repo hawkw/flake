@@ -30,9 +30,10 @@ let
         </service>
       </service-group>
     '';
+  promMdnsType = "_prometheus-http._tcp";
   mkPromExporterAvahiService = (name: mkAvahiService {
     name = "Prometheus ${name}-exporter";
-    type = "_prometheus-http._tcp";
+    type = promMdnsType;
     port = cfgExporters.${name}.port;
   });
 in
@@ -51,6 +52,12 @@ in
         type = types.int;
         default = 3100;
         description = "The port to run the Loki service on.";
+      };
+
+      promtailPort = mkOption {
+        type = types.int;
+        default = 28183;
+        description = "The port to run the Promtail service on.";
       };
     };
 
@@ -93,7 +100,7 @@ in
         enable = true;
         configuration = {
           server = {
-            http_listen_port = 28183;
+            http_listen_port = cfg.loki.promtailPort;
             grpc_listen_port = 0;
           };
 
@@ -120,6 +127,16 @@ in
           ];
         };
       };
+
+      # make an Avahi mDNS service for the Promtail metrics endpoint
+      services.avahi.extraServiceFiles.promtail-metrics = mkAvahiService
+        {
+          name = "Prometheus Promtail metrics";
+          port = cfg.loki.promtailPort;
+          type = promMdnsType;
+        };
+
+      networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
     })
 
     (mkIf cfg.observer.enable
