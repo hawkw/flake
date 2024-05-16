@@ -103,7 +103,7 @@ in
             grpc_listen_port = 0;
           };
 
-          clients = [{
+          clients = mkDefault [{
             url = "http://noctis.local:${toString cfg.loki.port}/loki/api/v1/push";
           }];
 
@@ -458,6 +458,10 @@ in
                   url = "http://127.0.0.1:${toString cfg.loki.port}";
                 }
               ];
+
+              services.promtail.configuration.clients = mkForce [{
+                url = "http://localhost:${toString cfg.loki.port}/loki/api/v1/push";
+              }];
 
               services.loki = {
                 enable = true;
