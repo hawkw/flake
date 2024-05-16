@@ -242,7 +242,23 @@ in
                       labels = { service = "loki"; };
                     }
                   ];
-
+                }
+                # tailscale dns
+                {
+                  job_name = "tailscale";
+                  scrape_interval = "10s";
+                  scrape_timeout = "8s";
+                  metrics_path = "/metrics";
+                  scheme = "http";
+                  http_sd_configs = (attrsets.mapAttrsToList
+                    (name: exporter: {
+                      targets = [ "theseus:${toString exporter.port}" ];
+                      labels = {
+                        service = "${name}";
+                        instance = "theseus";
+                      };
+                    })
+                    enabledExporters);
                 }
               ];
               exporters = {
