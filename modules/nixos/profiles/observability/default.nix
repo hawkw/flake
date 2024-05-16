@@ -113,16 +113,37 @@ in
               job_name = "journal";
               journal = {
                 max_age = "12h";
+                json = true;
                 labels = {
                   job = "systemd-journal";
                   host = "${config.networking.hostName}";
                 };
               };
 
-              relabel_configs = [{
-                source_labels = [ "__journal__systemd_unit" ];
-                target_label = "unit";
-              }];
+              relabel_configs = [
+                {
+                  source_labels = [ "__journal__systemd_unit" ];
+                  target_label = "unit";
+                }
+                {
+                  source_labels = [ "__journal_priority_keyword" ];
+                  target_label = "level";
+                }
+                {
+                  source_labels = [ "__journal_syslog_identifier" ];
+                  target_label = "syslog_identifier";
+                }
+              ];
+
+              pipeline_stages = [
+                # drop logs emitted by promtail itself.
+                {
+                  match = {
+                    selector = ''{unit="promtail.service"}'';
+                    action = "drop";
+                  };
+                }
+              ];
             }
           ];
         };
@@ -357,6 +378,44 @@ in
                 };
               };
             };
+
+            services.promtail.configuration.scrape_configs = [
+              {
+                job_name = "nginx";
+                static_configs = {
+                  targets = [ "localhost" ];
+                  labels = {
+                    __path__ = "/var/log/nginx/*.log";
+                    host = config.networking.hostName;
+                    job = "nginx";
+                  };
+                };
+                pipeline_stages = [{
+                  match = {
+                    selector = ''{__path__="/var/log/nginx/access.log"}'';
+                    stages = [
+                      {
+                        regex.expression = ''^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>.*)\] "(?P<method>[^ ]*) (?P<request>[^ ]*) (?P<protocol>[^ ]*)" (?P<status>[\d]+) (?P<body_bytes_sent>[\d]+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)'';
+                      }
+                      {
+                        labels = {
+                          remote_addr = { };
+                          remote_user = { };
+                          time_local = { };
+                          method = { };
+                          request = { };
+                          protocol = { };
+                          status = { };
+                          body_bytes_sent = { };
+                          http_referer = { };
+                          http_user_agent = { };
+                        };
+                      }
+                    ];
+                  };
+                }];
+              }
+            ];
           })
 
           (mkIf cfg.loki.enable (
