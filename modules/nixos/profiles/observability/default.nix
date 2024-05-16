@@ -419,7 +419,7 @@ in
                 }];
                 pipeline_stages = [{
                   match = {
-                    selector = ''{__path__="/var/log/nginx/access.log"}'';
+                    selector = ''{job="nginx"}'';
                     stages = [
                       {
                         regex.expression = ''^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>.*)\] "(?P<method>[^ ]*) (?P<request>[^ ]*) (?P<protocol>[^ ]*)" (?P<status>[\d]+) (?P<body_bytes_sent>[\d]+) "(?P<http_referer>[^\"]*)\" "(?P<http_user_agent>[^"]*)'';
