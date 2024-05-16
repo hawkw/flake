@@ -15,13 +15,8 @@ with lib;
       enable = true;
       forwardAgent = _1passwordAgent.enable;
       addKeysToAgent = "yes";
+      extraConfig = "IdentityAgent ${_1passwordAgent.path}";
       matchBlocks = {
-        "notSsh" = {
-          # match = ''host * exec "test -z $SSH_CONNECTION"'';
-          extraOptions = {
-            IdentityAgent = _1passwordAgent.path;
-          };
-        };
         "noctis" = {
           host = "noctis";
         };
