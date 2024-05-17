@@ -488,7 +488,14 @@ in
                   type = grafanaDataource;
                   access = "proxy";
                   url = "http://127.0.0.1:${toString port}";
-                }];
+                }
+                  # TODO until the VictoriaMetrics datasource works
+                  {
+                    name = "VictoriaMetrics Prometheus";
+                    type = "prometheus";
+                    access = "proxy";
+                    url = "http://127.0.0.1:${toString port}";
+                  }];
               };
 
 
