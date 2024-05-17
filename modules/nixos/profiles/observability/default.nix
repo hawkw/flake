@@ -360,7 +360,7 @@ in
             virtualisation.oci-containers.containers = {
               apple-health-ingester = {
                 image = "irvinlim/apple-health-ingester:v0.4.0";
-                extraOptions = [
+                cmd = [
                   "--backend.influxdb"
                   "--influxdb.serverURL=http://localhost:${toString victoriaPort}"
                   "--influxdb.orgName=eliza-networks"
