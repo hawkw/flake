@@ -498,7 +498,7 @@ in
                   cmd = [
                     "--log=debug"
                     "--backend.influxdb"
-                    "--influxdb.serverURL=http://localhost:${toString port}"
+                    "--influxdb.serverURL=http://host.docker.internal:${toString port}"
                     "--influxdb.orgName=eliza-networks"
                     "--influxdb.metricsBucketName=apple_health_metrics"
                     "--influxdb.workoutsBucketName=apple_health_workouts"
