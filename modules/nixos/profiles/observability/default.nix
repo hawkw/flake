@@ -169,6 +169,7 @@ in
           promPort = config.services.prometheus.port;
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
+          victoriaPort = 8428;
           scrapeConfigs = [
             # mDNS service discovery
             {
@@ -244,6 +245,12 @@ in
                   access = "proxy";
                   url = "http://127.0.0.1:${toString promPort}";
                 }
+                {
+                  name = "VictoriaMetrics";
+                  type = "victoriametrics-datasource";
+                  access = "proxy";
+                  url = "http://127.0.0.1:${toString victoriaPort}";
+                }
               ];
             };
 
@@ -265,6 +272,7 @@ in
             # and victoriametrics
             services.victoriametrics = {
               enable = true;
+              listenAddress = ":${toString victoriaPort}";
               extraOptions =
                 let
                   scrapeConfigFile = (pkgs.formats.yaml { }).generate "prom-scrape-config.yml" {
