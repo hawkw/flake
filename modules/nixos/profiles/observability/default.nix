@@ -238,6 +238,9 @@ in
                   admin_user = "admin";
                   admin_password = "admin";
                 };
+                plugins = {
+                  allow_loading_unsigned_plugins = "victoriametrics-datasource";
+                };
               };
               provision.datasources.settings.datasources = [
                 {
