@@ -29,7 +29,7 @@ let
           <port>${toString port}</port>
         </service>
         <txt-record>service=${name}</txt-record>
-        <txt-record>instance=${config.networking.hostName}.local</txt-record>
+        <txt-record>host=${config.networking.hostName}.local</txt-record>
       </service-group>
     '';
   mkPromExporterAvahiService = (name: mkPromAvahiService {
@@ -188,8 +188,8 @@ in
                   target_label = "service";
                 }
                 {
-                  source_labels = [ "__meta_instance" ];
-                  target_label = "instance";
+                  source_labels = [ "__meta_host" ];
+                  target_label = "host";
                 }
               ];
             }
