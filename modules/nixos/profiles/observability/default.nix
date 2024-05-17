@@ -362,7 +362,7 @@ in
                 image = "irvinlim/apple-health-ingester:v0.4.0";
                 extraOptions = [
                   "--backend.influxdb"
-                  "--influxdb.serverURL=http://localhost:${victoriaPort}"
+                  "--influxdb.serverURL=http://localhost:${toString victoriaPort}"
                   "--influxdb.orgName=eliza-networks"
                   "--influxdb.metricsBucketName=apple_health_metrics"
                   "--influxdb.workoutsBucketName=apple_health_workouts"
