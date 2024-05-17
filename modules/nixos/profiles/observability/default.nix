@@ -68,6 +68,18 @@ in
         default = "elizas.website";
         description = "The root domain for observability services.";
       };
+      victoriametrics = {
+        enable = mkOption {
+          type = types.bool;
+          default = true;
+          description = "Enable the VictoriaMetrics timeseries database.";
+        };
+        port = mkOption {
+          type = types.int;
+          default = 8428;
+          description = "VictoriaMetrics TSDB port";
+        };
+      };
     };
   };
 
@@ -169,7 +181,6 @@ in
           promPort = config.services.prometheus.port;
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
-          victoriaPort = 8428;
           appleHealthPort = 6969;
           scrapeConfigs = [
             # mDNS service discovery
@@ -238,9 +249,6 @@ in
                   admin_user = "admin";
                   admin_password = "admin";
                 };
-                plugins = {
-                  allow_loading_unsigned_plugins = "victoriametrics-datasource";
-                };
               };
               provision.datasources.settings.datasources = [
                 {
@@ -248,12 +256,6 @@ in
                   type = "prometheus";
                   access = "proxy";
                   url = "http://127.0.0.1:${toString promPort}";
-                }
-                {
-                  name = "VictoriaMetrics";
-                  type = "victoriametrics-datasource";
-                  access = "proxy";
-                  url = "http://127.0.0.1:${toString victoriaPort}";
                 }
               ];
             };
@@ -271,23 +273,6 @@ in
                 };
                 nginxlog.enable = config.services.nginx.enable;
               };
-            };
-
-            # and victoriametrics
-            services.victoriametrics = {
-              enable = true;
-              listenAddress = ":${toString victoriaPort}";
-              extraOptions =
-                let
-                  scrapeConfigFile = (pkgs.formats.yaml { }).generate "prom-scrape-config.yml" {
-                    scrape_configs = scrapeConfigs;
-                  };
-                in
-                [
-                  # required for victoriametrics to parse the config
-                  "-promscrape.config.strictParse=false"
-                  "-promscrape.config=${scrapeConfigFile}"
-                ];
             };
 
             systemd.services.prometheus-mdns = {
@@ -357,33 +342,6 @@ in
               enable = true;
               settings = {
                 PORT = toString uptimeKumaPort;
-              };
-            };
-
-            virtualisation.oci-containers.containers = {
-              apple-health-ingester = {
-                image = "irvinlim/apple-health-ingester:v0.4.0";
-                cmd = [
-                  "--backend.influxdb"
-                  "--influxdb.serverURL=http://localhost:${toString victoriaPort}"
-                  "--influxdb.orgName=eliza-networks"
-                  "--influxdb.metricsBucketName=apple_health_metrics"
-                  "--influxdb.workoutsBucketName=apple_health_workouts"
-                  "--http.listenAddr=:${toString appleHealthPort}"
-                  #                 ngester \
-                  # --backend.influxdb \
-                  # --influxdb.serverURL=http://localhost:8086 \
-                  # --influxdb.authToken=INFLUX_API_TOKEN \
-                  # --influxdb.orgName=my-org \
-                  # --influxdb.metricsBucketName=apple_health_metrics \
-                  # --influxdb.workoutsBucketName=apple_health_workouts
-                ];
-                environment = {
-                  TZ = "${config.time.timeZone}";
-                };
-                ports = [
-                  "${toString appleHealthPort}:${toString appleHealthPort}"
-                ];
               };
             };
           }
@@ -491,8 +449,77 @@ in
             ];
           })
 
+          (mkIf cfg.observer.victoriametrics.enable (
+            let
+              grafanaDataource = "victoriametrics-datasource";
+              port = cfg.observer.victoriametrics.port;
+            in
+            {
+              # VictoriaMetrics
+              services.victoriametrics = {
+                enable = true;
+                listenAddress = ":${toString port}";
+                extraOptions =
+                  let
+                    scrapeConfigFile = (pkgs.formats.yaml { }).generate "prom-scrape-config.yml" {
+                      scrape_configs = scrapeConfigs;
+                    };
+                  in
+                  [
+                    # required for victoriametrics to parse the config
+                    "-promscrape.config.strictParse=false"
+                    "-promscrape.config=${scrapeConfigFile}"
+                  ];
+              };
+
+              # add VictoriaMetrics datasource to Grafana.
+              services.grafana = {
+                settings.plugins = {
+                  # see https://docs.victoriametrics.com/grafana-datasource/#why-victoriametrics-datasource-is-unsigned
+                  allow_loading_unsigned_plugins = grafanaDataource;
+                };
+                provision.datasources.settings.datasources = [{
+                  name = "VictoriaMetrics";
+                  type = grafanaDataource;
+                  access = "proxy";
+                  url = "http://127.0.0.1:${toString port}";
+                }];
+              };
+
+
+              virtualisation.oci-containers.containers = {
+                apple-health-ingester = {
+                  image = "irvinlim/apple-health-ingester:v0.4.0";
+                  cmd = [
+                    "--log=debug"
+                    "--backend.influxdb"
+                    "--influxdb.serverURL=http://localhost:${toString port}"
+                    "--influxdb.orgName=eliza-networks"
+                    "--influxdb.metricsBucketName=apple_health_metrics"
+                    "--influxdb.workoutsBucketName=apple_health_workouts"
+                    "--http.listenAddr=:${toString appleHealthPort}"
+                    #                 ngester \
+                    # --backend.influxdb \
+                    # --influxdb.serverURL=http://localhost:8086 \
+                    # --influxdb.authToken=INFLUX_API_TOKEN \
+                    # --influxdb.orgName=my-org \
+                    # --influxdb.metricsBucketName=apple_health_metrics \
+                    # --influxdb.workoutsBucketName=apple_health_workouts
+                  ];
+                  environment = {
+                    TZ = "${config.time.timeZone}";
+                  };
+                  ports = [
+                    "${toString appleHealthPort}:${toString appleHealthPort}"
+                  ];
+                };
+              };
+            }
+          ))
+
           (mkIf cfg.loki.enable (
-            let dataDir = config.services.loki.dataDir; in {
+            let dataDir = config.services.loki.dataDir;
+            in {
 
               networking.firewall.allowedTCPPorts = [ cfg.loki.port ];
 
