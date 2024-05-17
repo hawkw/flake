@@ -344,7 +344,12 @@ in
                 PORT = toString uptimeKumaPort;
               };
             };
+
+            systemd.services.uptime-kuma.serviceConfig = {
+              SupplementaryGroups = "docker";
+            };
           }
+
 
           ### nginx virtual hosts for observer services ###
           (mkIf config.profiles.nginx.enable {
