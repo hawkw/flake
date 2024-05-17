@@ -29,6 +29,7 @@ let
           <port>${toString port}</port>
         </service>
         <txt-record>service=${name}</txt-record>
+        <txt-record>instance=${config.networking.hostName}.local</txt-record>
       </service-group>
     '';
   mkPromExporterAvahiService = (name: mkPromAvahiService {
@@ -221,10 +222,16 @@ in
                     files = [ mdnsJson ];
                     refresh_interval = "5m";
                   }];
-                  relabel_configs = [{
-                    source_labels = [ "__meta_service" ];
-                    target_label = "service";
-                  }];
+                  relabel_configs = [
+                    {
+                      source_labels = [ "__meta_service" ];
+                      target_label = "service";
+                    }
+                    {
+                      source_labels = [ "__meta_instance" ];
+                      target_label = "instance";
+                    }
+                  ];
                 }
                 # local services
                 {
@@ -243,23 +250,6 @@ in
                     }
                   ];
                 }
-                # # tailscale dns
-                # {
-                #   job_name = "tailscale";
-                #   scrape_interval = "10s";
-                #   scrape_timeout = "8s";
-                #   metrics_path = "/metrics";
-                #   scheme = "http";
-                #   http_sd_configs = (attrsets.mapAttrsToList
-                #     (name: exporter: {
-                #       targets = [ "theseus:${toString exporter.port}" ];
-                #       labels = {
-                #         service = "${name}";
-                #         instance = "theseus";
-                #       };
-                #     })
-                #     enabledExporters);
-                # }
               ];
               exporters = {
                 nginx = {
