@@ -169,6 +169,47 @@ in
           promPort = config.services.prometheus.port;
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
+          scrapeConfigs = [
+            # mDNS service discovery
+            {
+              job_name = "mdns-sd";
+              scrape_interval = "10s";
+              scrape_timeout = "8s";
+              metrics_path = "/metrics";
+              scheme = "http";
+              file_sd_configs = [{
+                files = [ mdnsJson ];
+                refresh_interval = "5m";
+              }];
+              relabel_configs = [
+                {
+                  source_labels = [ "__meta_service" ];
+                  target_label = "service";
+                }
+                {
+                  source_labels = [ "__meta_instance" ];
+                  target_label = "instance";
+                }
+              ];
+            }
+            # local services
+            {
+              job_name = "${config.networking.hostName}";
+              static_configs = (attrsets.mapAttrsToList
+                (name: exporter: {
+                  targets = [ "127.0.0.1:${toString exporter.port}" ];
+                  labels = {
+                    service = "${name}";
+                  };
+                })
+                enabledExporters) ++ [
+                {
+                  targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
+                  labels = { service = "loki"; };
+                }
+              ];
+            }
+          ];
         in
         mkMerge [
           {
@@ -210,47 +251,7 @@ in
             services.prometheus = {
               enable = true;
               port = mkDefault 9001;
-              scrapeConfigs = [
-                # mDNS service discovery
-                {
-                  job_name = "mdns-sd";
-                  scrape_interval = "10s";
-                  scrape_timeout = "8s";
-                  metrics_path = "/metrics";
-                  scheme = "http";
-                  file_sd_configs = [{
-                    files = [ mdnsJson ];
-                    refresh_interval = "5m";
-                  }];
-                  relabel_configs = [
-                    {
-                      source_labels = [ "__meta_service" ];
-                      target_label = "service";
-                    }
-                    {
-                      source_labels = [ "__meta_instance" ];
-                      target_label = "instance";
-                    }
-                  ];
-                }
-                # local services
-                {
-                  job_name = "${config.networking.hostName}";
-                  static_configs = (attrsets.mapAttrsToList
-                    (name: exporter: {
-                      targets = [ "127.0.0.1:${toString exporter.port}" ];
-                      labels = {
-                        service = "${name}";
-                      };
-                    })
-                    enabledExporters) ++ [
-                    {
-                      targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
-                      labels = { service = "loki"; };
-                    }
-                  ];
-                }
-              ];
+              inherit scrapeConfigs;
               exporters = {
                 nginx = {
                   enable = config.services.nginx.enable;
@@ -259,6 +260,22 @@ in
                 };
                 nginxlog.enable = config.services.nginx.enable;
               };
+            };
+
+            # and victoriametrics
+            services.victoriametrics = {
+              enable = true;
+              extraOptions =
+                let
+                  scrapeConfigFile = (pkgs.formats.yaml { }).generate "prom-scrape-config.yml" {
+                    scrape_configs = scrapeConfigs;
+                  };
+                in
+                [
+                  # required for victoriametrics to parse the config
+                  "-promscrape.config.strictParse=false"
+                  "-promscrape.config=${scrapeConfigFile}"
+                ];
             };
 
             systemd.services.prometheus-mdns = {
