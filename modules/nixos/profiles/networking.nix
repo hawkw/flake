@@ -32,10 +32,15 @@ in {
       # Strict reverse path filtering breaks Tailscale exit node use and some
       # subnet routing setups.
       firewall.checkReversePath = "loose";
+      firewall.trustedInterfaces = [
+        "docker0" # docker iface is basically loopback
+        "tailscale0Link" # tailscale
+      ];
 
       # enable mdns resolution for resolved on all connections
       # see https://man.archlinux.org/man/NetworkManager.conf.5#CONNECTION_SECTION
       networkmanager.connectionConfig."connection.mdns" = 2;
+
     };
 
     services = {

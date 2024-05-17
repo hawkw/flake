@@ -492,13 +492,13 @@ in
               };
 
 
-              virtualisation.oci-containers.containers = {
+              virtualisation.oci-containers.containers = let hostDnsName = "host.docker.internal"; in {
                 apple-health-ingester = {
                   image = "irvinlim/apple-health-ingester:v0.4.0";
                   cmd = [
                     "--log=debug"
                     "--backend.influxdb"
-                    "--influxdb.serverURL=http://host.docker.internal:${toString port}"
+                    "--influxdb.serverURL=http://${hostDnsName}:${toString port}"
                     "--influxdb.orgName=eliza-networks"
                     "--influxdb.metricsBucketName=apple_health_metrics"
                     "--influxdb.workoutsBucketName=apple_health_workouts"
@@ -516,6 +516,9 @@ in
                   };
                   ports = [
                     "${toString appleHealthPort}:${toString appleHealthPort}"
+                  ];
+                  extraOptions = [
+                    "--add-host=${hostDnsName}:host-gateway"
                   ];
                 };
               };
