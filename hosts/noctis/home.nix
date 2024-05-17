@@ -17,7 +17,15 @@
     };
   };
 
-  home.packages = with pkgs; [ lm_sensors wally-cli conky ];
+  home.packages = with pkgs; [
+    # not trying to build ESP32-C3 on this machine, so global clang is fine...
+    clang
+    # global pkgconfig too
+    pkg-config
+    pkg-configlm_sensors
+    wally-cli
+    conky
+  ];
 
   services = {
     gpg-agent = {
