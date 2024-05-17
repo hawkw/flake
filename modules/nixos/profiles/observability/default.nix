@@ -170,6 +170,7 @@ in
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
           victoriaPort = 8428;
+          appleHealthPort = 6969;
           scrapeConfigs = [
             # mDNS service discovery
             {
@@ -353,6 +354,33 @@ in
               enable = true;
               settings = {
                 PORT = toString uptimeKumaPort;
+              };
+            };
+
+            virtualisation.oci-containers.containers = {
+              apple-health-ingester = {
+                image = "irvinlim/apple-health-ingester:v0.4.0";
+                extraOptions = [
+                  "--backend.influxdb"
+                  "--influxdb.serverURL=http://localhost:${victoriaPort}"
+                  "--influxdb.orgName=eliza-networks"
+                  "--influxdb.metricsBucketName=apple_health_metrics"
+                  "--influxdb.workoutsBucketName=apple_health_workouts"
+                  "--http.listenAddr=:${toString appleHealthPort}"
+                  #                 ngester \
+                  # --backend.influxdb \
+                  # --influxdb.serverURL=http://localhost:8086 \
+                  # --influxdb.authToken=INFLUX_API_TOKEN \
+                  # --influxdb.orgName=my-org \
+                  # --influxdb.metricsBucketName=apple_health_metrics \
+                  # --influxdb.workoutsBucketName=apple_health_workouts
+                ];
+                environment = {
+                  TZ = "${config.time.timeZone}";
+                };
+                ports = [
+                  "${toString appleHealthPort}:${toString appleHealthPort}"
+                ];
               };
             };
           }
