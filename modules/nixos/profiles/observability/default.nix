@@ -474,6 +474,10 @@ in
                     # required for victoriametrics to parse the config
                     "-promscrape.config.strictParse=false"
                     "-promscrape.config=${scrapeConfigFile}"
+                    # rename influxdb metrics names to not be malformed in
+                    # prometheus
+                    # e.g. change `/` to `_`, etc
+                    "-usePromCompatibleNaming=true"
                   ];
               };
 
