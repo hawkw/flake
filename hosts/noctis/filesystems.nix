@@ -53,5 +53,10 @@
     fsType = "xfs";
   };
 
-  swapDevices = [ ];
+  swapDevices = [
+    {
+      device = "/dev/disk/by-id/nvme-ADATA_SX8100NP_2J4620041364-part2";
+      randomEncryption.enable = true;
+    }
+  ];
 }
