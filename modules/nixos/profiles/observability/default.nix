@@ -382,9 +382,15 @@ in
                 PORT = toString uptimeKumaPort;
               };
             };
-
-            systemd.services.uptime-kuma.serviceConfig = {
-              SupplementaryGroups = "docker";
+            # service configs for uptime-kuma that the upstream NixOS module
+            # doesn't have options for
+            systemd.services.uptime-kuma = {
+              # add the 'docker' group so that `uptime-kuma` can monitor local
+              # Docker containers' up-ness.
+              serviceConfig.SupplementaryGroups = "docker";
+              # add tailscale to the PATH so that the tailscale ping thingy
+              # works.
+              paths = [ pkgs.tailscale ];
             };
           }
 
