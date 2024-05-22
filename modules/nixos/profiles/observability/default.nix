@@ -188,34 +188,35 @@ in
                 targets = [ "${hostName}:${toString exporter.port}" ];
                 labels = {
                   service = "${name}";
+                  host = "${hostName}";
                 };
               })
               enabledExporters))
             (concatLists)
           ];
           scrapeConfigs = [
-            # mDNS service discovery
-            {
-              job_name = "mdns-sd";
-              scrape_interval = "10s";
-              scrape_timeout = "8s";
-              metrics_path = "/metrics";
-              scheme = "http";
-              file_sd_configs = [{
-                files = [ mdnsJson ];
-                refresh_interval = "5m";
-              }];
-              relabel_configs = [
-                {
-                  source_labels = [ "__meta_service" ];
-                  target_label = "service";
-                }
-                {
-                  source_labels = [ "__meta_host" ];
-                  target_label = "host";
-                }
-              ];
-            }
+            # # mDNS service discovery
+            # {
+            #   job_name = "mdns-sd";
+            #   scrape_interval = "10s";
+            #   scrape_timeout = "8s";
+            #   metrics_path = "/metrics";
+            #   scheme = "http";
+            #   file_sd_configs = [{
+            #     files = [ mdnsJson ];
+            #     refresh_interval = "5m";
+            #   }];
+            #   relabel_configs = [
+            #     {
+            #       source_labels = [ "__meta_service" ];
+            #       target_label = "service";
+            #     }
+            #     {
+            #       source_labels = [ "__meta_host" ];
+            #       target_label = "host";
+            #     }
+            #   ];
+            # }
             # tailscale service discovery
             {
               job_name = "tailscale";
@@ -224,23 +225,39 @@ in
               metrics_path = "/metrics";
               scheme = "http";
               static_configs = tailscaleScrapeTargets;
+              relabel_configs = [
+                {
+                  source_labels = [ "__address__" ];
+                  target_label = "address";
+                }
+                {
+                  source_labels = [ "host" ];
+                  target_label = "instance";
+                }
+              ];
             }
             # local services
             {
               job_name = "${config.networking.hostName}";
-              static_configs = (attrsets.mapAttrsToList
-                (name: exporter: {
-                  targets = [ "127.0.0.1:${toString exporter.port}" ];
-                  labels = {
-                    service = "${name}";
-                  };
-                })
-                enabledExporters) ++ [
-                {
-                  targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
-                  labels = { service = "loki"; };
-                }
-              ];
+              static_configs =
+                # (attrsets.mapAttrsToList
+                #   (name: exporter: {
+                #     targets = [ "127.0.0.1:${toString exporter.port}" ];
+                #     labels = {
+                #       service = "${name}";
+                #       host = "${config.networking.hostName}";
+                #     };
+                #   })
+                #   enabledExporters) ++
+                [
+                  {
+                    targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
+                    labels = {
+                      service = "loki";
+                      host = "${config.networking.hostName}";
+                    };
+                  }
+                ];
             }
           ];
         in
