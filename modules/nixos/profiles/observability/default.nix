@@ -1,23 +1,22 @@
-{ config, lib, pkgs, allHostConfigs, ... }:
+{ config, lib, pkgs, self, ... }:
 
 with lib;
 let
   cfg = config.profiles.observability;
   cfgExporters = config.services.prometheus.exporters;
   # An attrset of all Prometheus exporters that are enabled.
-  enabledExporters =
-    (conf: attrsets.filterAttrs
-      (name: cfg:
-        if
-        # The attribute named `unifi-poller` is deprecated in favor of
-        # `unipoller`, and accessing the config for it emits a warning, so we
-        # skip it to avoid that.
-          name != "unifi-poller" &&
-          # A couple of exporters are lists rather than attrsets, so avoid
-          # touching those, since it would be a type error.
-          isAttrs cfg
-        then cfg.enable else false)
-      conf.services.prometheus.exporters);
+  enabledExporters = attrsets.filterAttrs
+    (name: cfg:
+      if
+      # The attribute named `unifi-poller` is deprecated in favor of
+      # `unipoller`, and accessing the config for it emits a warning, so we
+      # skip it to avoid that.
+        name != "unifi-poller" &&
+        # A couple of exporters are lists rather than attrsets, so avoid
+        # touching those, since it would be a type error.
+        isAttrs cfg
+      then cfg.enable else false)
+    cfgExporters;
 
   mkPromAvahiService = { name, port }:
     ''
@@ -105,7 +104,7 @@ in
     # make an Avahi mDNS service for each enabled Prometheus exporter.
     services.avahi.extraServiceFiles = attrsets.mapAttrs'
       (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
-      (enabledExporters config);
+      enabledExporters;
   }
 
     (mkIf cfg.loki.enable {
@@ -183,21 +182,19 @@ in
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
           appleHealthPort = 6969;
-          tailscaleScrapeTargets =
-            let
-              mkHostExporters = (instance: config:
-                let
-                  mkExporter =
-                    (service: exporter: {
-                      targets = [ "${instance}:${toString exporter.port}" ];
-                      labels = {
-                        inherit instance service;
-                      };
-                    });
-                in
-                mapAttrsToList mkExporter (enabledExporters config));
-            in
-            concatLists (mapAttrsToList mkHostExporters allHostConfigs);
+          tailscaleScrapeTargets = trivial.pipe self.nixosConfigurations [
+            # (x: builtins.trace x.config x)
+            # (attrsets.filterAttrs (_: system: system.config.profiles.observability.enable))
+            (mapAttrsToList (instance: config: attrsets.mapAttrsToList
+              (service: exporter: {
+                targets = [ "${instance}:${toString exporter.port}" ];
+                labels = {
+                  inherit instance service;
+                };
+              })
+              enabledExporters))
+            (concatLists)
+          ];
           scrapeConfigs = [
             # # mDNS service discovery
             # {
