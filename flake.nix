@@ -61,14 +61,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # depend on the latest `atuin` in order to enable daemon mode
-    atuin = {
-      url = "github:atuin-sh/atuin/main";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
+    # # depend on the latest `atuin` in order to enable daemon mode
+    # atuin = {
+    #   url = "github:atuin-sh/atuin/main";
+    #   inputs = {
+    #     nixpkgs.follows = "nixpkgs";
+    #     flake-utils.follows = "flake-utils";
+    #   };
+    # };
   };
 
   ############################################################################
@@ -88,7 +88,7 @@
       overlays = [
         (import ./pkgs/overlay.nix)
         rust-overlay.overlays.default
-        inputs.atuin.overlays.default
+        # inputs.atuin.overlays.default
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
