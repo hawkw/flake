@@ -183,12 +183,11 @@ in
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
           appleHealthPort = 6969;
           tailscaleScrapeTargets = trivial.pipe self.nixosConfigurations [
-            (mapAttrsToList (hostName: _: attrsets.mapAttrsToList
-              (name: exporter: {
-                targets = [ "${hostName}:${toString exporter.port}" ];
+            (mapAttrsToList (instance: _: attrsets.mapAttrsToList
+              (service: exporter: {
+                targets = [ "${instance}:${toString exporter.port}" ];
                 labels = {
-                  service = "${name}";
-                  host = "${hostName}";
+                  inherit instance service;
                 };
               })
               enabledExporters))
@@ -230,10 +229,6 @@ in
                   source_labels = [ "__address__" ];
                   target_label = "address";
                 }
-                {
-                  source_labels = [ "host" ];
-                  target_label = "instance";
-                }
               ];
             }
             # local services
@@ -254,7 +249,7 @@ in
                     targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
                     labels = {
                       service = "loki";
-                      host = "${config.networking.hostName}";
+                      instance = "${config.networking.hostName}";
                     };
                   }
                 ];
