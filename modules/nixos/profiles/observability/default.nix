@@ -185,7 +185,7 @@ in
           tailscaleScrapeTargets = trivial.pipe self.nixosConfigurations [
             (mapAttrsToList (hostName: _: attrsets.mapAttrsToList
               (name: exporter: {
-                targets = [ "1${hostName}:${toString exporter.port}" ];
+                targets = [ "${hostName}:${toString exporter.port}" ];
                 labels = {
                   service = "${name}";
                 };
