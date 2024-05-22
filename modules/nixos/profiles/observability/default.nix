@@ -42,6 +42,7 @@ in
 
   options.profiles.observability = {
     enable = mkEnableOption "observability";
+    prometheusMdns.enable = mkEnableOption "Prometheus mDNS service discovery";
 
     loki = {
       enable = mkOption {
@@ -73,7 +74,7 @@ in
         enable = mkOption {
           type = types.bool;
           default = true;
-          description = "Enable the VictoriaMetrics timeseries database.";
+          description = "use VictoriaMetrics as the timeseries database (instead of Prometheus).";
         };
         port = mkOption {
           type = types.int;
@@ -84,30 +85,36 @@ in
     };
   };
 
-  config = mkIf cfg.enable (mkMerge [{
-    services.prometheus.exporters = {
-      node = {
-        enable = mkDefault true;
-        enabledCollectors = [ "systemd" "zfs" ];
-        port = mkDefault 9002;
-        openFirewall = mkDefault true;
+  config = mkIf cfg.enable (mkMerge [
+    #### OBSERVEE: default prometheus exporters ####
+    {
+      services.prometheus.exporters = {
+        node = {
+          enable = mkDefault true;
+          enabledCollectors = [ "systemd" "zfs" ];
+          port = mkDefault 9002;
+          openFirewall = mkDefault true;
+        };
+        smartctl = {
+          enable = mkDefault true;
+          openFirewall = mkDefault true;
+        };
+        systemd = {
+          enable = mkDefault true;
+          openFirewall = mkDefault true;
+        };
       };
-      smartctl = {
-        enable = mkDefault true;
-        openFirewall = mkDefault true;
-      };
-      systemd = {
-        enable = mkDefault true;
-        openFirewall = mkDefault true;
-      };
-    };
+    }
 
-    # make an Avahi mDNS service for each enabled Prometheus exporter.
-    services.avahi.extraServiceFiles = attrsets.mapAttrs'
-      (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
-      (enabledExporters config);
-  }
+    #### OBSERVEE: prometheus mDNS ####
+    (mkIf cfg.prometheusMdns.enable {
+      # make an Avahi mDNS service for each enabled Prometheus exporter.
+      services.avahi.extraServiceFiles = mkIf cfg.prometheusMdns.enable (attrsets.mapAttrs'
+        (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
+        (enabledExporters config));
+    })
 
+    #### OBSERVEE: promtail loki exporter ####
     (mkIf cfg.loki.enable {
       services.promtail = {
         enable = true;
@@ -118,7 +125,7 @@ in
           };
 
           clients = mkDefault [{
-            url = "http://noctis.local:${toString cfg.loki.port}/loki/api/v1/push";
+            url = "http://noctis:${toString cfg.loki.port}/loki/api/v1/push";
           }];
 
           scrape_configs = [
@@ -169,9 +176,10 @@ in
           port = cfg.loki.promtailPort;
         };
 
-      networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
+      # networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
     })
 
+    #### OBSERVER ############################################################
     (mkIf cfg.observer.enable
       (
         let
@@ -200,28 +208,6 @@ in
             in
             concatLists (mapAttrsToList mkHostExporters allHostConfigs);
           scrapeConfigs = [
-            # # mDNS service discovery
-            # {
-            #   job_name = "mdns-sd";
-            #   scrape_interval = "10s";
-            #   scrape_timeout = "8s";
-            #   metrics_path = "/metrics";
-            #   scheme = "http";
-            #   file_sd_configs = [{
-            #     files = [ mdnsJson ];
-            #     refresh_interval = "5m";
-            #   }];
-            #   relabel_configs = [
-            #     {
-            #       source_labels = [ "__meta_service" ];
-            #       target_label = "service";
-            #     }
-            #     {
-            #       source_labels = [ "__meta_host" ];
-            #       target_label = "host";
-            #     }
-            #   ];
-            # }
             # tailscale service discovery
             {
               job_name = "tailscale";
@@ -241,15 +227,6 @@ in
             {
               job_name = "${config.networking.hostName}";
               static_configs =
-                # (attrsets.mapAttrsToList
-                #   (name: exporter: {
-                #     targets = [ "127.0.0.1:${toString exporter.port}" ];
-                #     labels = {
-                #       service = "${name}";
-                #       host = "${config.networking.hostName}";
-                #     };
-                #   })
-                #   enabledExporters) ++
                 [
                   {
                     targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
@@ -263,6 +240,7 @@ in
           ];
         in
         mkMerge [
+          #### OBSERVER: defaults ####
           {
             environment.systemPackages = with pkgs;
               [ prometheusMdns ];
@@ -288,45 +266,16 @@ in
                   admin_password = "admin";
                 };
               };
-              provision.datasources.settings.datasources = [
-                {
-                  name = "Prometheus";
-                  type = "prometheus";
-                  access = "proxy";
-                  url = "http://127.0.0.1:${toString promPort}";
-                }
-              ];
             };
 
             # prometheus
-            services.prometheus = {
-              enable = true;
-              port = mkDefault 9001;
-              inherit scrapeConfigs;
-              exporters = {
-                nginx = {
-                  enable = config.services.nginx.enable;
-                  port = mkDefault 9113;
-                  scrapeUri = "http://localhost/nginx_status";
-                };
-                nginxlog.enable = config.services.nginx.enable;
+            services.prometheus.exporters = {
+              nginx = {
+                enable = config.services.nginx.enable;
+                port = mkDefault 9113;
+                scrapeUri = "http://localhost/nginx_status";
               };
-            };
-
-            systemd.services.prometheus-mdns = {
-              enable = true;
-              description = "Prometheus mDNS service discovery";
-              unitConfig = { Type = "simple"; };
-              # prometheus will warn if the scrape target file is missing, so ensure this
-              # service starts first.
-              before = [ "prometheus.service" ];
-              serviceConfig = {
-                ExecStart = ''
-                  ${pkgs.prometheusMdns}/bin/prometheus-mdns-sd -out ${mdnsJson}
-                '';
-                Restart = "always";
-              };
-              wantedBy = [ "multi-user.target" ];
+              nginxlog.enable = config.services.nginx.enable;
             };
 
             services.dashy = {
@@ -390,11 +339,77 @@ in
               serviceConfig.SupplementaryGroups = "docker";
               # add tailscale to the PATH so that the tailscale ping thingy
               # works.
-              paths = [ pkgs.tailscale ];
+              path = [ pkgs.tailscale ];
             };
           }
+          #### OBSERVER: prometheus mDNS service discovery ####
+          (mkIf cfg.prometheusMdns.enable {
+            services.prometheus.scrapeConfigs = [
+              # mDNS service discovery
+              {
+                job_name = "mdns-sd";
+                scrape_interval = "10s";
+                scrape_timeout = "8s";
+                metrics_path = "/metrics";
+                scheme = "http";
+                file_sd_configs = [{
+                  files = [ mdnsJson ];
+                  refresh_interval = "5m";
+                }];
+                relabel_configs = [
+                  {
+                    source_labels = [ "__meta_service" ];
+                    target_label = "service";
+                  }
+                  {
+                    source_labels = [ "__meta_host" ];
+                    target_label = "host";
+                  }
+                ];
+              }
+            ];
+            systemd.services.prometheus-mdns = {
+              enable = true;
+              description = "Prometheus mDNS service discovery";
+              unitConfig = { Type = "simple"; };
+              # prometheus will warn if the scrape target file is missing, so ensure this
+              # service starts first.
+              before = [ "prometheus.service" ];
+              serviceConfig = {
+                ExecStart = ''
+                  ${pkgs.prometheusMdns}/bin/prometheus-mdns-sd -out ${mdnsJson}
+                '';
+                Restart = "always";
+              };
+              wantedBy = [ "multi-user.target" ];
+            };
 
+          })
 
+          #### OBSERVER: prometheus as prometheus collector (not victoriametrics) ####
+          (mkIf (!cfg.observer.victoriametrics.enable) {
+            services.prometheus = {
+              enable = true;
+              port = mkDefault 9001;
+              inherit scrapeConfigs;
+            };
+            services.nginx.virtualHosts.${promDomain} = {
+              forceSSL = true;
+              useACMEHost = "home.${cfg.observer.rootDomain}";
+              locations."/" = {
+                proxyPass = "http://127.0.0.1:${toString promPort}/";
+                proxyWebsockets = true;
+              };
+            };
+            services.grafana.provision.datasources.settings.datasources = [
+              {
+                name = "Prometheus";
+                type = "prometheus";
+                access = "proxy";
+                url = "http://127.0.0.1:${toString promPort}";
+              }
+            ];
+          })
           ### nginx virtual hosts for observer services ###
           (mkIf config.profiles.nginx.enable {
             services.nginx.virtualHosts = {
@@ -414,14 +429,6 @@ in
                 };
               };
 
-              ${promDomain} = {
-                forceSSL = true;
-                useACMEHost = "home.${cfg.observer.rootDomain}";
-                locations."/" = {
-                  proxyPass = "http://127.0.0.1:${toString promPort}/";
-                  proxyWebsockets = true;
-                };
-              };
 
               ${uptimeKumaDomain} = {
                 forceSSL = true;
@@ -675,5 +682,6 @@ in
             }
           ))
         ]
-      ))]);
+      ))
+  ]);
 }
