@@ -183,6 +183,7 @@ in
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
           appleHealthPort = 6969;
           tailscaleScrapeTargets = trivial.pipe self.nixosConfigurations [
+            lib.debug.traceVal
             (mapAttrsToList (instance: _: attrsets.mapAttrsToList
               (service: exporter: {
                 targets = [ "${instance}:${toString exporter.port}" ];
