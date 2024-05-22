@@ -25,6 +25,7 @@ in
   # include it if it has a default.nix.
   genNixOSHosts =
     { inputs
+    , self
     , directory ? "${inputs.self}/hosts"
     , nixpkgs ? inputs.nixpkgs
     , builder ? nixpkgs.lib.nixosSystem
@@ -32,14 +33,13 @@ in
     , baseModules ? [ ]
     , overlays ? [ ]
     , config ? { allowUnfree = true; }
-    ,
     }:
     let
       mkHost = { system, modules, hostname, }:
         builder {
           inherit system;
 
-          specialArgs = { inherit inputs; } // specialArgs;
+          specialArgs = { inherit inputs self; } // specialArgs;
 
           modules = [
             ({ ... }: {

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, self, ... }:
 
 with lib;
 let
@@ -182,6 +182,17 @@ in
           uptimeKumaPort = 3001;
           uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
           appleHealthPort = 6969;
+          tailscaleScrapeTargets = trivial.pipe self.nixosConfigurations [
+            (mapAttrsToList (hostName: _: attrsets.mapAttrsToList
+              (name: exporter: {
+                targets = [ "1${hostName}:${toString exporter.port}" ];
+                labels = {
+                  service = "${name}";
+                };
+              })
+              enabledExporters))
+            (concatLists)
+          ];
           scrapeConfigs = [
             # mDNS service discovery
             {
@@ -204,6 +215,15 @@ in
                   target_label = "host";
                 }
               ];
+            }
+            # tailscale service discovery
+            {
+              job_name = "tailscale";
+              scrape_interval = "10s";
+              scrape_timeout = "8s";
+              metrics_path = "/metrics";
+              scheme = "http";
+              static_configs = tailscaleScrapeTargets;
             }
             # local services
             {
