@@ -102,7 +102,7 @@
       ## NixOS ##
       ###########
       nixosConfigurations = self.lib.genNixOSHosts {
-        inherit inputs config overlays self;
+        inherit inputs config overlays;
 
         baseModules = [
           utils.nixosModules.autoGenFromInputs

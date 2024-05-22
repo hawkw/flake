@@ -1,5 +1,5 @@
 let
-  inherit (builtins) readDir hasAttr attrNames filter concatMap listToAttrs;
+  inherit (builtins) readDir hasAttr attrNames filter concatMap listToAttrs mapAttrs;
 
   loadHosts = dir: inputs:
     let
@@ -20,26 +20,47 @@ let
       hosts';
 in
 {
+  # A list of all NixOS configurations
+  allNixOSConfigs = { inputs, directory ? "${inputs.self}/hosts" }:
+    let
+      hosts = loadHosts directory inputs;
+      attrifyConf = (conf: {
+        name = conf.hostname;
+        value = removeAttrs [ "home " ] conf;
+      });
+      hostAttrs = map attrifyConf hosts;
+    in
+    listToAttrs hostAttrs;
+
   # Discover NixOS configurations.
   # It will find all sub-directories in `directory` and
   # include it if it has a default.nix.
   genNixOSHosts =
     { inputs
-    , self
     , directory ? "${inputs.self}/hosts"
     , nixpkgs ? inputs.nixpkgs
     , builder ? nixpkgs.lib.nixosSystem
     , specialArgs ? { }
     , baseModules ? [ ]
     , overlays ? [ ]
-    , config ? { allowUnfree = true; }
+    , config ? {
+        allowUnfree = true;
+      }
     }:
     let
+      hosts = loadHosts directory inputs;
+      attrifyConf = (conf: {
+        name = conf.hostname;
+        value = removeAttrs conf [ "home" ];
+      });
+      # A list of all NixOS configurations
+      allHosts = listToAttrs (map attrifyConf hosts);
+      allHostConfigs = mapAttrs (_: value: value.system.config) allHosts;
       mkHost = { system, modules, hostname, }:
         builder {
           inherit system;
 
-          specialArgs = { inherit inputs self; } // specialArgs;
+          specialArgs = { inherit inputs allHostConfigs; } // specialArgs;
 
           modules = [
             ({ ... }: {
@@ -50,12 +71,7 @@ in
           ] ++ baseModules ++ modules;
         };
     in
-    listToAttrs (map
-      (conf: {
-        name = conf.hostname;
-        value = mkHost (removeAttrs conf [ "home" ]);
-      })
-      (loadHosts directory inputs));
+    mapAttrs (_: conf: mkHost conf) allHosts;
 
   # Discover home-manager configurations.
   # It will find all sub-directories in `directory` and
@@ -70,7 +86,9 @@ in
     , specialArgs ? { }
     , baseModules ? [ ]
     , overlays ? [ ]
-    , config ? { allowUnfree = true; }
+    , config ? {
+        allowUnfree = true;
+      }
     ,
     }:
     let
