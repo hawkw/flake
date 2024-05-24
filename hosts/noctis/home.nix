@@ -22,7 +22,7 @@
     clang
     # global pkgconfig too
     pkg-config
-    pkg-configlm_sensors
+    lm_sensors
     wally-cli
     conky
   ];
