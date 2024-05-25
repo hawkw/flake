@@ -17,6 +17,7 @@
     };
     vu-dials.enable = true;
     observability.enable = true;
+    arm-cross-dev.enable = true;
   };
 
   hardware = {

@@ -7,6 +7,7 @@
     ./hardware/tpm.nix
     ./hardware/probes.nix
     ./profiles/desktop
+    ./profiles/arm-cross-dev.nix
     ./profiles/docs.nix
     ./profiles/games.nix
     ./profiles/laptop.nix
