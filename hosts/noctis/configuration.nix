@@ -68,11 +68,20 @@
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
     useDHCP = false;
-    interfaces = {
-      enp5s0.useDHCP = true;
-      wlp4s0.useDHCP = true;
-    };
-
+    interfaces =
+      let
+        wakeOnLan = {
+          enable = true;
+          policy = [ "unicast" "magic" ];
+        };
+      in
+      {
+        enp5s0 = { inherit wakeOnLan; useDHCP = true; };
+        enp7s0 = { inherit wakeOnLan; useDHCP = true; };
+        enp8s0f1u1u1u2 = { inherit wakeOnLan; useDHCP = true; };
+        wlp4s0 = { useDHCP = true; };
+        wlp7s0 = { useDHCP = true; };
+      };
   };
 
   # This is a deskop machine. Use the high-performance frequency profile rather
