@@ -77,6 +77,15 @@
     #     flake-utils.follows = "flake-utils";
     #   };
     # };
+
+    eclssd = {
+      url = "github:hawkw/eclssd";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        rust-overlay.follows = "rust-overlay";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
   ############################################################################
@@ -118,6 +127,7 @@
           home.nixosModules.home-manager
           inputs.vu-server.nixosModules.default
           inputs.vupdaters.nixosModules.default
+          inputs.eclssd.nixosModules.default
         ];
       };
 

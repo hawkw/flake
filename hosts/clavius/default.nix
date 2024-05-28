@@ -7,5 +7,5 @@
     nixos-raspberrypi.nixosModules.base
   ];
 
-  # home.modules = [ ./home.nix ];
+  home.modules = [ ./home.nix ];
 }

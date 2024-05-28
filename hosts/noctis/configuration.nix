@@ -105,4 +105,10 @@
   services.gnome.gnome-keyring.enable = lib.mkForce false;
   security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
 
+  users.motd = ''
+    ┌┬────────────────┐
+    ││ ELIZA NETWORKS │ ${config.networking.hostName}: workstation
+    └┴────────────────┘
+  '';
+
 }

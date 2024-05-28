@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 {
   imports = [
@@ -78,6 +78,12 @@
 
   # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
   networking.wireless.enable = lib.mkForce false;
+
+  users.motd = ''
+    ┌┬────────────────┐
+    ││ ELIZA NETWORKS │ ${config.networking.hostName}: mobile workstation
+    └┴────────────────┘
+  '';
 
   # As of firmware v03.03, a bug in the EC causes the system to wake if AC is
   # connected despite the lid being closed. The following works around this,
