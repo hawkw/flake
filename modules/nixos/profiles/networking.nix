@@ -24,7 +24,7 @@ in {
       # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
       # Open ports in the firewall.
-      # networking.firewall.allowedTCPPorts = [ ... ];
+      # .allowedTCPPorts = [ ... ];
       # networking.firewall.allowedUDPPorts = [ ... ];
       # Or disable the firewall altogether.
       # networking.firewall.enable = false;
@@ -40,7 +40,6 @@ in {
       # enable mdns resolution for resolved on all connections
       # see https://man.archlinux.org/man/NetworkManager.conf.5#CONNECTION_SECTION
       networkmanager.connectionConfig."connection.mdns" = 2;
-
     };
 
     services = {
