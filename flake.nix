@@ -15,6 +15,14 @@
 
     nixos-hardware.url = "github:nixos/nixos-hardware/master";
 
+    nixos-raspberrypi = {
+      url = "github:ramblurr/nixos-raspberrypi";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        nixos-hardware.follows = "nixos-hardware";
+      };
+    };
+
     utils = {
       url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
       inputs.flake-utils.follows = "flake-utils";
@@ -73,7 +81,7 @@
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, nixos-hardware, home, utils, rust-overlay, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, nixos-raspberrypi, home, utils, rust-overlay, ... }@inputs:
     let
       config = {
         allowUnfree = true;
@@ -108,7 +116,21 @@
           utils.nixosModules.autoGenFromInputs
           self.nixosModules.default
           home.nixosModules.home-manager
+          inputs.vu-server.nixosModules.default
+          inputs.vupdaters.nixosModules.default
         ];
+      };
+
+      ###########
+      ## NixOS (images) ##
+      ###########
+      images = {
+        clavius =
+          (self.nixosConfigurations.clavius.extendModules {
+            modules = [
+              nixos-raspberrypi.nixosModules.sd-image-rpi3
+            ];
+          }).config.system.build.sdImage;
       };
 
       nixosModules.default = import ./modules/nixos;

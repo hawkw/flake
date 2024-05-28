@@ -254,6 +254,29 @@
         "type": "github"
       }
     },
+    "nixos-raspberrypi": {
+      "inputs": {
+        "nixos-hardware": [
+          "nixos-hardware"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1710516774,
+        "narHash": "sha256-JI59txzoysj0xSgWfx+T++3ZdHAH9ZCsvZC1mR+1dac=",
+        "owner": "ramblurr",
+        "repo": "nixos-raspberrypi",
+        "rev": "a05790c300ce37b0f071a98897b5ef52e0a90657",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ramblurr",
+        "repo": "nixos-raspberrypi",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1713714899,
@@ -363,6 +386,7 @@
         "home": "home",
         "lanzaboote": "lanzaboote",
         "nixos-hardware": "nixos-hardware",
+        "nixos-raspberrypi": "nixos-raspberrypi",
         "nixpkgs": "nixpkgs",
         "nixpkgs-stable": "nixpkgs-stable_2",
         "rust-overlay": "rust-overlay_2",
