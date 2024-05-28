@@ -217,7 +217,7 @@ in
                     inherit instance;
                   };
                 });
-                eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enabled) allHostConfigs;
+                eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enable) allHostConfigs;
               in
               (mapAttrsToList mkScrapeConfig eclssHosts);
             scrapeConfigs = [
