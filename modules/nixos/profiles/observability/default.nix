@@ -212,7 +212,7 @@ in
             eclssScrapeTargets =
               let
                 mkScrapeConfig = (instance: config: {
-                  targets = [ "${instance}:${toString config.services.eclssd.port}" ];
+                  targets = [ "${instance}:${toString config.services.eclssd.server.port}" ];
                   labels = {
                     inherit instance;
                   };
