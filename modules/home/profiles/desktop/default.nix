@@ -54,6 +54,7 @@ in {
 
         ### chat clients & stuff
         element-desktop
+        mumble
       ] ++ unfreePkgs);
     #############################################################################
     ## Programs                                                                 #
