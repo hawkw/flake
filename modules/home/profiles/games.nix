@@ -7,6 +7,12 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = with pkgs; [ minecraft technic-launcher ckan playonlinux ];
+    home.packages = with pkgs; [
+      # TODO(eliza): currently broken in nixpkgs
+      # minecraft
+      technic-launcher
+      ckan
+      playonlinux
+    ];
   };
 }
