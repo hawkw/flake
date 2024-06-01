@@ -79,7 +79,7 @@
     # };
 
     eclssd = {
-      url = "github:hawkw/eclssd";
+      url = "github:hawkw/eclssd?rev=f4b080e00c493a8c443d8f63b2b7587bee381344";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         rust-overlay.follows = "rust-overlay";
@@ -131,9 +131,9 @@
         ];
       };
 
-      ###########
+      ####################
       ## NixOS (images) ##
-      ###########
+      ####################
       images = {
         clavius =
           (self.nixosConfigurations.clavius.extendModules {

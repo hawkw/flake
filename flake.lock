@@ -43,16 +43,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1716857672,
-        "narHash": "sha256-nZx81KijzIK9f0xAQGBZPJrqlgDSyIag2silnv2AJHQ=",
+        "lastModified": 1717261554,
+        "narHash": "sha256-COBIXQW3+f7w8IX6pS6g/jKt86FAKUb4uP7Rmin/Wjc=",
         "owner": "hawkw",
         "repo": "eclssd",
-        "rev": "31cd5ab59565a358f28aa24c217179bdc16120fa",
+        "rev": "f4b080e00c493a8c443d8f63b2b7587bee381344",
         "type": "github"
       },
       "original": {
         "owner": "hawkw",
         "repo": "eclssd",
+        "rev": "f4b080e00c493a8c443d8f63b2b7587bee381344",
         "type": "github"
       }
     },

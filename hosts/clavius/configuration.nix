@@ -1,10 +1,33 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 with lib; {
   system.stateVersion = "23.11";
   raspberry-pi.hardware.platform.type = "rpi3";
 
-
   security.sudo-rs.enable = mkForce false;
+  security.sudo.enable = true;
+
+  boot = {
+    kernelPackages = pkgs.linuxKernel.packages.linux_rpi3;
+    initrd.availableKernelModules = [ "xhci_pci" "usbhid" "usb_storage" ];
+    loader = {
+      grub.enable = false;
+      generic-extlinux-compatible.enable = true;
+    };
+    tmp.cleanOnBoot = true;
+  };
+
+  # forcibly include rpi 3 devicetrees --- nixos-hardware will incorrectly
+  # filter for rpi-4 dtbs unless we put this here explicitly. :\
+  hardware.deviceTree.filter = "*rpi-3*.dtb";
+
+  ### enable I2C-1 on the Raspberry Pi 3 ###
+  hardware.i2c.enable = true;
+  # yes, i know this says "raspberry pi 4", rather than "raspberry pi 3";
+  # there's `nixos-hardware` modules for pi 2, 4, and 5, but not pi 3 for some
+  # reason. this seems to work on pi 4 as well though...
+  hardware.raspberry-pi."4".i2c1.enable = true;
+  # also, it's nice to have the i2c-tools package installed for debugging...
+  environment.systemPackages = with pkgs; [ i2c-tools ];
 
   profiles = {
     observability.enable = true;
@@ -12,18 +35,16 @@ with lib; {
     networking.enable = mkForce false;
   };
 
-
   networking = {
     wireless.enable = true;
     interfaces."wlan0".useDHCP = true;
     interfaces."eth0".useDHCP = true;
     firewall = {
-      allowedTCPPorts = [ config.services.eclssd.server.port ];
+      allowedTCPPorts = [ config.services.eclssd.server.port 22 ];
       # Strict reverse path filtering breaks Tailscale exit node use and some
       # subnet routing setups.
       checkReversePath = "loose";
       trustedInterfaces = [
-        "docker0" # docker iface is basically loopback
         "tailscale0Link" # tailscale
       ];
     };
@@ -32,7 +53,15 @@ with lib; {
   # OpenSSH is forced to have an empty `wantedBy` on the installer system[1], this won't allow it
   # to be automatically started. Override it with the normal value.
   # [1] https://github.com/NixOS/nixpkgs/blob/9e5aa25/nixos/modules/profiles/installation-device.nix#L76
-  systemd.services.sshd.wantedBy = mkOverride 40 [ "multi-user.target" ];
+  systemd.services.sshd.wantedBy = mkForce [ "multi-user.target" ];
+
+  # don't install documentation, in order to save space on the SD card
+  documentation.nixos.enable = false;
+  # enable automatic nix gc
+  nix.gc.automatic = true;
+  nix.gc.options = "--delete-older-than 30d";
+  # don't need docker
+  virtualisation.docker.enable = mkForce false;
 
   services = {
     eclssd.enable = true;
@@ -42,6 +71,8 @@ with lib; {
     openssh = {
       enable = true;
       openFirewall = true;
+      settings.PermitRootLogin = "yes";
+      listenAddresses = [{ addr = "0.0.0.0"; port = 22; }];
     };
 
     # DNS configurations --- Avahi (mDNS)
@@ -71,6 +102,10 @@ with lib; {
     └┴────────────────┘
   '';
   users.users.eliza.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
+  ];
+
+  users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
   ];
 }
