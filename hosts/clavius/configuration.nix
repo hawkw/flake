@@ -19,21 +19,31 @@ with lib; {
     platform.type = "rpi3";
     # apply-overlays-dtmerge.enable = true;
   };
-  # forcibly include rpi 3 devicetrees --- nixos-hardware will incorrectly
-  # filter for rpi-4 dtbs unless we put this here explicitly. :\
   # hardware.deviceTree.filter = "*rpi-3*.dtb";
   hardware.deviceTree = {
     enable = true;
     filter = "*rpi-3*.dtb";
     overlays = [
+      ### enable I2C-1 on the Raspberry Pi 3 ###
       {
-        name = "i2c1";
-        dtboFile = "${pkgs.device-tree_rpi.overlays}/i2c1.dtbo";
+        name = "i2c1-okay-overlay";
+        # dtboFile = "${pkgs.device-tree_rpi.overlays}/i2c1.dtbo";
+        dtsText = ''
+          /dts-v1/;
+          /plugin/;
+          / {
+            compatible = "raspberrypi";
+            fragment@0 {
+              target = <&i2c1>;
+              __overlay__ {
+                status = "okay";
+              };
+            };
+          };
+        '';
       }
     ];
   };
-
-  ### enable I2C-1 on the Raspberry Pi 3 ###
   hardware.i2c.enable = true;
   # yes, i know this says "raspberry pi 4", rather than "raspberry pi 3";
   # there's `nixos-hardware` modules for pi 2, 4, and 5, but not pi 3 for some
