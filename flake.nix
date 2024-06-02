@@ -144,6 +144,11 @@
           };
 
           ####################
+          ## NixOS modules ###
+          ####################
+          nixosModules.default = import ./modules/nixos;
+
+          ####################
           ## NixOS (images) ##
           ####################
           images = {
@@ -172,7 +177,7 @@
             in
             {
               clavius = {
-                hostname = "192.168.1.146";
+                hostname = "clavius";
                 profiles.system = {
                   sshUser = "eliza";
                   sshOpts = [ "-t" ];
@@ -186,7 +191,6 @@
               noctis = mkNode { hostname = "noctis"; };
             };
 
-          nixosModules.default = import ./modules/nixos;
 
           ##################
           ## Home Manager ##
@@ -201,6 +205,11 @@
           };
 
           homeModules.default = import ./modules/home;
+
+          ################
+          ## checks ######
+          ################
+          checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) deploy-rs.lib;
         };
 
         systems = [ "x86_64-linux" "aarch64-linux" ];
