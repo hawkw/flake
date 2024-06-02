@@ -7,6 +7,16 @@
     nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+
+    # deploy-rs: for remote deployments
+    deploy-rs = {
+      url = "github:serokell/deploy-rs";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
 
     home = {
       url = "github:nix-community/home-manager";
@@ -90,7 +100,7 @@
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, nixos-hardware, nixos-raspberrypi, home, utils, rust-overlay, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, nixos-raspberrypi, home, utils, rust-overlay, deploy-rs, flake-parts, ... }@inputs:
     let
       config = {
         allowUnfree = true;
@@ -110,54 +120,91 @@
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
       ];
-    in
-    {
 
       lib = import ./lib;
+    in
+    flake-parts.lib.mkFlake { inherit inputs; }
+      {
+        perSystem = { pkgs, system, ... }: with pkgs; with lib; {
+          devShells.default = mkShell { buildInputs = [ deploy-rs.packages.${system}.default ]; };
+        };
+        flake = {
+          ###########
+          ## NixOS ##
+          ###########
+          nixosConfigurations = lib.genNixOSHosts {
+            inherit inputs config overlays self;
 
-      ###########
-      ## NixOS ##
-      ###########
-      nixosConfigurations = self.lib.genNixOSHosts {
-        inherit inputs config overlays self;
-
-        baseModules = [
-          utils.nixosModules.autoGenFromInputs
-          self.nixosModules.default
-          home.nixosModules.home-manager
-          inputs.vu-server.nixosModules.default
-          inputs.vupdaters.nixosModules.default
-          inputs.eclssd.nixosModules.default
-        ];
-      };
-
-      ####################
-      ## NixOS (images) ##
-      ####################
-      images = {
-        clavius =
-          (self.nixosConfigurations.clavius.extendModules {
-            modules = [
-              nixos-raspberrypi.nixosModules.sd-image-rpi3
+            baseModules = [
+              utils.nixosModules.autoGenFromInputs
+              self.nixosModules.default
+              home.nixosModules.home-manager
+              inputs.vu-server.nixosModules.default
+              inputs.vupdaters.nixosModules.default
+              inputs.eclssd.nixosModules.default
             ];
-          }).config.system.build.sdImage;
+          };
+
+          ####################
+          ## NixOS (images) ##
+          ####################
+          images = {
+            clavius =
+              (self.nixosConfigurations.clavius.extendModules {
+                modules = [
+                  nixos-raspberrypi.nixosModules.sd-image-rpi3
+                ];
+              }).config.system.build.sdImage;
+          };
+
+
+          #####################
+          ## deploy-rs nodes ##
+          #####################
+          deploy.nodes =
+            let
+              mkNode = { hostname, system ? "x86_64-linux", extraOpts ? { } }: {
+                inherit hostname;
+                profiles.system = ({
+                  sshUser = "eliza";
+                  path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.${hostname};
+                  user = "root";
+                } // extraOpts);
+              };
+            in
+            {
+              clavius = {
+                hostname = "192.168.1.146";
+                profiles.system = {
+                  sshUser = "eliza";
+                  sshOpts = [ "-t" ];
+                  path =
+                    deploy-rs.lib.aarch64-linux.activate.nixos
+                      self.nixosConfigurations.clavius;
+                  user = "root";
+                };
+              };
+
+              noctis = mkNode { hostname = "noctis"; };
+            };
+
+          nixosModules.default = import ./modules/nixos;
+
+          ##################
+          ## Home Manager ##
+          ##################
+          homeConfigurations = lib.genHomeHosts {
+            inherit inputs config overlays;
+
+            user = "eliza";
+
+            baseModules = [ self.homeModules.default ];
+
+          };
+
+          homeModules.default = import ./modules/home;
+        };
+
+        systems = [ "x86_64-linux" "aarch64-linux" ];
       };
-
-      nixosModules.default = import ./modules/nixos;
-
-      ##################
-      ## Home Manager ##
-      ##################
-      homeConfigurations = self.lib.genHomeHosts {
-        inherit inputs config overlays;
-
-        user = "eliza";
-
-        baseModules = [ self.homeModules.default ];
-
-      };
-
-      homeModules.default = import ./modules/home;
-
-    };
 }

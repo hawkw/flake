@@ -1,7 +1,6 @@
 { config, lib, pkgs, ... }:
 with lib; {
   system.stateVersion = "23.11";
-  raspberry-pi.hardware.platform.type = "rpi3";
 
   security.sudo-rs.enable = mkForce false;
   security.sudo.enable = true;
@@ -16,16 +15,30 @@ with lib; {
     tmp.cleanOnBoot = true;
   };
 
+  raspberry-pi.hardware = {
+    platform.type = "rpi3";
+    # apply-overlays-dtmerge.enable = true;
+  };
   # forcibly include rpi 3 devicetrees --- nixos-hardware will incorrectly
   # filter for rpi-4 dtbs unless we put this here explicitly. :\
-  hardware.deviceTree.filter = "*rpi-3*.dtb";
+  # hardware.deviceTree.filter = "*rpi-3*.dtb";
+  hardware.deviceTree = {
+    enable = true;
+    filter = "*rpi-3*.dtb";
+    overlays = [
+      {
+        name = "i2c1";
+        dtboFile = "${pkgs.device-tree_rpi.overlays}/i2c1.dtbo";
+      }
+    ];
+  };
 
   ### enable I2C-1 on the Raspberry Pi 3 ###
   hardware.i2c.enable = true;
   # yes, i know this says "raspberry pi 4", rather than "raspberry pi 3";
   # there's `nixos-hardware` modules for pi 2, 4, and 5, but not pi 3 for some
   # reason. this seems to work on pi 4 as well though...
-  hardware.raspberry-pi."4".i2c1.enable = true;
+  # hardware.raspberry-pi."4".i2c1.enable = true;
   # also, it's nice to have the i2c-tools package installed for debugging...
   environment.systemPackages = with pkgs; [ i2c-tools ];
 
@@ -101,11 +114,5 @@ with lib; {
     ││ ELIZA NETWORKS │ ${config.networking.hostName}: environmental monitoring and control
     └┴────────────────┘
   '';
-  users.users.eliza.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
-  ];
 
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
-  ];
 }
