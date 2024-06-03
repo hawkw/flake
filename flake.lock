@@ -57,6 +57,9 @@
     },
     "eclssd": {
       "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -65,17 +68,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1717261554,
-        "narHash": "sha256-COBIXQW3+f7w8IX6pS6g/jKt86FAKUb4uP7Rmin/Wjc=",
+        "lastModified": 1717373006,
+        "narHash": "sha256-0pwNB7YphW2aO9unM+HGSGDrIP0ic1/inkPOFtflAz8=",
         "owner": "hawkw",
         "repo": "eclssd",
-        "rev": "f4b080e00c493a8c443d8f63b2b7587bee381344",
+        "rev": "9f38cc322fd39edabbc2c17a17ddfdf28291c703",
         "type": "github"
       },
       "original": {
         "owner": "hawkw",
         "repo": "eclssd",
-        "rev": "f4b080e00c493a8c443d8f63b2b7587bee381344",
+        "rev": "9f38cc322fd39edabbc2c17a17ddfdf28291c703",
         "type": "github"
       }
     },

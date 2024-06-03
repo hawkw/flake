@@ -88,10 +88,11 @@
     # };
 
     eclssd = {
-      url = "github:hawkw/eclssd?rev=f4b080e00c493a8c443d8f63b2b7587bee381344";
+      url = "github:hawkw/eclssd?rev=9f38cc322fd39edabbc2c17a17ddfdf28291c703";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         rust-overlay.follows = "rust-overlay";
+        flake-utils.follows = "flake-utils";
       };
     };
   };
