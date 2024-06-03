@@ -17,17 +17,23 @@ with lib; {
 
   raspberry-pi.hardware = {
     platform.type = "rpi3";
-    # apply-overlays-dtmerge.enable = true;
   };
-  # hardware.deviceTree.filter = "*rpi-3*.dtb";
+
   hardware.deviceTree = {
     enable = true;
     filter = "*rpi-3*.dtb";
     overlays = [
-      ### enable I2C-1 on the Raspberry Pi 3 ###
+      # enable I2C-1 on the Raspberry Pi 3
       {
+        # TODO(eliza): `hardware.raspberry-pi."4".i2c1.enable` in
+        # `nixos-hardware` will add an *almost identical* devicetree overlay,
+        # except it has `compatible = "brcm,bcm2711"` in it, making it only work
+        # on the Pi 4, and not the Pi 3. see:
+        # https://github.com/NixOS/nixos-hardware/blob/7b49d3967613d9aacac5b340ef158d493906ba79/raspberry-pi/4/i2c.nix
+        #
+        # it would be nice to upstream this change to nixos-hardware eventually
+        # to add i2c support for the Pi 3.
         name = "i2c1-okay-overlay";
-        # dtboFile = "${pkgs.device-tree_rpi.overlays}/i2c1.dtbo";
         dtsText = ''
           /dts-v1/;
           /plugin/;
@@ -45,10 +51,6 @@ with lib; {
     ];
   };
   hardware.i2c.enable = true;
-  # yes, i know this says "raspberry pi 4", rather than "raspberry pi 3";
-  # there's `nixos-hardware` modules for pi 2, 4, and 5, but not pi 3 for some
-  # reason. this seems to work on pi 4 as well though...
-  # hardware.raspberry-pi."4".i2c1.enable = true;
   # also, it's nice to have the i2c-tools package installed for debugging...
   environment.systemPackages = with pkgs; [ i2c-tools ];
 
