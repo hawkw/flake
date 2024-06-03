@@ -115,6 +115,8 @@
         (import ./pkgs/overlay.nix)
         rust-overlay.overlays.default
         # inputs.atuin.overlays.default
+
+        (_: prev: { eclssd = inputs.eclssd.packages.${prev.system}.eclssd; })
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
