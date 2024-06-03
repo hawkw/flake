@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 with lib; {
   system.stateVersion = "23.11";
 
@@ -40,7 +40,10 @@ with lib; {
   systemd.services.sshd.wantedBy = mkForce [ "multi-user.target" ];
 
   services = {
-    eclssd.enable = true;
+    eclssd = {
+      enable = true;
+      location = "office";
+    };
     tailscale.enable = true;
 
     # Enable the OpenSSH daemon.
@@ -70,16 +73,6 @@ with lib; {
         hinfo = true;
       };
     };
-  };
-
-  systemd.services.eclssd.serviceConfig = {
-    PrivateTmp = true;
-    ProtectSystem = "strict";
-    ProtectHome = true;
-    PrivateDevices = false;
-    PrivateNetwork = false;
-    MountAPIVFS = true;
-    ExecStart = mkForce "${pkgs.eclssd}/bin/eclssd --i2cdev '/dev/i2c-1' --listen-addr '0.0.0.0:${toString config.services.eclssd.server.port}'";
   };
 
   users.motd = ''

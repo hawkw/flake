@@ -215,6 +215,7 @@ in
                   targets = [ "${instance}:${toString config.services.eclssd.server.port}" ];
                   labels = {
                     inherit instance;
+                    location = "${config.services.eclssd.location}";
                   };
                 });
                 eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enable) allHostConfigs;

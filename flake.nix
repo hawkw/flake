@@ -88,7 +88,7 @@
     # };
 
     eclssd = {
-      url = "github:hawkw/eclssd?rev=9f38cc322fd39edabbc2c17a17ddfdf28291c703";
+      url = "github:hawkw/eclssd?rev=603e24e4cc3976372a657f98bcf7131ae5b3957f";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         rust-overlay.follows = "rust-overlay";
