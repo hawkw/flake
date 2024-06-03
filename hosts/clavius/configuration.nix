@@ -1,64 +1,23 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 with lib; {
   system.stateVersion = "23.11";
-
-  security.sudo-rs.enable = mkForce false;
-  security.sudo.enable = true;
-
-  boot = {
-    kernelPackages = pkgs.linuxKernel.packages.linux_rpi3;
-    initrd.availableKernelModules = [ "xhci_pci" "usbhid" "usb_storage" ];
-    loader = {
-      grub.enable = false;
-      generic-extlinux-compatible.enable = true;
-    };
-    tmp.cleanOnBoot = true;
-  };
 
   raspberry-pi.hardware = {
     platform.type = "rpi3";
   };
 
-  hardware.deviceTree = {
-    enable = true;
-    filter = "*rpi-3*.dtb";
-    overlays = [
-      # enable I2C-1 on the Raspberry Pi 3
-      {
-        # TODO(eliza): `hardware.raspberry-pi."4".i2c1.enable` in
-        # `nixos-hardware` will add an *almost identical* devicetree overlay,
-        # except it has `compatible = "brcm,bcm2711"` in it, making it only work
-        # on the Pi 4, and not the Pi 3. see:
-        # https://github.com/NixOS/nixos-hardware/blob/7b49d3967613d9aacac5b340ef158d493906ba79/raspberry-pi/4/i2c.nix
-        #
-        # it would be nice to upstream this change to nixos-hardware eventually
-        # to add i2c support for the Pi 3.
-        name = "i2c1-okay-overlay";
-        dtsText = ''
-          /dts-v1/;
-          /plugin/;
-          / {
-            compatible = "raspberrypi";
-            fragment@0 {
-              target = <&i2c1>;
-              __overlay__ {
-                status = "okay";
-              };
-            };
-          };
-        '';
-      }
-    ];
-  };
-  hardware.i2c.enable = true;
-  # also, it's nice to have the i2c-tools package installed for debugging...
-  environment.systemPackages = with pkgs; [ i2c-tools ];
-
   profiles = {
     observability.enable = true;
     # don't enable the network settings used
     networking.enable = mkForce false;
+    raspberry-pi = {
+      i2c.enable = true;
+      pi3.enable = true;
+    };
   };
+
+  # don't need docker
+  virtualisation.docker.enable = mkForce false;
 
   networking = {
     wireless.enable = true;
@@ -79,14 +38,6 @@ with lib; {
   # to be automatically started. Override it with the normal value.
   # [1] https://github.com/NixOS/nixpkgs/blob/9e5aa25/nixos/modules/profiles/installation-device.nix#L76
   systemd.services.sshd.wantedBy = mkForce [ "multi-user.target" ];
-
-  # don't install documentation, in order to save space on the SD card
-  documentation.nixos.enable = false;
-  # enable automatic nix gc
-  nix.gc.automatic = true;
-  nix.gc.options = "--delete-older-than 30d";
-  # don't need docker
-  virtualisation.docker.enable = mkForce false;
 
   services = {
     eclssd.enable = true;
@@ -126,5 +77,4 @@ with lib; {
     ││ ELIZA NETWORKS │ ${config.networking.hostName}: environmental monitoring and control
     └┴────────────────┘
   '';
-
 }

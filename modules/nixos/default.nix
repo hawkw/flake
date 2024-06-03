@@ -16,6 +16,7 @@
     ./profiles/nginx.nix
     ./profiles/observability
     ./profiles/perftools.nix
+    ./profiles/raspberry-pi
     ./profiles/vu-dials.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
