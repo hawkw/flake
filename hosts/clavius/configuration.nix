@@ -43,6 +43,10 @@ with lib; {
     eclssd = {
       enable = true;
       location = "office";
+      logging = {
+        timestamps = false;
+        format = "text";
+      };
     };
     tailscale.enable = true;
 

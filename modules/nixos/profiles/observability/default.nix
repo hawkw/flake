@@ -250,6 +250,11 @@ in
                     source_labels = [ "__address__" ];
                     target_label = "address";
                   }
+                  {
+                    "if" = ''{instance=~"clavius.*"}'';
+                    target_label = "location";
+                    replacement = "office";
+                  }
                 ];
               }
               # local services
