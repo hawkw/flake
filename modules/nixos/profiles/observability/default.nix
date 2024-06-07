@@ -40,24 +40,24 @@ let
 in
 {
 
-  options.profiles.observability = {
+  options.profiles.observability = with types; {
     enable = mkEnableOption "observability";
     prometheusMdns.enable = mkEnableOption "Prometheus mDNS service discovery";
 
     loki = {
       enable = mkOption {
-        type = types.bool;
+        type = bool;
         default = true;
         description = "Enable the Loki log aggregation service.";
       };
       port = mkOption {
-        type = types.int;
+        type = int;
         default = 3100;
         description = "The port to run the Loki service on.";
       };
 
       promtailPort = mkOption {
-        type = types.int;
+        type = int;
         default = 28183;
         description = "The port to run the Promtail service on.";
       };
@@ -66,20 +66,34 @@ in
     observer = {
       enable = mkEnableOption "observability collector";
       rootDomain = mkOption {
-        type = types.str;
+        type = str;
         default = "elizas.website";
         description = "The root domain for observability services.";
       };
       victoriametrics = {
         enable = mkOption {
-          type = types.bool;
+          type = bool;
           default = true;
           description = "use VictoriaMetrics as the timeseries database (instead of Prometheus).";
         };
         port = mkOption {
-          type = types.int;
+          type = int;
           default = 8428;
           description = "VictoriaMetrics TSDB port";
+        };
+      };
+
+      grafana = {
+        publicDashboards = mkOption {
+          type = attrsOf str;
+          description = ''
+            A map of URL paths to Grafana public dashboard URLs. A redirect
+            for each path to the corresponding public dashboard URL will be
+            added to NGINX.'';
+          default = {
+            "eclss" = "21447c2bc0e943ebac051abeda0ca58f";
+            "eliza-ops" = "bc53c5457dbd4705bb0d56e67f57408c";
+          };
         };
       };
     };
@@ -327,12 +341,12 @@ in
                     hideComponents.hideSettings = false;
                   };
                   sections = [
-                    {
-                      name = "overview";
-                      widgets = [
-                        { type = "system-info"; }
-                      ];
-                    }
+                    # {
+                    #   name = "overview";
+                    #   widgets = [
+                    #     { type = "system-info"; }
+                    #   ];
+                    # }
                     {
                       name = "monitoring";
                       icon = "fas fa-monitor-heart-rate";
@@ -351,6 +365,22 @@ in
                           title = "Uptime Kuma";
                           icon = "hl-uptime-kuma";
                           url = "https://${uptimeKumaDomain}";
+                        }
+                      ];
+                    }
+                    {
+                      name = "dashboards";
+                      icon = "fas fa-monitor-heart-rate";
+                      items = [
+                        {
+                          title = "ECLSS";
+                          icon = "hl-grafana";
+                          url = "https://${grafanaDomain}/eclss";
+                        }
+                        {
+                          title = "ElizaOps";
+                          icon = "hl-grafana";
+                          url = "https://${grafanaDomain}/eliza-ops";
                         }
                       ];
                     }
@@ -446,59 +476,76 @@ in
             })
             ### nginx virtual hosts for observer services ###
             (mkIf config.profiles.nginx.enable {
-              services.nginx.virtualHosts = {
-                "home.${cfg.observer.rootDomain}" = {
-                  locations."/" = {
-                    proxyPass = "http://127.0.0.1:${toString config.services.dashy.port}/";
-                  };
-                };
-
-                ${grafanaDomain} = {
+              services.nginx.virtualHosts =
+                let
                   forceSSL = true;
                   useACMEHost = "home.${cfg.observer.rootDomain}";
-                  locations."/" = {
-                    proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
-                    proxyWebsockets = true;
-
+                in
+                {
+                  "home.${cfg.observer.rootDomain}" = {
+                    locations."/" = {
+                      proxyPass = "http://127.0.0.1:${toString config.services.dashy.port}/";
+                    };
                   };
-                };
+
+                  ${grafanaDomain} =
+                    let
+                      # rewrite public dashboard URLs to shorter ones
+                      redirects = mapAttrs'
+                        (name: hash:
+                          let
+                            location = "/${name}";
+                            return = "301 $scheme://${grafanaDomain}/public-dashboards/${hash}";
+                          in
+                          nameValuePair location {
+                            inherit return;
+                          })
+                        cfg.observer.grafana.publicDashboards;
+                      locations = redirects // {
+                        "/" = {
+                          proxyPass = "http://127.0.0.1:${ toString grafanaPort}/";
+                          proxyWebsockets = true;
+                        };
+                      };
+                    in
+                    {
+                      inherit locations forceSSL useACMEHost;
+                    };
 
 
-                ${uptimeKumaDomain} = {
-                  forceSSL = true;
-                  useACMEHost = "home.${cfg.observer.rootDomain}";
-                  locations."/" = {
-                    proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
-                    proxyWebsockets = true;
+                  ${uptimeKumaDomain} = {
+                    inherit forceSSL useACMEHost;
+                    locations."/" = {
+                      proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
+                      proxyWebsockets = true;
+                    };
                   };
-                };
 
-                "status.${cfg.observer.rootDomain}" = {
-                  forceSSL = true;
-                  useACMEHost = "home.${cfg.observer.rootDomain}";
-                  locations."/" = {
-                    proxyPass = "http://127.0.0.1:${toString uptimeKumaPort}/";
-                    proxyWebsockets = true;
-                    extraConfig = ''
+                  "status.${cfg.observer.rootDomain}" = {
+                    inherit forceSSL useACMEHost;
+                    locations."/" = {
+                      proxyPass = "http://127.0.0.1:${ toString uptimeKumaPort}/";
+                      proxyWebsockets = true;
+                      extraConfig = ''
                         proxy_set_header Host status.${cfg.observer.rootDomain};
-                      proxy_set_header X-Forwarded-Host status.${cfg.observer.rootDomain};
-                    '';
+                        proxy_set_header X-Forwarded-Host status.${cfg.observer.rootDomain};
+                      '';
+                    };
                   };
-                };
 
-                "${config.networking.hostName}.local" = {
-                  locations."/grafana/" = {
-                    proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
-                    proxyWebsockets = true;
-                    extraConfig = "proxy_redirect default;";
-                  };
-                  locations."/prometheus/" = {
-                    proxyPass = "http://127.0.0.1:${toString promPort}/";
-                    proxyWebsockets = true;
-                    extraConfig = "proxy_redirect default;";
+                  "${config.networking.hostName}.local" = {
+                    locations."/grafana/" = {
+                      proxyPass = "http://127.0.0.1:${toString grafanaPort}/";
+                      proxyWebsockets = true;
+                      extraConfig = "proxy_redirect default;";
+                    };
+                    locations."/prometheus/" = {
+                      proxyPass = "http://127.0.0.1:${toString promPort}/";
+                      proxyWebsockets = true;
+                      extraConfig = "proxy_redirect default;";
+                    };
                   };
                 };
-              };
 
               services.promtail.configuration.scrape_configs = [
                 {
@@ -709,7 +756,7 @@ in
 
                     # table_manager = {
                     #   retention_deletes_enabled = false;
-                    #   retention_period = "0s";
+                    #   retention_period = "0s" ;
                     # };
                   };
                 };
