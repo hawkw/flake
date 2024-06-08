@@ -546,14 +546,18 @@ in
                     };
                   };
                 };
-
+              systemd.services.promtail.serviceConfig =
+                {
+                  # allow promtail to read nginx logs
+                  ReadOnlyPaths = [ "/var/log/nginx" ];
+                };
               services.promtail.configuration.scrape_configs = [
                 {
                   job_name = "nginx";
                   static_configs = [{
                     targets = [ "localhost" ];
                     labels = {
-                      __path__ = "/var/log/nginx/*.log";
+                      __path__ = "/var/log/nginx/*log";
                       host = config.networking.hostName;
                       job = "nginx";
                     };
