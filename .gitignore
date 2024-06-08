@@ -1,3 +1,4 @@
 # output by `nix build`
 result
 .direnv
+.deploy-gc
