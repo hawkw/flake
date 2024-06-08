@@ -2,12 +2,12 @@
 
 with lib;
 let cfg = config.profiles.networking;
-in {
-  options.profiles.networking = with lib; {
+in with lib; {
+  options.profiles.networking = {
     enable = mkEnableOption "Network profile";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     #### Networking Configuration ####
 
     networking = {
@@ -85,6 +85,7 @@ in {
       bluez
       tailscale
       ethtool
+      dig
     ];
 
     users.users.eliza.extraGroups = [ "networkmanager" ];
