@@ -7,9 +7,7 @@ with lib; {
   };
 
   profiles = {
-    observability.enable = true;
-    # don't enable the network settings used
-    networking.enable = mkForce false;
+    networking.enable = true;
     raspberry-pi = {
       i2c.enable = true;
       pi3.enable = true;
@@ -20,7 +18,8 @@ with lib; {
   virtualisation.docker.enable = mkForce false;
 
   networking = {
-    wireless.enable = true;
+    # use networkmanager instead of wpa_supplicant
+    wireless.enable = false;
     interfaces."wlan0".useDHCP = true;
     interfaces."eth0".useDHCP = true;
     firewall = {
