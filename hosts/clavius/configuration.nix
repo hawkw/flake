@@ -12,6 +12,12 @@ with lib; {
       i2c.enable = true;
       pi3.enable = true;
     };
+    observability.enable = true;
+  };
+
+  services.prometheus.exporters = {
+    # no drives with SMART support here...
+    smartctl.enable = false;
   };
 
   # don't need docker
@@ -44,7 +50,8 @@ with lib; {
       location = "office";
       logging = {
         timestamps = false;
-        format = "text";
+        format = "journald";
+        filter = "info,eclss=debug";
       };
     };
     tailscale.enable = true;
