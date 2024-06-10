@@ -42,6 +42,8 @@ in with lib; {
       networkmanager.connectionConfig."connection.mdns" = 2;
     };
 
+    programs.mosh.enable = mkDefault true;
+
     services = {
       # Enable the OpenSSH daemon.
       openssh = {
