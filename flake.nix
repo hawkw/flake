@@ -1,5 +1,6 @@
 {
   description = "Eliza's NixOS and Home-Manager configuration flake";
+
   ############################################################################
   #### NIX CONFIG ############################################################
   nixConfig = {
@@ -101,7 +102,7 @@
     # };
 
     eclssd = {
-      url = "https://flakehub.com/f/mycoliza/eclssd/0.1.40.tar.gz";
+      url = "https://flakehub.com/f/mycoliza/eclssd/0.1.52.tar.gz";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         rust-overlay.follows = "rust-overlay";
