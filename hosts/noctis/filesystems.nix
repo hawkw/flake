@@ -57,12 +57,12 @@
     device = "/dev/zvol/nvme-pool/system/docker";
     fsType = "xfs";
   };
-  # # 2. ext4 zvol for atuin; see: https://github.com/atuinsh/atuin/issues/952
-  # fileSystems."/home/eliza/.local/share/atuin" =
-  #   {
-  #     device = "/dev/zvol/nvme-pool/local/atuin";
-  #     fsType = "ext4";
-  #   };
+  # 2. ext4 zvol for atuin; see: https://github.com/atuinsh/atuin/issues/952
+  fileSystems."/home/eliza/.local/share/atuin" =
+    {
+      device = "/dev/zvol/nvme-pool/home/atuin";
+      fsType = "ext4";
+    };
 
   swapDevices = [
     {
