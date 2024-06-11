@@ -3,7 +3,7 @@
 {
 
   boot = {
-    supportedFilesystems = [ "zfs" "xfs" ];
+    supportedFilesystems = [ "zfs" "xfs" "ext4" ];
     kernelParams = [ "elevator=none" ];
     # zfs.enableUnstable = true;
   };
@@ -48,10 +48,21 @@
     fsType = "zfs";
   };
 
+  # zvols formatted with other filesystems to run software that doesn't like
+  # zfs:
+  #
+  # 1. xfs zvol for docker, because k3d volume mounts don't behave nicely on a
+  #    zfs volume
   fileSystems."/var/lib/docker" = {
     device = "/dev/zvol/nvme-pool/system/docker";
     fsType = "xfs";
   };
+  # # 2. ext4 zvol for atuin; see: https://github.com/atuinsh/atuin/issues/952
+  # fileSystems."/home/eliza/.local/share/atuin" =
+  #   {
+  #     device = "/dev/zvol/nvme-pool/local/atuin";
+  #     fsType = "ext4";
+  #   };
 
   swapDevices = [
     {
