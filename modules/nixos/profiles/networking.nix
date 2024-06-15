@@ -12,7 +12,7 @@ in with lib; {
 
     networking = {
       # use networkmanager.
-      networkmanager.enable = true;
+      networkmanager.enable = lib.mkDefault true;
       # disable wpa_supplicant, as NetworkManager is used instead.
       wireless.enable = false;
       # `dhcpcd` conflicts with NetworkManager's `dhclient`, as they try to bind

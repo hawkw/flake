@@ -26,8 +26,12 @@ with lib; {
   networking = {
     # use networkmanager instead of wpa_supplicant
     wireless.enable = false;
+
+    networkmanager.enable = mkForce false;
+    useNetworkd = mkForce true;
+
     interfaces."wlan0".useDHCP = true;
-    interfaces."eth0".useDHCP = true;
+    interfaces."eth0".useDHCP = false;
     firewall = {
       allowedTCPPorts = [ config.services.eclssd.server.port 22 ];
       # Strict reverse path filtering breaks Tailscale exit node use and some

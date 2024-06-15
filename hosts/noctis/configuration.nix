@@ -74,13 +74,15 @@
           enable = true;
           policy = [ "unicast" "magic" ];
         };
+        # disable dhcpd and use networkmanager instead.
+        useDHCP = false;
       in
       {
-        enp5s0 = { inherit wakeOnLan; useDHCP = true; };
-        enp7s0 = { inherit wakeOnLan; useDHCP = true; };
-        enp8s0f1u1u1u2 = { inherit wakeOnLan; useDHCP = true; };
-        wlp4s0 = { useDHCP = true; };
-        wlp7s0 = { useDHCP = true; };
+        enp5s0 = { inherit wakeOnLan useDHCP; };
+        enp7s0 = { inherit wakeOnLan useDHCP; };
+        enp8s0f1u1u1u2 = { inherit wakeOnLan useDHCP; };
+        wlp4s0 = { inherit useDHCP; };
+        wlp7s0 = { inherit useDHCP; };
       };
   };
 
