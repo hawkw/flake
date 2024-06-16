@@ -27,6 +27,8 @@
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
     vu-dials.enable = true;
+
+    arm-cross-dev.enable = true;
   };
 
   hardware = {
