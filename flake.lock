@@ -57,39 +57,59 @@
     },
     "eclssd": {
       "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
+        "oranda": "oranda",
         "rust-overlay": [
           "rust-overlay"
-        ]
+        ],
+        "vu-server": "vu-server"
       },
       "locked": {
-        "lastModified": 1718566414,
-        "narHash": "sha256-zbq2w6bPw8aOBZ9osBqNgI3j4A4Fho/5GOApt6UhLnc=",
-        "owner": "hawkw",
-        "repo": "eclssd",
-        "rev": "06a24000d54a9383da1a7efb7b39e2c038992a09",
-        "type": "github"
+        "lastModified": 1715617155,
+        "narHash": "sha256-ryIpevDCR6kX2TbcMxc/qqiyQe7x8TLP6FX8IOg5E1I=",
+        "rev": "2aede78b6a7623d6302ba54deae99ded500454d4",
+        "revCount": 121,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/mycoliza/vupdaters/0.1.121%2Brev-2aede78b6a7623d6302ba54deae99ded500454d4/018f72c1-335f-7050-8f97-98e33a8284cf/source.tar.gz"
       },
       "original": {
-        "owner": "hawkw",
-        "repo": "eclssd",
-        "rev": "06a24000d54a9383da1a7efb7b39e2c038992a09",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://flakehub.com/f/mycoliza/vupdaters/0.1.72.tar.gz"
       }
     },
     "fenix": {
+      "inputs": {
+        "nixpkgs": [
+          "eclssd",
+          "oranda",
+          "nixpkgs"
+        ],
+        "rust-analyzer-src": "rust-analyzer-src"
+      },
+      "locked": {
+        "lastModified": 1692889293,
+        "narHash": "sha256-pkQGbmDcHD4To6lZGbPcUynTuceqmt0Le6uUfxijYs4=",
+        "owner": "nix-community",
+        "repo": "fenix",
+        "rev": "d3f055733e5449a31c22d64951300072d84c5f81",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "fenix",
+        "type": "github"
+      }
+    },
+    "fenix_2": {
       "inputs": {
         "nixpkgs": [
           "vupdaters",
           "oranda",
           "nixpkgs"
         ],
-        "rust-analyzer-src": "rust-analyzer-src"
+        "rust-analyzer-src": "rust-analyzer-src_2"
       },
       "locked": {
         "lastModified": 1692889293,
@@ -181,6 +201,24 @@
         "systems": "systems_2"
       },
       "locked": {
+        "lastModified": 1692799911,
+        "narHash": "sha256-3eihraek4qL744EvQXsK1Ha6C3CR7nnT8X2qWap4RNk=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "f9e7cf818399d17d347f847525c5a5a8032e4e44",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems_3"
+      },
+      "locked": {
         "lastModified": 1710146030,
         "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
@@ -194,9 +232,9 @@
         "type": "github"
       }
     },
-    "flake-utils_2": {
+    "flake-utils_3": {
       "inputs": {
-        "systems": "systems_3"
+        "systems": "systems_4"
       },
       "locked": {
         "lastModified": 1692799911,
@@ -212,9 +250,9 @@
         "type": "github"
       }
     },
-    "flake-utils_3": {
+    "flake-utils_4": {
       "inputs": {
-        "systems": "systems_4"
+        "systems": "systems_5"
       },
       "locked": {
         "lastModified": 1705309234,
@@ -423,7 +461,30 @@
     "oranda": {
       "inputs": {
         "fenix": "fenix",
-        "flake-utils": "flake-utils_2",
+        "flake-utils": "flake-utils",
+        "nixpkgs": [
+          "eclssd",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1714765455,
+        "narHash": "sha256-PECM0HLomMzNWnERgvYSfSh+XQAjGLxybZAJcaAzEBo=",
+        "owner": "axodotdev",
+        "repo": "oranda",
+        "rev": "fb97859c99ab81f644ab5b1449f725fc5c3e9721",
+        "type": "github"
+      },
+      "original": {
+        "owner": "axodotdev",
+        "repo": "oranda",
+        "type": "github"
+      }
+    },
+    "oranda_2": {
+      "inputs": {
+        "fenix": "fenix_2",
+        "flake-utils": "flake-utils_3",
         "nixpkgs": [
           "vupdaters",
           "nixpkgs"
@@ -479,7 +540,7 @@
         "deploy-rs": "deploy-rs",
         "eclssd": "eclssd",
         "flake-parts": "flake-parts",
-        "flake-utils": "flake-utils",
+        "flake-utils": "flake-utils_2",
         "fw-ectool": "fw-ectool",
         "home": "home",
         "lanzaboote": "lanzaboote",
@@ -489,11 +550,28 @@
         "nixpkgs-stable": "nixpkgs-stable_2",
         "rust-overlay": "rust-overlay_2",
         "utils": "utils_2",
-        "vu-server": "vu-server",
+        "vu-server": "vu-server_2",
         "vupdaters": "vupdaters"
       }
     },
     "rust-analyzer-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1692775770,
+        "narHash": "sha256-LwoR5N1JHykSte2Ak+Pj/HjJ9fKy9zMJNEftfBJQkLs=",
+        "owner": "rust-lang",
+        "repo": "rust-analyzer",
+        "rev": "f5b7c60ff7a79bfb3e10f3e98c81b7bb4cb53c68",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rust-lang",
+        "ref": "nightly",
+        "repo": "rust-analyzer",
+        "type": "github"
+      }
+    },
+    "rust-analyzer-src_2": {
       "flake": false,
       "locked": {
         "lastModified": 1692775770,
@@ -560,7 +638,7 @@
     },
     "rust-overlay_3": {
       "inputs": {
-        "flake-utils": "flake-utils_3",
+        "flake-utils": "flake-utils_4",
         "nixpkgs": [
           "vupdaters",
           "nixpkgs"
@@ -640,6 +718,21 @@
         "type": "github"
       }
     },
+    "systems_5": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
     "utils": {
       "inputs": {
         "systems": "systems"
@@ -682,6 +775,27 @@
     "vu-server": {
       "inputs": {
         "nixpkgs": [
+          "eclssd",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1708362627,
+        "narHash": "sha256-mGCCailRjWF9RBskuT8/oWvPHeu3ymTFZSltspzqxEU=",
+        "owner": "hawkw",
+        "repo": "vu-server-flake",
+        "rev": "b397ffdeea894a704998733a7fd40515657d5bb3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hawkw",
+        "repo": "vu-server-flake",
+        "type": "github"
+      }
+    },
+    "vu-server_2": {
+      "inputs": {
+        "nixpkgs": [
           "nixpkgs"
         ]
       },
@@ -704,7 +818,7 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "oranda": "oranda",
+        "oranda": "oranda_2",
         "rust-overlay": "rust-overlay_3",
         "vu-server": [
           "vu-server"
