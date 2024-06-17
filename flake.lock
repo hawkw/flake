@@ -68,16 +68,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1718568267,
-        "narHash": "sha256-CvCgRAGngW2m1dvSAslCWxPCOKQ8CMKpoHMB0z0pSDk=",
-        "rev": "40ffd6ca82396565e0513a839bd4d9fc11d54c44",
-        "revCount": 73,
-        "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/mycoliza/eclssd/0.1.73%2Brev-40ffd6ca82396565e0513a839bd4d9fc11d54c44/019022a7-c3ff-7d6f-a85d-09b5ed3fefaa/source.tar.gz"
+        "lastModified": 1718649782,
+        "narHash": "sha256-M/OplbQOtz69oybyxVrgVzvt1Kr9kdEaktYAbNYno+4=",
+        "owner": "hawkw",
+        "repo": "eclssd",
+        "rev": "77720806df00d7dce20faf70270b46a567016521",
+        "type": "github"
       },
       "original": {
-        "type": "tarball",
-        "url": "https://flakehub.com/f/mycoliza/eclssd/0.1.73.tar.gz"
+        "owner": "hawkw",
+        "repo": "eclssd",
+        "rev": "77720806df00d7dce20faf70270b46a567016521",
+        "type": "github"
       }
     },
     "fenix": {

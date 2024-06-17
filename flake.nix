@@ -102,8 +102,8 @@
     # };
 
     eclssd = {
-      # url = "github:hawkw/eclssd/06a24000d54a9383da1a7efb7b39e2c038992a09";
-      url = "https://flakehub.com/f/mycoliza/eclssd/0.1.73.tar.gz";
+      url = "github:hawkw/eclssd/77720806df00d7dce20faf70270b46a567016521";
+      # url = "https://flakehub.com/f/mycoliza/eclssd/0.1.79.tar.gz";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         rust-overlay.follows = "rust-overlay";
