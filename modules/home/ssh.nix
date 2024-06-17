@@ -12,12 +12,12 @@ with lib;
     mkEnableOption "Enable 1Password SSH Agent";
 
   config = mkIf _1passwordAgent.enable {
-    home.file.".ssh/rc".source = pkgs.writeScript "ssh-agent-rc" ''
-      # create/update symlink only if interactive ssh login AND ~/.ssh/ssh_auth_sock doesn't exist AND $SSH_AUTH_SOCK does exist
-      if [[ -n "$SSH_TTY" && ! -S ${authSockPath} && -S "$SSH_AUTH_SOCK" ]]; then
-          ln -sf $SSH_AUTH_SOCK ${authSockPath}
-      fi
-    '';
+    # home.file.".ssh/rc".source = pkgs.writeScript "ssh-agent-rc" ''
+    #   # create/update symlink only if interactive ssh login AND ~/.ssh/ssh_auth_sock doesn't exist AND $SSH_AUTH_SOCK does exist
+    #   if [[ -n "$SSH_TTY" && ! -S ${authSockPath} && -S "$SSH_AUTH_SOCK" ]]; then
+    #       ln -sf $SSH_AUTH_SOCK ${authSockPath}
+    #   fi
+    # '';
     programs.ssh = {
       enable = true;
       forwardAgent = _1passwordAgent.enable;
