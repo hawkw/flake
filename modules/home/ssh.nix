@@ -23,13 +23,15 @@ with lib;
       forwardAgent = _1passwordAgent.enable;
       addKeysToAgent = "yes";
       matchBlocks = {
-        hasAuthSock = {
-          match = ''host * exec "test -S ${authSockPath}"'';
-          extraOptions = {
-            IdentityAgent = authSockPath;
-          };
-        };
-        noAuthSock = hm.dag.entryAfter [ "hasAuthSock" ] {
+        # hasAuthSock = {
+        #   match = ''host * exec "test -S ${authSockPath}"'';
+        #   extraOptions = {
+        #     IdentityAgent = authSockPath;
+        #   };
+        # };
+        # noAuthSock = hm.dag.entryAfter [ "hasAuthSock" ] {
+
+        authSock = {
           match = "host *";
           extraOptions = {
             IdentityAgent = _1passwordAgent.path;
