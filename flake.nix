@@ -102,7 +102,7 @@
     # };
 
     eclssd = {
-      url = "github:hawkw/eclssd/77720806df00d7dce20faf70270b46a567016521";
+      url = "github:hawkw/eclssd/6de42a256f547bba72bda5274b3d42dc574676e8";
       # url = "https://flakehub.com/f/mycoliza/eclssd/0.1.79.tar.gz";
       inputs = {
         nixpkgs.follows = "nixpkgs";
