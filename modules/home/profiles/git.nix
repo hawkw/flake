@@ -21,7 +21,7 @@ with lib; {
     };
   };
 
-  config = mkIf cfg.enable {
+  config = mkIf cfg.enable (mkMerge [{
     programs = {
       # GitHub CLI tool
       gh = {
@@ -129,8 +129,8 @@ with lib; {
           # use 1password to manage commit signing if available
           gpg = {
             format = "ssh";
-            "ssh".program = lib.mkIf enable1PasswordSshAgent
-              "${pkgs._1password-gui}/bin/op-ssh-sign";
+            # "ssh".program = lib.mkIf enable1PasswordSshAgent
+            #   "${pkgs._1password-gui}/bin/op-ssh-sign";
           };
           commit.gpgsign = true;
           user.signingkey =
@@ -138,5 +138,28 @@ with lib; {
         };
       };
     };
-  };
+  }
+    (mkIf enable1PasswordSshAgent (
+      let
+        signingScript =
+          with pkgs; writeShellApplication {
+            name = "ssh-sign";
+            runtimeInputs = [ _1password-gui ];
+            # If we're not in a SSH session, use `op-ssh-sign` to sign commits.
+            # Otherwise, use `ssh-keygen` to sign commits with a forwarded key
+            # in `SSH_AUTH_SOCK`.
+            text = ''
+              if [ -z "''${SSH_CONNECTION-}" ]; then
+                exec "op-ssh-sign" "$@"
+              else
+                exec ssh-keygen "$@"
+              fi
+            '';
+          };
+      in
+      {
+        home.packages = [ signingScript ];
+        programs.git.extraConfig.gpg."ssh".program = "ssh-sign";
+      }
+    ))]);
 }
