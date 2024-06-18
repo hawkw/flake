@@ -10,6 +10,7 @@ with lib; {
     networking.enable = true;
     raspberry-pi = {
       i2c.enable = true;
+      spi.enable = true;
       pi3.enable = true;
     };
     observability.enable = true;
