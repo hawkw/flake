@@ -13,6 +13,7 @@ with lib;
   options.profiles.raspberry-pi = {
     i2c.enable = mkEnableOption "Raspberry Pi I2C devices";
     spi.enable = mkEnableOption "Raspberry Pi SPI devices";
+    gpio.enable = mkEnableOption "Raspberry Pi GPIO utilities";
   };
 
   config = mkIf (cfg.pi3.enable || cfg.pi4.enable || cfg.pi5.enable) (mkMerge [
@@ -70,12 +71,19 @@ with lib;
       users.groups.spi = { };
       users.users.eliza.extraGroups = [ "spi" ];
 
-      services.udev = {
-        extraRules = ''
-          KERNEL=="gpiochip0*", GROUP="wheel", MODE="0660"
-          SUBSYSTEM=="spidev", KERNEL=="spidev0.0", GROUP="spi", MODE="0660"
-        '';
-      };
+      services.udev.extraRules = ''
+        SUBSYSTEM=="spidev", KERNEL=="spidev0.0", GROUP="spi", MODE="0660"
+      '';
+    })
+    (mkIf cfg.gpio.enable {
+      users.groups.gpio = { };
+      users.users.eliza.extraGroups = [ "gpio" ];
+
+      environment.systemPackages = with pkgs; [ wiringpi gpio-utils ];
+
+      services.udev.extraRules = ''
+        KERNEL=="gpiochip0*", GROUP="gpio", MODE="0660"
+      '';
     })
   ]);
 }

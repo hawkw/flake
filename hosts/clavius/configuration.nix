@@ -11,6 +11,7 @@ with lib; {
     raspberry-pi = {
       i2c.enable = true;
       spi.enable = true;
+      gpio.enable = true;
       pi3.enable = true;
     };
     observability.enable = true;
