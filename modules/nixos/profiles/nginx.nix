@@ -77,11 +77,22 @@ in
           recommendedProxySettings = true;
           recommendedTlsSettings = true;
 
-
           virtualHosts."${acmeDomain}" = {
             forceSSL = true;
             enableACME = true;
           };
+
+          # Log to journald rather than to `/var/log/nginx` (by logging errors
+          # to stderr and access logs to syslog).
+          #
+          # This is appended to all virtual host configs.
+          #
+          # See https://discourse.nixos.org/t/nginx-logging-to-journald/2005 for
+          # details.
+          appendHttpConfig = ''
+            error_log stderr;
+            access_log syslog:server=unix:/dev/log combined;
+          '';
         };
       }
     );
