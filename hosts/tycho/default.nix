@@ -1,4 +1,5 @@
 { nixos-hardware, nixos-raspberrypi, ... }:
+
 {
   system = "aarch64-linux";
 

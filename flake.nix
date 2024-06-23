@@ -169,14 +169,19 @@
           ####################
           ## NixOS (images) ##
           ####################
-          images = {
-            clavius =
-              (self.nixosConfigurations.clavius.extendModules {
-                modules = [
-                  nixos-raspberrypi.nixosModules.sd-image-rpi3
-                ];
-              }).config.system.build.sdImage;
-          };
+          images =
+            let
+              mkPiImage = { hostname, imageKind ? "sd-image-rpi3" }:
+                (self.nixosConfigurations.${hostname}.extendModules {
+                  modules = [
+                    nixos-raspberrypi.nixosModules.${imageKind}
+                  ];
+                }).config.system.build.sdImage;
+            in
+            {
+              clavius = mkPiImage { hostname = "clavius"; };
+              tycho = mkPiImage { hostname = "tycho"; };
+            };
 
 
           #####################
@@ -194,16 +199,16 @@
               };
             in
             {
-              clavius = {
+              clavius = mkNode {
                 hostname = "clavius";
-                profiles.system = {
-                  sshUser = "eliza";
-                  sshOpts = [ "-t" ];
-                  path =
-                    deploy-rs.lib.aarch64-linux.activate.nixos
-                      self.nixosConfigurations.clavius;
-                  user = "root";
-                };
+                system = "aarch64-linux";
+                extraOpts = { sshOpts = [ "-t" ]; };
+              };
+
+              tycho = mkNode {
+                hostname = "tycho";
+                system = "aarch64-linux";
+                extraOpts = { sshOpts = [ "-t" ]; };
               };
 
               noctis = mkNode { hostname = "noctis"; };

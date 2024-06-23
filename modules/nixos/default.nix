@@ -2,13 +2,14 @@
 
 {
   imports = [
+    ./profiles/arm-cross-dev.nix
     ./hardware/ergodox.nix
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/probes.nix
     ./profiles/desktop
-    ./profiles/arm-cross-dev.nix
     ./profiles/docs.nix
+    ./profiles/eclss-node.nix
     ./profiles/games.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
