@@ -6,5 +6,8 @@
 
   system.stateVersion = "23.11";
   profiles.eclss-node.enable = true;
-  services.eclssd.location = "kitchen";
+  services.eclssd = {
+    location = "kitchen";
+    onlySensors = [ "SCD41" "BME680" "SEN55" ];
+  };
 }

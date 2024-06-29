@@ -14,6 +14,7 @@ with lib;
     i2c.enable = mkEnableOption "Raspberry Pi I2C devices";
     spi.enable = mkEnableOption "Raspberry Pi SPI devices";
     gpio.enable = mkEnableOption "Raspberry Pi GPIO utilities";
+    poe-hat.enable = mkEnableOption "Raspberry Pi PoE HAT";
   };
 
   config = mkIf (cfg.pi3.enable || cfg.pi4.enable || cfg.pi5.enable) (mkMerge [
@@ -59,6 +60,12 @@ with lib;
         })
         # (mkIf cfg.spi.enable
         #   { name = "spi0-0cs.dtbo"; dtboFile = "${pkgs.device-tree_rpi.overlays}/spi0-0cs.dtbo"; })
+
+        (mkIf cfg.poe-hat.enable {
+          name = "poe-hat";
+          # TODO(eliza): make pi3-specific?
+          dtsFile = ./dts/poe-hat-pi3.dts;
+        })
       ];
 
     }

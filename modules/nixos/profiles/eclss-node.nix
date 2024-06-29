@@ -30,8 +30,11 @@ with lib;
     virtualisation.docker.enable = mkForce false;
 
     networking = {
-      # use networkmanager instead of wpa_supplicant
-      wireless.enable = false;
+      wireless = {
+        enable = mkForce true;
+        environmentFile = "/var/secrets/wireless.env";
+        networks."ManyPaws".psk = "@PSK_MANYPAWS@";
+      };
 
       networkmanager.enable = mkForce false;
       useNetworkd = mkForce true;
@@ -60,7 +63,7 @@ with lib;
         logging = {
           timestamps = false;
           format = "journald";
-          filter = "info,eclss=debug";
+          filter = "info";
         };
       };
       tailscale.enable = true;
