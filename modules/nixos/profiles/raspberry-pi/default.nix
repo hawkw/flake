@@ -1,6 +1,11 @@
 { config, pkgs, lib, ... }:
 let
   cfg = config.profiles.raspberry-pi;
+  mkUdevRules = ({ name, text }:
+    pkgs.writeTextFile {
+      inherit name text;
+      destination = "/etc/udev/rules.d/75-${name}.rules";
+    });
 in
 with lib;
 {
@@ -80,9 +85,15 @@ with lib;
       users.groups.spi = { };
       users.users.eliza.extraGroups = [ "spi" ];
 
-      services.udev.extraRules = ''
-        SUBSYSTEM=="spidev", KERNEL=="spidev0.0", GROUP="spi", MODE="0660"
-      '';
+      services.udev.packages = [
+        (mkUdevRules
+          {
+            name = "spi";
+            text = ''
+              SUBSYSTEM=="spidev", KERNEL=="spidev0.0", GROUP="spi", MODE="0660"
+            '';
+          })
+      ];
     })
     (mkIf cfg.gpio.enable {
       users.groups.gpio = { };
@@ -90,9 +101,16 @@ with lib;
 
       environment.systemPackages = with pkgs; [ wiringpi gpio-utils ];
 
-      services.udev.extraRules = ''
-        KERNEL=="gpiochip0*", GROUP="gpio", MODE="0660"
-      '';
+      services.udev.packages = [
+        (mkUdevRules
+          {
+            name = "gpio";
+            text = ''
+              KERNEL=="gpiochip0*", GROUP="gpio", MODE="0660"
+              SUBSYSTEM=="gpiomem", GROUP="gpio", MODE="0660"
+            '';
+          })
+      ];
     })
   ]);
 }
