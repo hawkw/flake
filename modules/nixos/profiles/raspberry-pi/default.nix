@@ -39,6 +39,8 @@ with lib;
         options = "--delete-older-than 30d";
       };
 
+      environment.systemPackages = with pkgs; [ libraspberrypi ];
+
       hardware.deviceTree.overlays = [
         # enable I2C-1 on the Raspberry Pi 3
         #
