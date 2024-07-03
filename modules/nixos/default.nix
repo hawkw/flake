@@ -14,7 +14,6 @@
     ./profiles/games.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
-    ./profiles/nix-ld.nix
     ./profiles/nginx.nix
     ./profiles/observability
     ./profiles/perftools.nix
