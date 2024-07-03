@@ -18,6 +18,7 @@
     vu-dials.enable = true;
     observability.enable = true;
     arm-cross-dev.enable = true;
+    nix-ld.enable = true;
   };
 
   hardware = {
