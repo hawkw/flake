@@ -73,7 +73,7 @@ in
             for each path to the corresponding public dashboard URL will be
             added to NGINX.'';
           default = {
-            "eclss" = "21447c2bc0e943ebac051abeda0ca58f";
+            "eclss" = "5c87345de11549dca71df920f8de526d";
             "eliza-ops" = "bc53c5457dbd4705bb0d56e67f57408c";
           };
         };
