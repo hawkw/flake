@@ -47,6 +47,7 @@ in
 
     observer = {
       enable = mkEnableOption "observability collector";
+      enableUnifi = mkEnableOption "Unifi poller";
       rootDomain = mkOption {
         type = str;
         default = "elizas.website";
@@ -590,6 +591,32 @@ in
                 };
               }
             ))
+            (mkIf cfg.observer.enableUnifi {
+              services.prometheus.exporters.unpoller = {
+                enable = true;
+                log.prometheusErrors = true;
+                loki = {
+                  url = "http://127.0.0.1:${toString cfg.loki.port}";
+                };
+                controllers = [{
+                  user = "readonly2";
+                  pass = /etc/secrets/unpoller-dream-machine.password;
+                  # Per the Unpoller docs:
+                  # > When configuring make sure that you do not include :8443
+                  # > on the url of the controller if you are using unifios.
+                  # > Those are: UDM Pro, UDM, UXG, or CloudKey with recent
+                  # > firmware.
+                  url = "https://unifi";
+                  verify_ssl = false;
+                  save_events = true;
+                  save_anomalies = true;
+                  save_alarms = true;
+                  save_dpi = false;
+                  save_sites = true;
+                  save_ids = false;
+                }];
+              };
+            })
           ]
         ))
     ]);

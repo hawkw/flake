@@ -16,6 +16,7 @@
       enable = true;
       observer = {
         enable = true;
+        enableUnifi = true;
         inherit rootDomain;
       };
     };
