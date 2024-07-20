@@ -99,8 +99,9 @@ with lib;
 
     users.motd = ''
       ┌┬────────────────┐
-      ││ ELIZA NETWORKS │ ${config.networking.hostName}: environmental monitoring and control
+      ││ ELIZA NETWORKS │
       └┴────────────────┘
+      ${config.networking.hostName}: environmental monitoring and control
     '';
   };
 }

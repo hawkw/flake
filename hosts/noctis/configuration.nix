@@ -122,8 +122,9 @@
 
   users.motd = ''
     ┌┬────────────────┐
-    ││ ELIZA NETWORKS │ ${config.networking.hostName}: workstation
+    ││ ELIZA NETWORKS │
     └┴────────────────┘
+    ${config.networking.hostName}: workstation
   '';
 
 }

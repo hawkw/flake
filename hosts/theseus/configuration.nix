@@ -82,8 +82,9 @@
 
   users.motd = ''
     ┌┬────────────────┐
-    ││ ELIZA NETWORKS │ ${config.networking.hostName}: mobile workstation
+    ││ ELIZA NETWORKS │
     └┴────────────────┘
+    ${config.networking.hostName}: mobile workstation
   '';
 
   # As of firmware v03.03, a bug in the EC causes the system to wake if AC is
