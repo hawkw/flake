@@ -10,31 +10,63 @@ with lib; {
 
   config =
     mkIf cfg.enable {
-        home.packages = with pkgs;
-          let
-            atrium-sync = writeShellApplication
-              {
-                name = "atrium-sync";
-                runtimeInputs = [ rsync ];
-                text = builtins.readFile ./atrium-sync.sh;
-              };
-            atrium-run = writeShellApplication
-              {
-                name = "atrium";
-                runtimeInputs = [ openssh rsync atrium-sync ];
-                text = builtins.readFile ./atrium-run.sh;
-              };
-          in
-          [ atrium-sync atrium-run ];
+      home.packages = with pkgs;
+        let
+          atrium-sync = writeShellApplication
+            {
+              name = "atrium-sync";
+              runtimeInputs = [ rsync ];
+              text = builtins.readFile ./atrium-sync.sh;
+            };
+          atrium-run = writeShellApplication
+            {
+              name = "atrium";
+              runtimeInputs = [ openssh rsync atrium-sync ];
+              text = builtins.readFile ./atrium-run.sh;
+            };
+        in
+        [ atrium-sync atrium-run ];
 
-        # use Nix flake in the Omicron repo.
-        programs.zsh.initExtra = ''
-          export OMICRON_USE_FLAKE=1;
-        '';
+      # use Nix flake in the Omicron repo.
+      programs.zsh.initExtra = ''
+        export OMICRON_USE_FLAKE=1;
+      '';
 
-        home.sessionVariables = {
-          # Tell direnv to opt in to using the Nix flake for Omicron.
-          OMICRON_USE_FLAKE = " 1 ";
+      home.sessionVariables = {
+        # Tell direnv to opt in to using the Nix flake for Omicron.
+        OMICRON_USE_FLAKE = " 1 ";
+      };
+
+      programs.ssh.matchBlocks =
+        let
+          proxyJump = "vpn.eng.oxide.computer,jeeves.eng.oxide.computer";
+          switchZoneHostname = "fe80::aa40:25ff:fe05:602%%madrid_sw1tp0";
+          extraOptions = {
+            "StrictHostKeyChecking" = "no";
+          };
+        in
+        {
+          # madrid - global zone
+          "madridgz" = {
+            host = "madridgz";
+            hostname = "fe80::eaea:6aff:fe09:7f66%%madrid_host0";
+            user = "root";
+            inherit proxyJump extraOptions;
+          };
+          # madrid - wicket on switch zone
+          "madridwicket" = {
+            host = "madridwicket";
+            hostname = switchZoneHostname;
+            user = "wicket";
+            inherit proxyJump extraOptions;
+          };
+          # madrid - root on switch zone
+          "madridswitch" = {
+            host = "madriswitch";
+            hostname = switchZoneHostname;
+            user = "root";
+            inherit proxyJump extraOptions;
+          };
         };
 
       programs.oxide = {
