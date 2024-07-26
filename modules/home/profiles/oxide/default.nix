@@ -62,7 +62,7 @@ with lib; {
           };
           # madrid - root on switch zone
           "madridswitch" = {
-            host = "madriswitch";
+            host = "madridswitch";
             hostname = switchZoneHostname;
             user = "root";
             inherit proxyJump extraOptions;
