@@ -1,8 +1,11 @@
 { config, lib, pkgs, ... }:
+
 let
   cfg = config.profiles.oxide;
 in
 with lib; {
+
+  imports = [ ./madrid.nix ];
 
   options.profiles.oxide = {
     enable = mkEnableOption "personal configuration for Oxide utilities";
@@ -36,38 +39,6 @@ with lib; {
         # Tell direnv to opt in to using the Nix flake for Omicron.
         OMICRON_USE_FLAKE = " 1 ";
       };
-
-      programs.ssh.matchBlocks =
-        let
-          proxyJump = "vpn.eng.oxide.computer,jeeves.eng.oxide.computer";
-          switchZoneHostname = "fe80::aa40:25ff:fe05:602%%madrid_sw1tp0";
-          extraOptions = {
-            "StrictHostKeyChecking" = "no";
-          };
-        in
-        {
-          # madrid - global zone
-          "madridgz" = {
-            host = "madridgz";
-            hostname = "fe80::eaea:6aff:fe09:7f66%%madrid_host0";
-            user = "root";
-            inherit proxyJump extraOptions;
-          };
-          # madrid - wicket on switch zone
-          "madridwicket" = {
-            host = "madridwicket";
-            hostname = switchZoneHostname;
-            user = "wicket";
-            inherit proxyJump extraOptions;
-          };
-          # madrid - root on switch zone
-          "madridswitch" = {
-            host = "madridswitch";
-            hostname = switchZoneHostname;
-            user = "root";
-            inherit proxyJump extraOptions;
-          };
-        };
 
       programs.oxide = {
         looker.enable = true;
