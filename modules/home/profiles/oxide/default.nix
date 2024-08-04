@@ -5,7 +5,7 @@ let
 in
 with lib; {
 
-  imports = [ ./madrid.nix ];
+  imports = [ ./lab.nix ];
 
   options.profiles.oxide = {
     enable = mkEnableOption "personal configuration for Oxide utilities";
