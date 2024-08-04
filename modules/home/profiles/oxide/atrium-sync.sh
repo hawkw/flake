@@ -5,4 +5,4 @@ rsync \
     --exclude="out/*" \
     --delete \
     --progress \
-    . "${USER}@atrium.eng.oxide.computer:/home/${USER}/${PWD##*/}"
+    . "${USER}@atrium:/home/${USER}/${PWD##*/}"

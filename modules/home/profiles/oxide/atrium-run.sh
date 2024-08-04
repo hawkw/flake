@@ -17,4 +17,4 @@ CMD="source ~/.bashrc && \
 # want to forward the arguments to this script as a command to run on the remote
 # box.
 # shellcheck disable=SC2029
-ssh "${USER}@atrium.eng.oxide.computer" "${CMD}"
+ssh "${USER}@atrium" "${CMD}"
