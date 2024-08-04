@@ -15,64 +15,79 @@ with lib; {
           proxyJump = vpn;
           user = "eliza";
         };
-        mkRacklette = { name, gzIp, switchZoneIp, }: (
-          let all = "${name}-all"; in {
-            #
-            # root in the global zone of the scrimlet:
-            #
-            "${name}gz" = hm.dag.entryBefore [ all ] {
-              host = "${name}gz";
-              hostname = "${gzIp}%%${name}_host0";
-            };
-
-            #
-            # Wicket in the switch zone:
-            #
-            "${name}wicket" = hm.dag.entryBefore [ all ] {
-              host = "${name}wicket";
-              hostname = "${switchZoneIp}%%${name}_sw1tp0";
-              user = "wicket";
-            };
-
-            #
-            # root in the switch zone:
-            #
-            "${name}switch" = hm.dag.entryBefore [ all ] {
-              host = "${name}switch";
-              hostname = switchZoneHostname;
-            };
-
-            #
-            # gimlets by cubby number
-            #
-            ${name} = hm.dag.entryBefore [ all jeeves ] {
-              host = "${name}gc*";
-              proxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo "%h" | sed s/${name}gc//) %p'';
-              forwardAgent = true;
-              proxyJump = vpn;
-              extraOptions = {
-                ServerAliveInterval = "15";
+        mkRacklette =
+          {
+            # name of the racklet
+            name
+          , # yes, this looks like "gzip", but it's the global zone IP
+            gzIp
+            # IP of the switch zone
+          , switchZoneIp
+          }: (
+            let
+              all = "${name}-all";
+              switchZoneHostname = "${switchZoneIp}%%${name}_sw1tp0";
+              wicket = "${name}wicket";
+              switch = "${name}switch";
+              gc = "${name}gc";
+            in
+            {
+              #
+              # root in the global zone of the scrimlet:
+              #
+              "${name}gz" = hm.dag.entryBefore [ all ] {
+                host = "${name}gz";
+                hostname = "${gzIp}%%${name}_host0";
               };
-            };
 
-            #
-            # config applied to all of the above:
-            #
-            "${name}-all" = hm.dag.entryBefore [ jeeves ] {
-              host = "${name}*";
-              user = "root";
-              proxyJump = jeeves;
-              extraOptions = {
-                # Every time the racklet is reset, the host key changes, so
-                # silence all  of openssh's warnings that "SOMEONE MIGHT BE
-                # DOING SOMETHING NASTY".
-                StrictHostKeyChecking = "no";
-                UserKnownHostsFile = "/dev/null";
-                LogLevel = "error";
+              #
+              # Wicket in the switch zone:
+              #
+              ${wicket} = hm.dag.entryBefore [ all ] {
+                host = wicket;
+                hostname = switchZoneHostname;
+                user = "wicket";
               };
-            };
-          }
-        );
+
+              #
+              # root in the switch zone:
+              #
+              switch = hm.dag.entryBefore [ all ] {
+                host = switch;
+                hostname = switchZoneIp;
+              };
+
+              #
+              # gimlets by cubby number
+              #
+              gc = hm.dag.entryBefore [ all jeeves ] {
+                host = gc;
+                proxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo "%h" | sed s/${gc}//) %p'';
+                forwardAgent = true;
+                proxyJump = vpn;
+                extraOptions = {
+                  ServerAliveInterval = "15";
+                };
+              };
+
+              #
+              # config applied to all of the above:
+              #
+              "${name}-all" = hm.dag.entryBefore [ jeeves ] {
+                host = "${name}*";
+                user = "root";
+                proxyJump = jeeves;
+                extraOptions = {
+                  # Every time the racklet is reset, the host key changes, so
+                  # silence all  of openssh's warnings that "SOMEONE MIGHT BE
+                  # DOING SOMETHING NASTY".
+                  StrictHostKeyChecking = "no";
+                  UserKnownHostsFile = "/dev/null";
+                  LogLevel = "error";
+                };
+              };
+            }
+          );
       in
       ### lab machines
       (attrsets.genAttrs [ jeeves "atrium" "cadbury" "yuban" "lurch" ] mkLabMachine)
