@@ -7,12 +7,12 @@ with lib; {
   config = mkIf cfg.enable {
     programs.ssh.matchBlocks =
       let
-        vpn = "vpn.eng.oxide.computer";
         jeeves = "jeeves";
-        mkLabMachine = name: {
+        labNoVpn = "noVpn";
+        engDomain = "eng.oxide.computer";
+        mkLabMachine = name: hm.dag.entryBefore [ labNoVpn ] {
           host = name;
-          hostname = "${name}.eng.oxide.computer";
-          proxyJump = vpn;
+          hostname = "${name}.${engDomain}";
           user = "eliza";
         };
         mkRacklette =
@@ -64,7 +64,6 @@ with lib; {
                 host = gc;
                 proxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo "%h" | sed s/${gc}//) %p'';
                 forwardAgent = true;
-                proxyJump = vpn;
                 extraOptions = {
                   ServerAliveInterval = "15";
                 };
@@ -91,6 +90,15 @@ with lib; {
       in
       ### lab machines
       (attrsets.genAttrs [ jeeves "atrium" "cadbury" "yuban" "lurch" ] mkLabMachine)
+      # if the Oxide VPN connection is *not* active, add a `proxyJump` to
+      # connect to the VPN first. Don't do this if already on the VPN,
+      # because it makes the SSH connection take longer to establish.
+      // {
+        ${labNoVpn} = {
+          match = ''host "*.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
+          proxyJump = "vpn.${engDomain}";
+        };
+      }
 
       ### racklette: madrid
       // mkRacklette {
