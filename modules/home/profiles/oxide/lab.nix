@@ -61,7 +61,7 @@ with lib; {
               # gimlets by cubby number
               #
               gc = hm.dag.entryBefore [ all jeeves ] {
-                host = gc;
+                host = "${gc}*";
                 proxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo "%h" | sed s/${gc}//) %p'';
                 forwardAgent = true;
                 extraOptions = {
