@@ -10,11 +10,8 @@ with lib; {
         jeeves = "jeeves";
         labNoVpn = "noVpn";
         engDomain = "eng.oxide.computer";
-        mkLabMachine = name: hm.dag.entryBefore [ labNoVpn ] {
-          host = name;
-          hostname = "${name}.${engDomain}";
-          user = "eliza";
-        };
+        all-racklettes = "all-racklettes";
+        racklette-gimlets = "racklette-gimlets";
         mkRacklette =
           {
             # name of the racklet
@@ -25,17 +22,15 @@ with lib; {
           , switchZoneIp
           }: (
             let
-              all = "${name}-all";
               switchZoneHostname = "${switchZoneIp}%%${name}_sw1tp0";
               wicket = "${name}wicket";
               switch = "${name}switch";
-              gc = "${name}gc";
             in
             {
               #
               # root in the global zone of the scrimlet:
               #
-              "${name}gz" = hm.dag.entryBefore [ all ] {
+              "${name}gz" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                 host = "${name}gz";
                 hostname = "${gzIp}%%${name}_host0";
               };
@@ -43,7 +38,7 @@ with lib; {
               #
               # Wicket in the switch zone:
               #
-              ${wicket} = hm.dag.entryBefore [ all ] {
+              ${wicket} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                 host = wicket;
                 hostname = switchZoneHostname;
                 user = "wicket";
@@ -52,67 +47,85 @@ with lib; {
               #
               # root in the switch zone:
               #
-              switch = hm.dag.entryBefore [ all ] {
+              switch = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                 host = switch;
                 hostname = switchZoneIp;
               };
-
-              #
-              # gimlets by cubby number
-              #
-              gc = hm.dag.entryBefore [ all jeeves ] {
-                host = "${gc}*";
-                proxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo "%h" | sed s/${gc}//) %p'';
-                forwardAgent = true;
-                extraOptions = {
-                  ServerAliveInterval = "15";
-                };
-              };
-
-              #
-              # config applied to all of the above:
-              #
-              "${name}-all" = hm.dag.entryBefore [ jeeves ] {
-                host = "${name}*";
-                user = "root";
-                proxyJump = jeeves;
-                extraOptions = {
-                  # Every time the racklet is reset, the host key changes, so
-                  # silence all  of openssh's warnings that "SOMEONE MIGHT BE
-                  # DOING SOMETHING NASTY".
-                  StrictHostKeyChecking = "no";
-                  UserKnownHostsFile = "/dev/null";
-                  LogLevel = "error";
-                };
-              };
             }
           );
+        labMachines = [ jeeves "atrium" "cadbury" "yuban" "lurch" "alfred" ];
+        racklettes = [
+          # racklette: madrid
+          {
+            name = "madrid";
+            gzIp = "fe80::eaea:6aff:fe09:7f66";
+            switchZoneIp = "fe80::aa40:25ff:fe05:602";
+          }
+          # racklette: london
+          {
+            name = "london";
+            gzIp = "fe80::eaea:6aff:fe09:8567";
+            switchZoneIp = "fe80::aa40:25ff:fe05:702";
+          }
+        ];
+        rackletteNames = attrsets.catAttrs "name" racklettes;
       in
-      ### lab machines
-      (attrsets.genAttrs [ jeeves "atrium" "cadbury" "yuban" "lurch" ] mkLabMachine)
-      # if the Oxide VPN connection is *not* active, add a `proxyJump` to
-      # connect to the VPN first. Don't do this if already on the VPN,
-      # because it makes the SSH connection take longer to establish.
-      // {
+      {
+        #
+        # oxide lab machines
+        #
+        "lab" = hm.dag.entryBefore [ labNoVpn ] {
+          host = concatStringsSep " " labMachines;
+          hostname = "%h.${engDomain}";
+          user = "eliza";
+        };
+
+        # if the Oxide VPN connection is *not* active, add a `proxyJump` to
+        # connect to the VPN first. Don't do this if already on the VPN,
+        # because it makes the SSH connection take longer to establish.
         ${labNoVpn} = {
           match = ''host "!vpn.${engDomain}, *.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
           proxyJump = "vpn.${engDomain}";
         };
+
+        #
+        # racklette gimlets by cubby number
+        #
+        ${racklette-gimlets} = hm.dag.entryBefore [ "lab" all-racklettes ] {
+          host = trivial.pipe rackletteNames [
+            (map (name: "${name}gc*"))
+            (concatStringsSep " ")
+          ];
+          proxyCommand = ''ssh ${jeeves} pilot -r $(echo "%h" | sed 's/gc.*//') tp nc any $(echo "%h" | sed 's/.*gc//') %p'';
+          forwardAgent = true;
+          extraOptions = {
+            ServerAliveInterval = "15";
+          };
+        };
+
+        #
+        # config applied to all of the above:
+        #
+        ${all-racklettes} = hm.dag.entryBefore [ jeeves ] {
+          host = trivial.pipe rackletteNames [
+            (map (name: "${name}*"))
+            (concatStringsSep " ")
+          ];
+          user = "root";
+          proxyJump = jeeves;
+          extraOptions = {
+            # Every time the racklet is reset, the host key changes, so
+            # silence all  of openssh's warnings that "SOMEONE MIGHT BE
+            # DOING SOMETHING NASTY".
+            StrictHostKeyChecking = "no";
+            UserKnownHostsFile = "/dev/null";
+            LogLevel = "error";
+          };
+        };
       }
-
-      ### racklette: madrid
-      // mkRacklette {
-        name = "madrid";
-        gzIp = "fe80::eaea:6aff:fe09:7f66";
-        switchZoneIp = "fe80::aa40:25ff:fe05:602";
-      }
-
-      ### racklette: london
-      // mkRacklette {
-        name = "london";
-        gzIp = "fe80::eaea:6aff:fe09:8567";
-        switchZoneIp = "fe80::aa40:25ff:fe05:702";
-      };
-
+      #
+      # individual racklettes
+      #
+      // (attrsets.mergeAttrsList (map mkRacklette racklettes));
   };
 }
