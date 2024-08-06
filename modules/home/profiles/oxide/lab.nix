@@ -84,7 +84,7 @@ with lib; {
         # connect to the VPN first. Don't do this if already on the VPN,
         # because it makes the SSH connection take longer to establish.
         ${labNoVpn} = {
-          match = ''host "!vpn.${engDomain}, *.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
+          match = ''host "*.${engDomain} !vpn.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
           proxyJump = "vpn.${engDomain}";
         };
 
