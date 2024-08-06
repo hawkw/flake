@@ -95,7 +95,7 @@ with lib; {
       # because it makes the SSH connection take longer to establish.
       // {
         ${labNoVpn} = {
-          match = ''host "*.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
+          match = ''host "!vpn.${engDomain}, *.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
           proxyJump = "vpn.${engDomain}";
         };
       }
