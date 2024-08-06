@@ -38,6 +38,7 @@ rec {
       slurm
       bandwhich
       nghttp2
+      inetutils
       # assorted wiresharks
       termshark
       tcpdump
