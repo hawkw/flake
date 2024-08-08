@@ -27,8 +27,13 @@ with lib; {
               runtimeInputs = [ openssh rsync atrium-sync ];
               text = builtins.readFile ./atrium-run.sh;
             };
+          lookall = writeShellApplication {
+            name = "lookall";
+            runtimeInputs = [ openssh ];
+            text = builtins.readFile ./lookall.sh;
+          };
         in
-        [ atrium-sync atrium-run ];
+        [ atrium-sync atrium-run lookall ];
 
       # use Nix flake in the Omicron repo.
       programs.zsh.initExtra = ''
