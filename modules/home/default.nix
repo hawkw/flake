@@ -46,6 +46,7 @@ rec {
       ### stuff ###
       neofetch
       pfetch
+      fastfetch
       dtrx # Do The Right eXtraction --- extract any kind of archive file
       unzip
       btop
@@ -144,6 +145,11 @@ rec {
 
         direnv = {
           disabled = false;
+          symbol = "direnv ";
+          format = "env [$loaded$allowed]($style) ";
+          style = "bold blue";
+          unloaded_msg = "📁 ";
+          loaded_msg = "📂 ";
         };
 
         # nodejs.disabled = true;
@@ -180,7 +186,7 @@ rec {
           symbol = "❄️ ";
           impure_msg = "[impure](bold red)";
           pure_msg = "[pure](bold green)";
-          format = "in [$symbol$name\\($state\\)]($style) ";
+          format = "with [$symbol$name\\($state\\)]($style) ";
           heuristic = true;
         };
 
@@ -191,6 +197,8 @@ rec {
           "$username"
           "$hostname"
           "$all"
+          "$direnv"
+          "$nix"
           "$kubernetes"
           "$cmd_duration"
           "$status"
