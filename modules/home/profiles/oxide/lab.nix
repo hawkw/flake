@@ -47,7 +47,7 @@ with lib; {
               #
               # root in the switch zone:
               #
-              switch = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+              ${switch} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                 host = switch;
                 hostname = switchZoneIp;
               };
