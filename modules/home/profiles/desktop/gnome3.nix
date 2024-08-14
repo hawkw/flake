@@ -35,13 +35,13 @@ let
     matcha-gtk-theme
   ];
 in
-{
+with lib; {
 
-  options.profiles.desktop.gnome3 = with lib; {
+  options.profiles.desktop.gnome3 = {
     enable = mkEnableOption "gnome3 profile";
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     home.packages = with pkgs;
       [
         # useful for testing webcams, etc
