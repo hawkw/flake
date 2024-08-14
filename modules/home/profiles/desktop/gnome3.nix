@@ -45,9 +45,9 @@ in
     home.packages = with pkgs;
       [
         # useful for testing webcams, etc
-        gnome3.cheese
+        cheese
         # A tool to customize advanced GNOME 3 options
-        gnome3.gnome-tweaks
+        gnome-tweaks
         # A nice way to view information about use of system resources, like memory
         # and disk space
         gnome-usage
