@@ -98,6 +98,8 @@ rec {
   };
 
   programs = {
+    wezterm.enable = lib.mkDefault true;
+
     nushell = {
       enable = lib.mkDefault true;
       configFile.text = ''
