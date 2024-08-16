@@ -68,7 +68,7 @@ in with lib; {
                 separator = " ";
               };
 
-              hyperlink = "auto";
+              hyperlink = "never";
             };
           };
 
