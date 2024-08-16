@@ -12,7 +12,8 @@ in {
       # minecraft
       technic-launcher
       ckan
-      playonlinux
+      # disable this, currently broken due to some kind of python thing
+      # playonlinux 
     ];
   };
 }
