@@ -22,10 +22,10 @@ with lib;
               noctis-tailscale = "${noctis}-tailscale";
             in
             {
-              "${noctis}-local" = hm.dag.entryBefore [ noctis-tailscale ] {
-                match = ''host ${noctis} exec "ping -c1 -W1 -q ${noctis}.local"'';
-                hostname = "noctis.local";
-              };
+              # "${noctis}-local" = hm.dag.entryBefore [ noctis-tailscale ] {
+              #   match = ''host ${noctis} exec "ping -c1 -W1 -q ${noctis}.local"'';
+              #   hostname = "noctis.local";
+              # };
               ${noctis-tailscale} = hm.dag.entryBefore [ "notSsh" ] {
                 host = "noctis";
                 hostname = "noctis";
