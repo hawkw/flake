@@ -57,12 +57,18 @@ in with lib; {
           lsd = {
             enable = true;
             settings = {
+              color = {
+                when = "auto";
+                # theme = "custom";
+              };
               icons = {
                 when = "auto";
                 # use unicode icons rather than fontawesome or whatever (for compatibility).
                 theme = "unicode";
-                separator = "  ";
+                separator = " ";
               };
+
+              hyperlink = "auto";
             };
           };
 
@@ -73,10 +79,13 @@ in with lib; {
         xdg.configFile."lsd/icons.yaml".source = (pkgs.formats.yaml { }).generate "icons.yml"
           {
             filetype = {
-              dir = "🗁";
+              dir = "🗀";
               file = "🗎";
               executable = "🗔";
               pipe = "⭍";
+              socket = "🖧";
+              device_block = "🖴";
+              device_char = "🖵";
             };
           };
       }
