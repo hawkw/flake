@@ -60,7 +60,7 @@ in with lib; {
               icons = {
                 when = "auto";
                 # use unicode icons rather than fontawesome or whatever (for compatibility).
-                # theme = "unicode";
+                theme = "unicode";
                 separator = "  ";
               };
             };
@@ -68,6 +68,17 @@ in with lib; {
 
           zoxide = { enable = true; };
         };
+
+
+        xdg.configFile."lsd/icons.yaml".source = (pkgs.formats.yaml { }).generate "icons.yml"
+          {
+            filetype = {
+              dir = "🗁";
+              file = "🗎";
+              executable = "🗔";
+              pipe = "⭍";
+            };
+          };
       }
 
       # mcfly: shell history (ctrl-r) replacement

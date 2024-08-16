@@ -131,24 +131,28 @@ rec {
         # why use ":;" as the prompt character? it is a no-op in most (all?) unix shells, so copying and
         # pasting a command including the prompt character will still work
         character = {
-          success_symbol = "[:;](bold green)";
-          error_symbol = "[:](bold green)[;](bold red)";
+          success_symbol = "[\\$](bold green)";
+          error_symbol = "[\\$](bold red)";
         };
 
         hostname = {
-          format = "at [$hostname]($style) in ";
+          format = "@[$hostname]($style)";
           ssh_only = false;
         };
 
         username = {
-          format = "[$user]($style) ";
+          format = "[$user]($style)";
           show_always = true;
+        };
+
+        directory = {
+          truncate_to_repo = false;
         };
 
         direnv = {
           disabled = false;
-          symbol = "direnv ";
-          format = "env [$loaded$allowed]($style) ";
+          symbol = "env ";
+          format = "$symbol[$loaded$allowed]($style) ";
           style = "bold blue";
           unloaded_msg = "📁 ";
           loaded_msg = "📂 ";
@@ -188,23 +192,46 @@ rec {
           symbol = "❄️ ";
           impure_msg = "[impure](bold red)";
           pure_msg = "[pure](bold green)";
-          format = "with [$symbol$name\\($state\\)]($style) ";
-          heuristic = true;
+          format = "in [$symbol$name\\($state\\)]($style) ";
+          # heuristic = true;
+        };
+
+        time = {
+          disabled = false;
+          # style = "bold fg:bright-black bg:green";
+          format = "[$time ]($style)";
+        };
+
+        git_branch = {
+          # Unicode "alternative key symbol" works nicely as a "git branch"
+          # symbol but doesn't require patched fonts.
+          symbol = "⎇ ";
         };
 
         format = lib.concatStrings [
           # Start the first line with a shell comment so that the entire prompt
           # can be copied and pasted.
-          "[#;](bold green) "
-          "$username"
-          "$hostname"
-          "$all"
+          "# "
+          # "[](fg:black bg:green)"
+          # "[ ](bg:green)"
+          "$time"
+          # "[](fg:green) "
+          # "[](bg:#DA627D fg:#9A348E)"
           "$direnv"
-          "$nix"
+          "$nix_shell"
+          # "[](fg:#DA627D bg:#FCA17D)"
+          "$git"
+          # "[](fg:#FCA17D bg:#86BBD8)"
+          "$all"
           "$kubernetes"
+          # "[](fg:#86BBD8 bg:#06969A)"
           "$cmd_duration"
           "$status"
           "$line_break"
+          "$username"
+          "$hostname"
+          " "
+          "$directory"
           "$character"
         ];
 
