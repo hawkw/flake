@@ -127,7 +127,7 @@ rec {
       settings = {
 
         # Replace the "❯" symbol in the prompt with ":;"
-        #
+
         # why use ":;" as the prompt character? it is a no-op in most (all?) unix shells, so copying and
         # pasting a command including the prompt character will still work
         character = {
@@ -147,6 +147,8 @@ rec {
 
         directory = {
           truncate_to_repo = false;
+          truncation_length = 5;
+          truncation_symbol = "…/";
         };
 
         direnv = {
@@ -154,8 +156,8 @@ rec {
           symbol = "env ";
           format = "$symbol[$loaded$allowed]($style) ";
           style = "bold blue";
-          unloaded_msg = "📁 ";
-          loaded_msg = "📂 ";
+          allowed_msg = "";
+          not_allowed_msg = " (not allowed)";
         };
 
         # nodejs.disabled = true;
@@ -190,28 +192,28 @@ rec {
 
         nix_shell = {
           symbol = "❄️ ";
-          impure_msg = "[impure](bold red)";
-          pure_msg = "[pure](bold green)";
-          format = "in [$symbol$name\\($state\\)]($style) ";
+          impure_msg = "[\\(]($style)[±](bold red)[\\)]($style)";
+          pure_msg = "";
+          format = "in [$symbol$name$state]($style) ";
           # heuristic = true;
         };
 
         time = {
           disabled = false;
           # style = "bold fg:bright-black bg:green";
-          format = "[$time ]($style)";
+          format = "⏲ [$time]($style) ";
         };
 
         git_branch = {
           # Unicode "alternative key symbol" works nicely as a "git branch"
           # symbol but doesn't require patched fonts.
-          symbol = "⎇ ";
+          symbol = "⎇  ";
         };
 
         format = lib.concatStrings [
           # Start the first line with a shell comment so that the entire prompt
           # can be copied and pasted.
-          "# "
+          "[#](hidden)"
           # "[](fg:black bg:green)"
           # "[ ](bg:green)"
           "$time"
