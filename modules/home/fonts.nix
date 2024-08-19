@@ -27,5 +27,8 @@
     noto-fonts-cjk
     noto-fonts-emoji
     noto-fonts-extra
+    noto-fonts-monochrome-emoji
+    # fontconfig binary
+    fontconfig
   ];
 }

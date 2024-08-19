@@ -9,11 +9,19 @@ in
   ];
 
   options.profiles.terminal = with types;{
-    font = mkOption {
-      type = uniq str;
-      default = "Berkeley Mono";
-      example = "Berkeley Mono";
-      description = "The font family to use in the terminal.";
+    font = {
+      family = mkOption {
+        type = uniq str;
+        default = "Berkeley Mono";
+        example = "Berkeley Mono";
+        description = "The font family to use in the terminal.";
+      };
+      sizePt = mkOption {
+        type = int;
+        default = 13;
+        example = 12;
+        description = "The font size in points to use in the terminal.";
+      };
     };
     padding = {
       x = mkOption {
@@ -78,20 +86,20 @@ in
           # Font configuration for alacritty (changes require restart)
           font = {
             # Point size of the font
-            size = 13;
+            size = cfg.font.sizePt;
             # The normal (roman) font face to use.
             normal = {
-              family = cfg.font;
+              family = cfg.font.family;
               style = "Regular";
             };
 
             bold = {
-              family = cfg.font;
+              family = cfg.font.family;
               style = "Bold";
             };
 
             italic = {
-              family = cfg.font;
+              family = cfg.font.family;
               style = "Italic";
             };
           };
@@ -99,7 +107,11 @@ in
       };
     })
     (mkIf config.programs.wezterm.enable (
-      let waylandGnomeScript = "wayland-gnome"; in {
+      let
+        waylandGnomeScript = "wayland_gnome";
+        bgColor = "#242424";
+      in
+      {
         programs.wezterm = {
           enableZshIntegration = true;
           enableBashIntegration = true;
@@ -110,7 +122,12 @@ in
             -- This will hold the configuration.
             local config = wezterm.config_builder()
 
-            config.font = wezterm.font '${cfg.font}'
+            config.font = wezterm.font_with_fallback {
+              '${cfg.font.family}',
+              -- Prefer monochrome emoji
+              { family = 'Noto Emoji', assume_emoji_presentation = true },
+            }
+            config.font_size = ${toString cfg.font.sizePt}.0
             config.harfbuzz_features = { 'calt=1', 'clig=1', 'liga=1' }
 
             -- Window padding
@@ -126,20 +143,27 @@ in
             config.window_frame = {
               -- The overall background color of the tab bar when
               -- the window is focused
-              active_titlebar_bg = '#242424',
+              active_titlebar_bg = '${bgColor}',
 
               -- The overall background color of the tab bar when
               -- the window is not focused
-              inactive_titlebar_bg = '#242424',
+              inactive_titlebar_bg = '${bgColor}',
             }
 
-            local ${waylandGnomeScript} = require '${waylandGnomeScript} '
+            -- This config appears to make the mouse cursor disappear whenever
+            -- it's over a Wezterm window, not just when actively typing, at
+            -- least on my system (GNOME3 on Wayland). This makes it impossible
+            -- to use the mouse to select text in the terminal, which is
+            -- borderline unusable.
+            config.hide_mouse_cursor_when_typing = false
+
+            local ${waylandGnomeScript} = require '${waylandGnomeScript}'
             ${waylandGnomeScript}.apply_to_config(config)
 
             return config
           '';
         };
-        xdg.configFile."wezterm/${waylandGnomeScript}.lua".source = ./wezterm/wayland-gnome.lua;
+        xdg.configFile."wezterm/${waylandGnomeScript}.lua".source = ./wezterm/wayland_gnome.lua;
       }
     )
     )
