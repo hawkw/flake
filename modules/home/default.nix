@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ config, pkgs, lib, ... }:
 
 let
   user = {
@@ -10,7 +10,6 @@ rec {
   imports = [
     ./fonts.nix
     ./ssh.nix
-    ./zsh.nix
     ./profiles
     ./programs
   ];
@@ -98,6 +97,7 @@ rec {
   };
 
   programs = {
+    alacritty.enable = lib.mkDefault true;
     wezterm.enable = lib.mkDefault true;
 
     nushell = {
@@ -125,7 +125,6 @@ rec {
     starship = {
       enable = true;
       settings = {
-
         # Replace the "❯" symbol in the prompt with ":;"
 
         # why use ":;" as the prompt character? it is a no-op in most (all?) unix shells, so copying and
@@ -163,7 +162,7 @@ rec {
         # nodejs.disabled = true;
 
         kubernetes = {
-          disabled = false;
+          # disabled = false;
           format = "on [$symbol$context(\\($namespace\\))]($style) ";
           context_aliases = {
             # OpenShift contexts carry the namespace and user in the kube context: `namespace/name/user`:
@@ -188,6 +187,9 @@ rec {
 
         # unfortunately, the `sudo` module for starship doesn't work nicely with
         # sudo-rs :(
+        # TODO(eliza): sudo-rs.enable is part of the NixOS config, not
+        # home-manager...
+        # sudo.disabled = config.security.sudo-rs.enable;
         sudo.disabled = true;
 
         nix_shell = {
@@ -208,6 +210,16 @@ rec {
           # Unicode "alternative key symbol" works nicely as a "git branch"
           # symbol but doesn't require patched fonts.
           symbol = "⎇  ";
+        };
+
+        status = {
+          disabled = false;
+          map_symbol = true;
+          pipestatus = true;
+          # symbol = "❌";
+          not_executable_symbol = "🚫";
+          sigint_symbol = "❗";
+          not_found_symbol = "❓";
         };
 
         format = lib.concatStrings [
@@ -270,53 +282,6 @@ rec {
       #   # be useable. :)
       #   right_meters = [ "AllCPUs2" "Blank" "Memory" "Swap" ];
       # };
-    };
-
-    alacritty = {
-      enable = lib.mkDefault true;
-      settings = {
-        # Configuration for Alacritty, the GPU enhanced terminal emulator
-        # Live config reload (changes require restart)
-        live_config_reload = true;
-        window = {
-          dynamic_title = true;
-          # Window dimensions in character columns and lines
-          # (changes require restart)
-          dimensions = {
-            columns = 120;
-            lines = 80;
-          };
-
-          # Adds this many blank pixels of padding around the window
-          # This is DPI-aware.
-          # (change requires restart)
-          padding = {
-            x = 30;
-            y = 30;
-          };
-
-          # Window decorations
-          # Setting this to false will result in window without borders and title bar.
-          # decorations: false
-          decorations_theme_variant = "Dark";
-          class = {
-            instance = "Alacritty";
-            general = "Alacritty";
-          };
-        };
-
-        cursor = {
-          style = {
-            blinking = "On";
-            shape = "Block";
-          };
-        };
-
-        # When true, bold text is drawn using the bright variant of colors.
-        colors.draw_bold_text_with_bright_colors = true;
-
-        # Fonts are configured in fonts.nix
-      };
     };
 
     tmux = {

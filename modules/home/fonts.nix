@@ -28,26 +28,4 @@
     noto-fonts-emoji
     noto-fonts-extra
   ];
-
-  #  Font configuration for alacritty (changes require restart)
-  programs.alacritty.settings.font = {
-    # TamzenForPowerline-14
-    # Point size of the font
-    size = 13;
-    # The normal (roman) font face to use.
-    normal = {
-      family = "Berkeley Mono";
-      style = "Regular";
-    };
-
-    bold = {
-      family = "Berkeley Mono";
-      style = "Bold";
-    };
-
-    italic = {
-      family = "Berkeley Mono";
-      style = "Italic";
-    };
-  };
 }

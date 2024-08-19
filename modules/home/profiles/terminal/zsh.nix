@@ -51,7 +51,7 @@
 
         # Import colorscheme from 'wal' asynchronously, if the terminal is
         # alacritty, and the current session is not a SSH session.
-        if [[ "''${TERM}" == (alacritty*|wezterm*) ]] && [[ -z ''${SESSION_TYPE+x} ]]; then
+        if [[ -z ''${SESSION_TYPE+x} ]]; then
           (cat "''${HOME}/.cache/wal/sequences" &)
         fi
       '';
