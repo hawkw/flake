@@ -8,7 +8,7 @@ in
     ./zsh.nix
   ];
 
-  options.profiles.terminal = with types;{
+  options.profiles.terminal = with types; {
     font = {
       family = mkOption {
         type = uniq str;
@@ -141,6 +141,9 @@ in
             config.enable_tab_bar = true
             config.hide_tab_bar_if_only_one_tab = true
             config.window_frame = {
+              font = wezterm.font { family = '${cfg.font.family}', weight = 'Bold', },
+              font_size = ${toString cfg.font.sizePt}.0,
+
               -- The overall background color of the tab bar when
               -- the window is focused
               active_titlebar_bg = '${bgColor}',
@@ -157,6 +160,17 @@ in
             -- borderline unusable.
             config.hide_mouse_cursor_when_typing = false
 
+            config.ssh_domains = {
+              {
+                -- This name identifies the domain
+                name = 'noctis',
+                -- The hostname or address to connect to. Will be used to match settings
+                -- from your ssh config file
+                remote_address = 'noctis',
+                -- The username to use on the remote host
+                username = 'eliza',
+              },
+            }
             local ${waylandGnomeScript} = require '${waylandGnomeScript}'
             ${waylandGnomeScript}.apply_to_config(config)
 
