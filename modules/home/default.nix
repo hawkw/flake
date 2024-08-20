@@ -12,6 +12,7 @@ rec {
     ./ssh.nix
     ./profiles
     ./programs
+    ./services
   ];
 
   home.stateVersion = "23.11";
@@ -330,28 +331,13 @@ rec {
   programs.atuin = {
     enable = lib.mkDefault true;
     settings = {
+      style = "compact";
       dialect = "us";
       auto_sync = true;
-      daemon.enabled = lib.mkDefault true;
+      daemon = {
+        sync_frequency = "30";
+      };
     };
   };
-  # Running the daemon should fix ZFS-related issues.
-  # See: https://github.com/atuinsh/atuin/issues/952
-  #
-  # This systemd unit config is based on the one from this thread:
-  # https://forum.atuin.sh/t/getting-the-daemon-working-on-nixos/334
-  systemd.user.services.atuind = {
-    Unit = {
-      Description = "Atuin daemon";
-      After = [ "network.target" ];
-    };
-    Service = {
-      Environment = [ "ATUIN_LOG=info" ];
-      ExecStart = "${pkgs.atuin}/bin/atuin daemon";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
-    };
-  };
-
+  services.atuin-daemon.enable = lib.mkDefault true;
 }

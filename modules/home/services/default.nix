@@ -1,0 +1,4 @@
+{ ... }:
+{
+  imports = [ ./atuin-daemon.nix ];
+}
