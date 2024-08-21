@@ -82,17 +82,5 @@ with lib; {
         };
       };
     };
-
-
-    # automagically add zsh completions from packages
-    xdg.configFile."zsh/vendor-completions".source = with pkgs;
-      runCommandNoCC "vendored-zsh-completions" { } ''
-        mkdir -p $out
-        ${fd}/bin/fd -t f '^_[^.]+$' \
-          ${escapeShellArgs home.packages} \
-          | xargs -0 -I {} bash -c '${ripgrep}/bin/rg -0l "^#compdef" $@ || :' _ {} \
-          | xargs -0 -I {} cp -t $out/ {}
-      '';
-
   };
 }

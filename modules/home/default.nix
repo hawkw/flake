@@ -9,9 +9,11 @@ in
 rec {
   imports = [
     ./fonts.nix
-    ./ssh.nix
     ./profiles
     ./programs
+    ./shell
+    ./ssh.nix
+    ./terminal
   ];
 
   home.stateVersion = "23.11";
@@ -56,17 +58,6 @@ rec {
       gnupg
     ];
   };
-
-  # automagically add zsh completions from packages
-  xdg.configFile."zsh/vendor-completions".source = with pkgs;
-    runCommandNoCC "vendored-zsh-completions" { } ''
-      mkdir -p $out
-      ${fd}/bin/fd -t f '^_[^.]+$' \
-        ${lib.escapeShellArgs home.packages} \
-        | xargs -0 -I {} bash -c '${ripgrep}/bin/rg -0l "^#compdef" $@ || :' _ {} \
-        | xargs -0 -I {} cp -t $out/ {}
-    '';
-
   # configure discord to launch even when an update is available
 
   #############################################################################
@@ -191,4 +182,20 @@ rec {
 
     ssh = { enable = true; };
   };
+
+  # automagically add zsh completions from packages
+  #
+  # /!\ NOTE TO FUTURE ELIZAS /!\
+  # You may, foolishly, attempt to move this into the `zsh.nix` module. Don't do
+  # that, dumbass. It needs to be here so that it can access `home.packages`. I
+  # don't know why it doesn't work in `zsh.nix` off the top of my head, but I'm
+  # too lazy to figure it out.
+  xdg.configFile."zsh/vendor-completions".source = with pkgs;
+    runCommandNoCC "vendored-zsh-completions" { } ''
+      mkdir -p $out
+      ${fd}/bin/fd -t f '^_[^.]+$' \
+        ${lib.escapeShellArgs home.packages} \
+        | xargs -0 -I {} bash -c '${ripgrep}/bin/rg -0l "^#compdef" $@ || :' _ {} \
+        | xargs -0 -I {} cp -t $out/ {}
+    '';
 }
