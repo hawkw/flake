@@ -1,13 +1,15 @@
+#
+# Terminal emulator configuration.
+#
+# This module contains configs for terminal emulator programs. At
+# present, it supports WezTerm and Alacritty.
+#
 { config, lib, ... }:
 
 with lib; let
   cfg = config.profiles.terminal;
 in
 {
-  imports = [
-    ./zsh.nix
-  ];
-
   options.profiles.terminal = with types; {
     font = {
       family = mkOption {
