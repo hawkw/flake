@@ -1,7 +1,8 @@
 { ... }:
 {
-    imports = [
-      ./oxide
+  imports = [
+    ./oxide
+    ./atuin.nix
   ];
 
 }

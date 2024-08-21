@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ pkgs, lib, ... }:
 
 let
   user = {
@@ -12,7 +12,6 @@ rec {
     ./ssh.nix
     ./profiles
     ./programs
-    ./services
   ];
 
   home.stateVersion = "23.11";
@@ -100,6 +99,12 @@ rec {
   programs = {
     alacritty.enable = lib.mkDefault true;
     wezterm.enable = lib.mkDefault true;
+
+    # atuin --- enable the Atuin daemon as well as the program and its config.
+    atuin = {
+      enable = lib.mkDefault true;
+      enableDaemon = lib.mkDefault true;
+    };
 
     nushell = {
       enable = lib.mkDefault true;
@@ -323,21 +328,6 @@ rec {
       '';
     };
 
-
     ssh = { enable = true; };
   };
-
-  # atuin --- enable the Atuin daemon as well as the program and its config.
-  programs.atuin = {
-    enable = lib.mkDefault true;
-    settings = {
-      style = "compact";
-      dialect = "us";
-      auto_sync = true;
-      daemon = {
-        sync_frequency = "30";
-      };
-    };
-  };
-  services.atuin-daemon.enable = lib.mkDefault true;
 }
