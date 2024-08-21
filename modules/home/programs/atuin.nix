@@ -12,8 +12,11 @@ with lib;
     {
       programs.atuin.settings = {
         style = "auto";
+        # style = "compact";
+        # inline_height = 20;
         dialect = "us";
         auto_sync = true;
+
       };
     }
     (mkIf cfg.enableDaemon (
