@@ -102,6 +102,12 @@ with lib; {
             "!pr() { git fetch origin pull/$1/head:pr-$1; git checkout pr-$1; }; pr";
         };
 
+        # default gitignores for all repos
+        ignores = [
+          ".cargo/"
+          ".direnv/"
+        ];
+
         # extra git config
         extraConfig = {
           # use rebase in `git pull` to avoid gross merge commits.
