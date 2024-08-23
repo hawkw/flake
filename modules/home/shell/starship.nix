@@ -100,6 +100,10 @@ with lib; {
         not_executable_symbol = "🚫";
         sigint_symbol = "❗";
         not_found_symbol = "❓";
+
+        format = "[$symbol( $common_meaning)( SIG$signal_name)( $maybe_int)]($style)";
+        pipestatus_separator = " | ";
+        pipestatus_format = "\\[ $pipestatus \\] → [$symbol($common_meaning)(SIG$signal_name)($maybe_int)]($style)";
       };
 
       format = lib.concatStrings [
