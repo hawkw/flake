@@ -14,8 +14,6 @@ in {
     boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
     ### pipewire ###
-    # don't use the default `sound` config (alsa)
-    sound.enable = false;
     # Use PipeWire as the system audio/video bus
     hardware.pulseaudio.enable = false;
     security.rtkit.enable = true;

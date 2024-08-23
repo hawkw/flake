@@ -107,7 +107,11 @@
     # workaround for https://github.com/moby/moby/issues/45935, see
     # https://github.com/armbian/build/issues/5586#issuecomment-1677708996
     # or i could try podman...
-    package = pkgs.docker_24;
+    #
+    # UPDATE: docker 24.0.9 is now marked as "insecure" in nixpkgs, and needs to
+    # be explicitly allowed. let's try the latest docker and see if the problems
+    # go away. if not, roll back to this.
+    # package = pkgs.docker_24;
   };
   virtualisation.oci-containers = {
     backend = "docker";
