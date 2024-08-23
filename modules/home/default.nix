@@ -26,6 +26,8 @@ rec {
       EDITOR = "code --wait";
       BROWSER = "firefox";
       TERMINAL = "alacritty";
+      CARGO_TERM_COLOR = "auto";
+      RUST_BACKTRACE = "1";
     };
 
     sessionPath = [
