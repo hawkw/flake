@@ -109,7 +109,7 @@ with lib; {
       format = lib.concatStrings [
         # Start the first line with a shell comment so that the entire prompt
         # can be copied and pasted.
-        "[#](hidden)"
+        "# "
         # "[](fg:black bg:green)"
         # "[ ](bg:green)"
         "$time"
