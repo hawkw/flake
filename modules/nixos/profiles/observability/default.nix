@@ -6,16 +6,26 @@ let
   cfgExporters = config.services.prometheus.exporters;
   # An attrset of all Prometheus exporters that are enabled.
   enabledExporters =
-    (conf: attrsets.filterAttrs
-      (name: cfg:
-        if
+    let
+      # List of exporter names that are deprecated and whose configs should not
+      # be accessed.
+      deprecatedExporterNames = [
         # The attribute named `unifi-poller` is deprecated in favor of
         # `unipoller`, and accessing the config for it emits a warning, so we
         # skip it to avoid that.
-          name != "unifi-poller" &&
-          # A couple of exporters are lists rather than attrsets, so avoid
-          # touching those, since it would be a type error.
-          isAttrs cfg
+        "unifi-poller"
+        # The `minio` exporter has been removed, so avoid touching it, since
+        # accessing its attributes is an error.
+        "minio"
+      ];
+    in
+    (conf: attrsets.filterAttrs
+      (name: cfg:
+        # Before accessing the exporter's config, make sure it's not deprecated,
+        # to avoid a warning/error for accessing it. Also, a couple of exporters
+        # are lists rather than attrsets, so avoid touching those, since it
+        # would be a type error to access their `enable` property.
+        if !(elem name deprecatedExporterNames) && isAttrs cfg
         then cfg.enable else false)
       conf.services.prometheus.exporters);
 
