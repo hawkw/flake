@@ -127,4 +127,21 @@
     ${config.networking.hostName}: workstation
   '';
 
+
+  environment.etc."issue".text = ''
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │ THIS PLACE IS A MESSAGE... AND PART OF A SYSTEM OF MESSAGES...       │
+    │ PAY ATTENTION TO IT!                                                 │
+    │                                                                      │
+    │ Sending this message was important to us. We considered ourselves to │
+    │ be a powerful culture.                                               │
+    │                                                                      │
+    │ This place is not a place of honor... no highly esteemed deed is     │
+    │ commemorated here... nothing valued is here.                         │
+    │                                                                      │
+    │ What is here was dangerous and repulsive to us.                      │
+    │                                                                      │
+    │ THIS MESSAGE IS A WARNING ABOUT DANGER!                              │
+    └──────────────────────────────────────────────────────────────────────┘
+  '';
 }
