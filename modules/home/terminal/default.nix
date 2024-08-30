@@ -42,72 +42,98 @@ in
   };
 
   config = mkMerge [
-    (mkIf config.programs.alacritty.enable {
-      programs.alacritty = {
-        settings = {
-          # Configuration for Alacritty, the GPU enhanced terminal emulator
-          # Live config reload (changes require restart)
-          live_config_reload = true;
-          window = {
-            dynamic_title = true;
-            # Window dimensions in character columns and lines
-            # (changes require restart)
-            dimensions = {
-              columns = 120;
-              lines = 80;
-            };
+    (mkIf config.programs.alacritty.enable (
+      let
+        fixTermEnvVar = ''
+          # alacritty misuses TERM and sets it to its own name, but does not
+          # set TERM_PROGRAM. this causes issues when using software that
+          # attempts to detect whether the terminal supports colors using
+          # TERM, which is not *really* supposed to be the name of the terminal
+          # emulator. in particular, this happens on SSH connections a lot,
+          # because the COLORTERM env var usually isn't propagated by sshd, but
+          # TERM is, making it the only way for software on the remote to detect
+          # terminal capabilities.
+          if [[ "$TERM" == alacritty* ]]; then
+            export TERM_PROGRAM="$TERM"
+            export TERM="xterm-256color"
+          fi
+        '';
+      in
+      mkMerge [
+        {
+          programs.alacritty = {
+            settings = {
+              # Configuration for Alacritty, the GPU enhanced terminal emulator
+              # Live config reload (changes require restart)
+              live_config_reload = true;
+              window = {
+                dynamic_title = true;
+                # Window dimensions in character columns and lines
+                # (changes require restart)
+                dimensions = {
+                  columns = 120;
+                  lines = 80;
+                };
 
-            # Adds this many blank pixels of padding around the window
-            # This is DPI-aware.
-            # (change requires restart)
-            padding = {
-              x = cfg.padding.x;
-              y = cfg.padding.y;
-            };
+                # Adds this many blank pixels of padding around the window
+                # This is DPI-aware.
+                # (change requires restart)
+                padding = {
+                  x = cfg.padding.x;
+                  y = cfg.padding.y;
+                };
 
-            # Window decorations
-            # Setting this to false will result in window without borders and title bar.
-            # decorations: false
-            decorations_theme_variant = "Dark";
-            class = {
-              instance = "Alacritty";
-              general = "Alacritty";
+                # Window decorations
+                # Setting this to false will result in window without borders and title bar.
+                # decorations: false
+                decorations_theme_variant = "Dark";
+                class = {
+                  instance = "Alacritty";
+                  general = "Alacritty";
+                };
+              };
+
+              cursor = {
+                style = {
+                  blinking = "On";
+                  shape = "Block";
+                };
+              };
+
+              # When true, bold text is drawn using the bright variant of colors.
+              colors.draw_bold_text_with_bright_colors = true;
+
+              # Font configuration for alacritty (changes require restart)
+              font = {
+                # Point size of the font
+                size = cfg.font.sizePt;
+                # The normal (roman) font face to use.
+                normal = {
+                  family = cfg.font.family;
+                  style = "Regular";
+                };
+
+                bold = {
+                  family = cfg.font.family;
+                  style = "Bold";
+                };
+
+                italic = {
+                  family = cfg.font.family;
+                  style = "Italic";
+                };
+              };
             };
           };
-
-          cursor = {
-            style = {
-              blinking = "On";
-              shape = "Block";
-            };
-          };
-
-          # When true, bold text is drawn using the bright variant of colors.
-          colors.draw_bold_text_with_bright_colors = true;
-
-          # Font configuration for alacritty (changes require restart)
-          font = {
-            # Point size of the font
-            size = cfg.font.sizePt;
-            # The normal (roman) font face to use.
-            normal = {
-              family = cfg.font.family;
-              style = "Regular";
-            };
-
-            bold = {
-              family = cfg.font.family;
-              style = "Bold";
-            };
-
-            italic = {
-              family = cfg.font.family;
-              style = "Italic";
-            };
-          };
-        };
-      };
-    })
+        }
+        (mkIf config.programs.zsh.enable {
+          programs.zsh.initExtra = fixTermEnvVar;
+        })
+        (mkIf config.programs.bash.enable {
+          programs.bash.initExtra = fixTermEnvVar;
+        })
+      ]
+    ))
     (mkIf config.programs.wezterm.enable (
       let
         waylandGnomeScript = "wayland_gnome";
