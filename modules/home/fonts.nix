@@ -9,6 +9,7 @@
     iosevka
     cozette
     tamzen
+    departure-mono
     # tamsyn
     nerdfonts
     # requires `input-fonts.acceptLicense = true` in `config.nix`.
