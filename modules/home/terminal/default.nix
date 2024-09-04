@@ -158,6 +158,11 @@ in
             config.font_size = ${toString cfg.font.sizePt}.0
             config.harfbuzz_features = { 'calt=1', 'clig=1', 'liga=1' }
 
+            -- This fixes broken font rendering on recent NixOS; see:
+            -- https://github.com/wez/wezterm/issues/5990#issuecomment-2305416553
+            -- https://github.com/NixOS/nixpkgs/issues/336069
+            config.front_end = "WebGpu"
+
             -- Window padding
             config.window_padding = {
               top = '${toString cfg.padding.y}px',
