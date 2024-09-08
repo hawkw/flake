@@ -45,7 +45,12 @@
   boot = {
     loader = {
       # Use the systemd-boot EFI boot loader.
-      systemd-boot.enable = true;
+      systemd-boot = {
+        enable = true;
+        # don't keep more than 32 old configurations, to keep the /boot
+        # partition from filling up.
+        configurationLimit = 32;
+      };
       efi.canTouchEfiVariables = true;
     };
 
@@ -57,8 +62,50 @@
     # machines, rather than power efficiency on laptops/small devices. Use that!
     # kernelPackages = pkgs.linuxPackages_zen;
 
+    ### configuration for unlocking the encrypted ZFS root dataset over SSH ###
+    # based on
+    # https://gitlab.com/usmcamp0811/dotfiles/-/blob/nixos/modules/nixos/system/zfs/default.nix
+    #
+    # kernel modules for network adapters
+    kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
+    # TODO(eliza): this could be a static IP so that we don't depend on DHCP
+    # working to boot...
+    kernelParams = [ "ip=dhcp" ];
+
     # additional kernel modules
-    initrd.availableKernelModules = [ "usb_storage" "sd_mod" ];
+    initrd.availableKernelModules = [
+      "usb_storage"
+      "sd_mod"
+      # enable initrd kernel modules for network adapters.
+      #
+      # these can be found using `sudo lspci -v -nn -d '::0200'` to find Ethernet
+      # controllers and `sudo lscpi -v -nn -d '::0280'` to find wireless
+      # controllers, and then looking for the "Kernel driver in use" line.
+      "igb" # Intel GigaBit Ethernet
+      "iwlwifi" # Intel WiFi
+      # other network adapters. these aren't currently present on my system, but
+      # let's enable them anyway in case it grows additional hardware
+      # later.abort
+      "thunderbolt"
+      "usbnet"
+      "r8152"
+      "igc"
+      "cdc_ether"
+    ];
+    initrd.network = {
+      enable = true;
+      ssh = {
+        enable = true;
+        port = 22;
+        authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
+        # WARNING: these must actually exist :)
+        hostKeys = [
+          "/etc/ssh/ssh_host_rsa_key"
+          "/etc/ssh/ssh_host_ed25519_key"
+        ];
+      };
+    };
+
   };
 
   #### System configuration ####
@@ -79,7 +126,7 @@
           policy = [ "unicast" "magic" ];
         };
         # disable dhcpd and use networkmanager instead.
-        useDHCP = false;
+        useDHCP = true;
       in
       {
         enp5s0 = { inherit wakeOnLan useDHCP; };
@@ -125,23 +172,5 @@
     ││ ELIZA NETWORKS │
     └┴────────────────┘
     ${config.networking.hostName}: workstation
-  '';
-
-
-  environment.etc."issue".text = ''
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │ THIS PLACE IS A MESSAGE... AND PART OF A SYSTEM OF MESSAGES...       │
-    │ PAY ATTENTION TO IT!                                                 │
-    │                                                                      │
-    │ Sending this message was important to us. We considered ourselves to │
-    │ be a powerful culture.                                               │
-    │                                                                      │
-    │ This place is not a place of honor... no highly esteemed deed is     │
-    │ commemorated here... nothing valued is here.                         │
-    │                                                                      │
-    │ What is here was dangerous and repulsive to us.                      │
-    │                                                                      │
-    │ THIS MESSAGE IS A WARNING ABOUT DANGER!                              │
-    └──────────────────────────────────────────────────────────────────────┘
   '';
 }

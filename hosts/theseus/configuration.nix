@@ -19,6 +19,7 @@
     observability.enable = true;
     arm-cross-dev.enable = true;
     nix-ld.enable = true;
+    games.enable = true;
   };
 
   hardware = {
@@ -48,7 +49,7 @@
     lanzaboote = {
       enable = true;
       pkiBundle = "/etc/secureboot";
-      # don't keep more than 8 old configurations, to keep the /boot partition
+      # don't keep more than 32 old configurations, to keep the /boot partition
       # from filling up.
       configurationLimit = 32;
     };
