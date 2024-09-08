@@ -66,6 +66,12 @@
     # based on
     # https://gitlab.com/usmcamp0811/dotfiles/-/blob/nixos/modules/nixos/system/zfs/default.nix
     #
+    # TO REMOTELY UNLOCK ZPOOL:
+    #
+    # ssh root@192.168.1.38 -p 22
+    # zfs load-key -a
+    # <enter password>
+    #
     # kernel modules for network adapters
     kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     # TODO(eliza): this could be a static IP so that we don't depend on DHCP
