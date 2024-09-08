@@ -24,7 +24,10 @@ with lib; {
             let
               switchZoneHostname = "${switchZoneIp}%%${name}_sw1tp0";
               wicket = "${name}wicket";
+              switch0 = "${name}switch0";
+              switch1 = "${name}switch1";
               switch = "${name}switch";
+              brm = "${name}BRM";
             in
             {
               #
@@ -45,12 +48,42 @@ with lib; {
               };
 
               #
-              # root in the switch zone:
+              # root in the switch 0 zone:
+              #
+              ${switch0} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                host = switch0;
+                extraOptions = {
+                  ProxyCommand = "pilot -r ${name} tp nc 0 %p";
+                };
+              };
+
+              #
+              # root in the switch 1 zone:
+              #
+              ${switch1} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                host = switch1;
+                extraOptions = {
+                  ProxyCommand = "pilot -r ${name} tp nc 1 %p";
+                };
+              };
+
+              #
+              # root in the switch 1 zone:
               #
               ${switch} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                 host = switch;
-                hostname = switchZoneIp;
+                extraOptions = {
+                  ProxyCommand = "pilot -r ${name} tp nc 1 %p";
+                };
               };
+
+              ${brm} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ]
+                {
+                  host = "${brm}*";
+                  extraOptions = {
+                    ProxyCommand = ''pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
+                  };
+                };
             }
           );
         labMachines = [ jeeves "atrium" "cadbury" "yuban" "lurch" "alfred" ];
