@@ -44,6 +44,7 @@ in {
         vlc
         plex-media-player
         ghostscriptX
+        losslesscut-bin
 
         ### stuff ###
         pywal
