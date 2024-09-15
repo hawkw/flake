@@ -8,7 +8,6 @@ with lib; {
     programs.ssh.matchBlocks =
       let
         jeeves = "jeeves";
-        labNoVpn = "noVpn";
         engDomain = "eng.oxide.computer";
         all-racklettes = "all-racklettes";
         racklette-gimlets = "racklette-gimlets";
@@ -16,98 +15,86 @@ with lib; {
           {
             # name of the racklet
             name
-          , # yes, this looks like "gzip", but it's the global zone IP
-            gzIp
-            # IP of the switch zone
-          , switchZoneIp
+          , # list of scrimlet serials
+            scrimletSerials
+          ,
           }: (
             let
-              switchZoneHostname = "${switchZoneIp}%%${name}_sw1tp0";
-              wicket = "${name}wicket";
-              switch0 = "${name}switch0";
-              switch1 = "${name}switch1";
-              switch = "${name}switch";
               brm = "${name}BRM";
+              scrimletGzs =
+                let
+                  mkGz =
+                    (n: serial:
+                      let h = "${name}gz${toString n}"; in {
+                        ${h} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                          host = h + (if n == 0 then " ${name}gz" else "");
+                          user = "root";
+                          extraOptions = {
+                            ProxyCommand = "ssh ${jeeves} pilot -r ${name} host nc ${serial} %p";
+                          };
+                        };
+                      });
+                in
+                attrsets.mergeAttrsList (imap0 mkGz scrimletSerials);
+              switches =
+                let
+                  mkSwitch = (n:
+                    let
+                      h = "${name}switch${toString n}";
+                      extraOptions = {
+                        ProxyCommand = "ssh ${jeeves} pilot -r ${name} tp nc ${toString n} %p";
+                      };
+                    in
+                    {
+                      ${h} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                        host = h + (if n == 1 then " ${name}switch" else "");
+                        user = "root";
+                        inherit extraOptions;
+                      };
+                    } // (if n == 1 then {
+                      "${name}wicket" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                        host = "${name}wicket";
+                        user = "wicket";
+                        inherit extraOptions;
+                      };
+                    } else { }));
+                in
+                attrsets.mergeAttrsList (map mkSwitch [ 0 1 ]);
             in
             {
-              #
-              # root in the global zone of the scrimlet:
-              #
-              "${name}gz" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                host = "${name}gz";
-                hostname = "${gzIp}%%${name}_host0";
-              };
-
-              #
-              # Wicket in the switch zone:
-              #
-              ${wicket} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                host = wicket;
-                hostname = switchZoneHostname;
-                user = "wicket";
-              };
-
-              #
-              # root in the switch 0 zone:
-              #
-              ${switch0} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                host = switch0;
-                extraOptions = {
-                  ProxyCommand = "pilot -r ${name} tp nc 0 %p";
-                };
-              };
-
-              #
-              # root in the switch 1 zone:
-              #
-              ${switch1} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                host = switch1;
-                extraOptions = {
-                  ProxyCommand = "pilot -r ${name} tp nc 1 %p";
-                };
-              };
-
-              #
-              # root in the switch 1 zone:
-              #
-              ${switch} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                host = switch;
-                extraOptions = {
-                  ProxyCommand = "pilot -r ${name} tp nc 1 %p";
-                };
-              };
-
               ${brm} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ]
                 {
                   host = "${brm}*";
                   extraOptions = {
-                    ProxyCommand = ''pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
+                    ProxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
                   };
                 };
-            }
+            } // scrimletGzs // switches
           );
         labMachines = [ jeeves "atrium" "cadbury" "yuban" "lurch" "alfred" ];
         racklettes = [
           # racklette: madrid
           {
             name = "madrid";
-            gzIp = "fe80::eaea:6aff:fe09:7f66";
-            switchZoneIp = "fe80::aa40:25ff:fe05:602";
+            # note madrid only has one k.2-accessible scrimlet, while london has
+            # two.
+            scrimletSerials = [ "BRM42220007" ];
           }
           # racklette: london
           {
             name = "london";
-            gzIp = "fe80::eaea:6aff:fe09:8567";
-            switchZoneIp = "fe80::aa40:25ff:fe05:702";
+            scrimletSerials = [ "BRM42220036" "BRM42220030" ];
           }
         ];
         rackletteNames = attrsets.catAttrs "name" racklettes;
+        labBlock = "lab";
+        labNoVpnBlock = "lab-no-vpn";
       in
       {
         #
         # oxide lab machines
         #
-        "lab" = hm.dag.entryBefore [ labNoVpn ] {
+        ${labBlock} = hm.dag.entryBefore [ labNoVpnBlock ] {
           host = concatStringsSep " " labMachines;
           hostname = "%h.${engDomain}";
           user = "eliza";
@@ -116,7 +103,7 @@ with lib; {
         # if the Oxide VPN connection is *not* active, add a `proxyJump` to
         # connect to the VPN first. Don't do this if already on the VPN,
         # because it makes the SSH connection take longer to establish.
-        ${labNoVpn} = {
+        ${labNoVpnBlock} = {
           match = ''host "!vpn.${engDomain},*.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
           proxyJump = "vpn.${engDomain}";
         };
@@ -124,7 +111,7 @@ with lib; {
         #
         # racklette gimlets by cubby number
         #
-        ${racklette-gimlets} = hm.dag.entryBefore [ "lab" all-racklettes ] {
+        ${racklette-gimlets} = hm.dag.entryBefore [ labBlock all-racklettes ] {
           host = trivial.pipe rackletteNames [
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
@@ -139,13 +126,13 @@ with lib; {
         #
         # config applied to all of the above:
         #
-        ${all-racklettes} = hm.dag.entryBefore [ jeeves ] {
+        ${all-racklettes} = hm.dag.entryBefore [ labBlock ] {
           host = trivial.pipe rackletteNames [
             (map (name: "${name}*"))
             (concatStringsSep " ")
           ];
           user = "root";
-          proxyJump = jeeves;
+          proxyJump = "jeeves.eng.oxide.computer";
           extraOptions = {
             # Every time the racklet is reset, the host key changes, so
             # silence all  of openssh's warnings that "SOMEONE MIGHT BE
