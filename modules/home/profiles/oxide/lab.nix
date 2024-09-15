@@ -21,6 +21,7 @@ with lib; {
           }: (
             let
               brm = "${name}BRM";
+              mkPilotProxyCommand = (cmd: tgt: "ssh ${jeeves} pilot -r ${name} ${cmd} nc ${tgt} %p");
               scrimletGzs =
                 let
                   mkGz =
@@ -30,7 +31,7 @@ with lib; {
                           host = h + (if n == 0 then " ${name}gz" else "");
                           user = "root";
                           extraOptions = {
-                            ProxyCommand = "ssh ${jeeves} pilot -r ${name} host nc ${serial} %p";
+                            ProxyCommand = mkPilotProxyCommand "host" serial;
                           };
                         };
                       });
@@ -40,18 +41,18 @@ with lib; {
                 let
                   mkSwitch = (n:
                     let
-                      h = "${name}switch${toString n}";
+                      host = if n == "any" then "${name}switch" else "${name}switch${toString n}";
                       extraOptions = {
-                        ProxyCommand = "ssh ${jeeves} pilot -r ${name} tp nc ${toString n} %p";
+                        ProxyCommand = mkPilotProxyCommand "tp" n;
                       };
                     in
                     {
-                      ${h} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                        host = h + (if n == 1 then " ${name}switch" else "");
+                      ${host} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                        inherit host;
                         user = "root";
                         inherit extraOptions;
                       };
-                    } // (if n == 1 then {
+                    } // (if n == "any" then {
                       "${name}wicket" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
                         host = "${name}wicket";
                         user = "wicket";
@@ -59,7 +60,7 @@ with lib; {
                       };
                     } else { }));
                 in
-                attrsets.mergeAttrsList (map mkSwitch [ 0 1 ]);
+                attrsets.mergeAttrsList (map mkSwitch [ "0" "1" "any" ]);
             in
             {
               ${brm} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ]
@@ -118,9 +119,6 @@ with lib; {
           ];
           proxyCommand = ''ssh ${jeeves} pilot -r $(echo "%h" | sed 's/gc.*//') tp nc any $(echo "%h" | sed 's/.*gc//') %p'';
           forwardAgent = true;
-          extraOptions = {
-            ServerAliveInterval = "15";
-          };
         };
 
         #
@@ -135,11 +133,12 @@ with lib; {
           proxyJump = "jeeves.eng.oxide.computer";
           extraOptions = {
             # Every time the racklet is reset, the host key changes, so
-            # silence all  of openssh's warnings that "SOMEONE MIGHT BE
+            # silence all of openssh's warnings that "SOMEONE MIGHT BE
             # DOING SOMETHING NASTY".
             StrictHostKeyChecking = "no";
             UserKnownHostsFile = "/dev/null";
             LogLevel = "error";
+            ServerAliveInterval = "15";
           };
         };
       }
