@@ -61,9 +61,20 @@ in with lib; {
                 when = "auto";
                 # theme = "custom";
               };
+              # use unicode icons rather than fontawesome or whatever (for
+              # compatibility).
               icons = {
                 when = "auto";
-                # use unicode icons rather than fontawesome or whatever (for compatibility).
+                # # apparently lsd will only honor custom icon overrides when the
+                # # theme is set to "fancy" rather than "unicode", which the
+                # # documentation does not indicate but seems to be the case. see:
+                # # https://github.com/lsd-rs/lsd/issues/1082#issuecomment-2411590702
+                # #
+                # # we intend to only use unicode characters as icons. however, we
+                # # must select the "fancy" (i.e., nerd fonts) theme in order to
+                # # change the unicode characters from the default. this is weird
+                # # and surprising, but it seems to work.
+                # theme = "fancy";
                 theme = "unicode";
                 separator = " ";
               };
@@ -75,19 +86,39 @@ in with lib; {
           zoxide = { enable = true; };
         };
 
-
-        xdg.configFile."lsd/icons.yaml".source = (pkgs.formats.yaml { }).generate "icons.yml"
+        xdg.configFile."lsd/icons.yaml".source = (pkgs.formats.yaml { }).generate "icons.yaml"
           {
+            name = { };
+            extension = { };
             filetype = {
-              dir = "🗀";
+              dir = "🗁";
               file = "🗎";
               executable = "🗔";
               pipe = "⭍";
               socket = "🖧";
-              device_block = "🖴";
-              device_char = "🖵";
+              symlink-dir = "🗂";
+              simlink-file = "🗐";
+              device-block = "🖴";
+              device-char = "🖵";
+              special = "🖭";
             };
           };
+        # alternative LSD icons using all emojis
+        # xdg.configFile."lsd/icons.yaml".source = (pkgs.formats.yaml { }).generate "icons.yml"
+        #   {
+        #     filetype = {
+        #       dir = "📂";
+        #       file = "📄";
+        #       executable = "📝";
+        #       pipe = "📨";
+        #       socket = "📡";
+        #       symlink-dir = "🔗";
+        #       simlink-file = "📑";
+        #       device-block = "💽";
+        #       device-char = "📟";
+        #       special = "📼";
+        #     };
+        #   };
       }
 
       # mcfly: shell history (ctrl-r) replacement
