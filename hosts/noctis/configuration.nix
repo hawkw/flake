@@ -165,7 +165,8 @@
   #### Services ####
   services = {
     openrgb.enable = true;
-    # logid.enable = true;
+    # FOR CVE REASONS
+    printing.enable = lib.mkForce false;
   };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
