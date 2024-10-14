@@ -14,6 +14,7 @@ in
     (mkIf cfg.enable {
       home.packages = with pkgs; [
         vscode
+        zed-editor
         # ## toolchains ###
         rustup
         # clang
@@ -38,6 +39,9 @@ in
         # docker stuff
         docker-compose
         docker-credential-helpers
+
+        # asciidoc
+        asciidoctor-with-extensions
       ];
 
       home.sessionPath = [ "$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin" ];
