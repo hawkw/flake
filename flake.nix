@@ -23,6 +23,14 @@
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
+    # for building Rust packages
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+
     # deploy-rs: for remote deployments
     deploy-rs = {
       url = "github:serokell/deploy-rs";
@@ -63,6 +71,7 @@
       inputs = {
         nixpkgs.follows = "nixpkgs";
         vu-server.follows = "vu-server";
+        rust-overlay.follows = "rust-overlay";
       };
     };
 
@@ -77,13 +86,6 @@
       };
     };
 
-    # for building Rust packages
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
 
     # fw ectool as configured for FW13 7040 AMD (until patch is upstreamed)
     fw-ectool = {

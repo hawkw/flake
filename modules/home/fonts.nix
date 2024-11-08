@@ -17,7 +17,6 @@
 
     # some nice ui fonts
     roboto
-    inter-ui
     inter
     b612 # designed by Airbus for jet cockpit UIs!
 
@@ -25,7 +24,7 @@
     # this fixes unicode tofu, even if you don't actually use
     # noto as a UI font...
     noto-fonts
-    noto-fonts-cjk
+    noto-fonts-cjk-sans
     noto-fonts-emoji
     noto-fonts-extra
     noto-fonts-monochrome-emoji
