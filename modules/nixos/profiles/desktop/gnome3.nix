@@ -1,13 +1,13 @@
 { config, lib, pkgs, ... }:
 
 let cfg = config.profiles.desktop;
-in {
-  options.profiles.desktop.gnome3 = with lib; {
+in with lib; {
+  options.profiles.desktop.gnome3 = {
     enable = mkEnableOption "gnome3 profile";
   };
 
-  config = lib.mkIf cfg.gnome3.enable {
-    profiles.desktop.enable = lib.mkDefault true;
+  config = mkIf cfg.gnome3.enable {
+    profiles.desktop.enable = mkDefault true;
 
     services = {
       displayManager.defaultSession = "gnome";
@@ -23,7 +23,7 @@ in {
       };
 
       dbus.packages = with pkgs; [ dconf ];
-      udev.packages = with pkgs; [ gnome3.gnome-settings-daemon ];
+      udev.packages = with pkgs; [ gnome-settings-daemon ];
 
       # Enable gnome3 components
       gnome = {
@@ -47,10 +47,10 @@ in {
 
     ### gnome-keyring #########################################################
     # enable the Gnome keyring
-    services.gnome.gnome-keyring.enable = lib.mkDefault true;
+    services.gnome.gnome-keyring.enable = mkDefault true;
     # enable gnome keyring unlock on login
     security.pam.services = {
-      login.enableGnomeKeyring = lib.mkDefault true;
+      login.enableGnomeKeyring = mkDefault true;
     };
   };
 }
