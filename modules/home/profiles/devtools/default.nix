@@ -72,7 +72,7 @@ in
 
     (mkIf cfg.enablePython {
       home.packages = with pkgs;
-        [ python39Packages.pip ];
+        [ python312Packages.pip ];
     })
   ];
 }

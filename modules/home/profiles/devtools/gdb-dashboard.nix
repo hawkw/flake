@@ -65,7 +65,7 @@ in
   config = mkIf cfg.enable {
 
     home.packages = mkMerge [
-      (mkIf cfg.enablePygments [ pkgs.python39Packages.pygments ])
+      (mkIf cfg.enablePygments [ pkgs.python312Packages.pygments ])
       [ cfg.gdbPackage ]
     ];
 
