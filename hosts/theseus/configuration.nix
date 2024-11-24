@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 
-{
+with lib; {
   imports = [
     # Include the results of the hardware scan.
     ./hardware-configuration.nix
@@ -58,7 +58,7 @@
     # This setting is usually set to true in configuration.nix
     # generated at installation time. So we force it to false
     # for now.
-    loader.systemd-boot.enable = lib.mkForce false;
+    loader.systemd-boot.enable = mkForce false;
   };
 
   environment.systemPackages = with pkgs; [
@@ -75,11 +75,14 @@
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
-  services.gnome.gnome-keyring.enable = lib.mkForce false;
-  security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
+  services.gnome.gnome-keyring.enable = mkForce false;
+  security.pam.services.login.enableGnomeKeyring = mkForce false;
+  # services = {
+  #   desktopManager.cosmic.enable = true;
+  # };
 
   # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
-  networking.wireless.enable = lib.mkForce false;
+  networking.wireless.enable = mkForce false;
 
   users.motd = ''
     ┌┬────────────────┐

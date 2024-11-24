@@ -10,14 +10,14 @@ in with lib; {
     profiles.desktop.enable = mkDefault true;
 
     services = {
-      displayManager.defaultSession = "gnome";
+      displayManager.defaultSession = mkDefault "gnome";
       xserver = {
         # Enable the GNOME Desktop Environment.
         desktopManager.gnome.enable = true;
         displayManager = {
           gdm = {
-            enable = true;
-            wayland = true;
+            enable = mkDefault true;
+            wayland = mkDefault true;
           };
         };
       };

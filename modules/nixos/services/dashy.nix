@@ -3,7 +3,7 @@
 with lib;
 
 let
-  cfg = config.services.dashy;
+  cfg = config.services.docker-dashy;
   configFile = pkgs.runCommand "conf.yml"
     {
       buildInputs = [ pkgs.yj ];
@@ -13,7 +13,7 @@ let
   '';
 in
 {
-  options.services.dashy = {
+  options.services.docker-dashy = {
     enable = mkEnableOption "dashy";
     imageTag = mkOption {
       type = types.str;

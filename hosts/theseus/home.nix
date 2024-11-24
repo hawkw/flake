@@ -22,5 +22,6 @@
     pkg-config
     qemu
     screen
+    ipmicfg
   ];
 }

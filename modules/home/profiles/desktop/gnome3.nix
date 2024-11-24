@@ -51,12 +51,7 @@ with lib; {
         # A nice way to view information about use of system resources, like memory
         # and disk space
         gnome-usage
-        # cosmic-icons
-        # cosmic-osd
-        # cosmic-greeter
-        # cosmic-panel
-        # cosmic-settings
-        # cosmic-applets
+        ocs-url
       ] ++ gnome_extensions ++ themes;
 
     programs.firefox = { package = pkgs.firefox-wayland; };

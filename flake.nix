@@ -7,19 +7,25 @@
     extra-substituters = [
       "https://nix-community.cachix.org"
       "https://cache.garnix.io"
+      # "https://cosmic.cachix.org/"
     ];
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+      # "cosmic.cachix.org-1:Dya9IyXD4xdBehWjrkPv6rtxpmMdRel02smYzA85dPE="
     ];
   };
-
 
   ############################################################################
   #### INPUTS ################################################################
   inputs = {
     nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
+    # nixpkgs-stable.follows = "nixos-cosmic/nixpkgs-stable";
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+    # NOTE:change "nixpkgs" to "nixpkgs-stable" to use stable NixOS release
+    # nixpkgs.follows = "nixos-cosmic/nixpkgs";
+
+    # nixos-cosmic.url = "github:lilyinstarlight/nixos-cosmic";
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
@@ -115,7 +121,18 @@
 
   ############################################################################
   #### OUTPUTS ###############################################################
-  outputs = { self, nixpkgs, nixos-hardware, nixos-raspberrypi, home, utils, rust-overlay, deploy-rs, flake-parts, ... }@inputs:
+  outputs =
+    { self
+    , nixpkgs
+    , nixos-hardware
+    , nixos-raspberrypi
+    , home
+    , utils
+    , rust-overlay
+    , deploy-rs
+    , flake-parts
+    , ...
+    }@inputs:
     let
       config = {
         allowUnfree = true;
@@ -159,6 +176,7 @@
               inputs.vu-server.nixosModules.default
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
+              # inputs.nixos-cosmic.nixosModules.default
             ];
           };
 

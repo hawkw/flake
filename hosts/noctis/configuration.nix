@@ -169,6 +169,13 @@
     printing.enable = lib.mkForce false;
   };
 
+  services.tailscale = {
+    useRoutingFeatures = "server";
+    extraUpFlags = [
+      "--advertise-routes=192.168.50.0/24"
+    ];
+  };
+
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
   services.gnome.gnome-keyring.enable = lib.mkForce false;

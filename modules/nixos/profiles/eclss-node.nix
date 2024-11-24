@@ -32,7 +32,7 @@ with lib;
     networking = {
       wireless = {
         enable = mkForce true;
-        environmentFile = "/var/secrets/wireless.env";
+        secretsFile = "/var/secrets/wireless.env";
         networks."ManyPaws".psk = "@PSK_MANYPAWS@";
       };
 

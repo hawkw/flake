@@ -17,6 +17,9 @@ let
         # The `minio` exporter has been removed, so avoid touching it, since
         # accessing its attributes is an error.
         "minio"
+        # The option `tor' can no longer be used since it's been removed. The
+        # Tor exporter has been removed, as it was broken and unmaintained. 
+        "tor"
       ];
     in
     (conf: attrsets.filterAttrs
@@ -256,7 +259,7 @@ in
                 nginxlog.enable = config.services.nginx.enable;
               };
 
-              services.dashy = {
+              services.docker-dashy = {
                 enable = true;
                 settings = {
                   pageInfo = {
@@ -414,7 +417,7 @@ in
                 {
                   "home.${cfg.observer.rootDomain}" = {
                     locations."/" = {
-                      proxyPass = "http://127.0.0.1:${toString config.services.dashy.port}/";
+                      proxyPass = "http://127.0.0.1:${toString config.services.docker-dashy.port}/";
                     };
                   };
 
