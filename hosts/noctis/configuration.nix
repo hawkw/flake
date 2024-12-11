@@ -68,7 +68,7 @@
     #
     # TO REMOTELY UNLOCK ZPOOL:
     #
-    # ssh root@192.168.1.38 -p 22
+    # ssh root@10.0.10.42 -p 22
     # zfs load-key -a
     # <enter password>
     #
@@ -169,12 +169,17 @@
     printing.enable = lib.mkForce false;
   };
 
-  services.tailscale = {
-    useRoutingFeatures = "server";
-    extraUpFlags = [
-      "--advertise-routes=192.168.50.0/24"
-    ];
-  };
+  services.tailscale =
+    let
+      labMgmtNet = "10.0.50.0/24";
+      labServerNet = "10.0.60.0/24";
+    in
+    {
+      useRoutingFeatures = "server";
+      extraUpFlags = [
+        "--advertise-routes=${labMgmtNet},${labServerNet}"
+      ];
+    };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
