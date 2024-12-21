@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 # let
 #   mkIosevkaEliza = { spacing, name }: pkgs.iosevka.override
 #     {
@@ -26,6 +26,10 @@
 #   iosevkaEliza = mkIosevkaEliza { spacing = "sans"; name = ""; };
 #   iosevkaElizaEtoile = mkIosevkaEliza { spacing = "quasi-proportional"; name = "Etoile"; };
 # in
+let
+  # all nerdfonts
+  nerdfonts = builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
+in
 {
   fonts.fontconfig.enable = true;
 
@@ -42,7 +46,6 @@
     tamzen
     departure-mono
     # tamsyn
-    nerdfonts
     # requires `input-fonts.acceptLicense = true` in `config.nix`.
     input-fonts
 
@@ -61,5 +64,5 @@
     noto-fonts-monochrome-emoji
     # fontconfig binary
     fontconfig
-  ];
+  ] ++ nerdfonts;
 }

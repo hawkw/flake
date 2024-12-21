@@ -286,17 +286,12 @@ in
                       items = [
                         {
                           title = "Grafana";
-                          icon = "hl-grafana";
+                          icon = "si-grafana";
                           url = "https://${grafanaDomain}";
                         }
                         {
-                          title = "Prometheus";
-                          icon = "hl-prometheus";
-                          url = "https://${promDomain}";
-                        }
-                        {
                           title = "Uptime Kuma";
-                          icon = "hl-uptime-kuma";
+                          icon = "si-uptime-kuma";
                           url = "https://${uptimeKumaDomain}";
                         }
                       ];
@@ -307,15 +302,40 @@ in
                       items = [
                         {
                           title = "ECLSS";
-                          icon = "hl-grafana";
+                          icon = "mdi-thermometer-lines";
                           url = "https://${grafanaDomain}/eclss";
                         }
                         {
                           title = "ElizaOps";
-                          icon = "hl-grafana";
+                          icon = "mdi-heart-pulse";
                           url = "https://${grafanaDomain}/eliza-ops";
                         }
                       ];
+                    }
+                    {
+                      name = "LAN";
+                      icon = "mdi-lan";
+                      items = [
+                        {
+                          title = "Unifi";
+                          icon = "si-ubiquiti";
+                          url = "https://unifi";
+                        }
+                        {
+                          title = "Noctis BMC";
+                          icon = "mdi-console-network-outline";
+                          url = "https://bmc.noctis.home.${cfg.observer.rootDomain}";
+                        }
+                        {
+                          title = "Rack #0 PDU #0";
+                          icon = "mdi-power-socket-us";
+                          url = "http://pdu0.rack0.home.${cfg.observer.rootDomain}";
+                        }
+                      ] ++ (lists.optional cfg.observer.victoriametrics.enable {
+                        title = "VictoriaMetrics";
+                        icon = "si-victoriametrics";
+                        url = "https://noctis.home.${cfg.observer.rootDomain}:${toString cfg.observer.victoriametrics.port}";
+                      });
                     }
                   ];
 
@@ -571,6 +591,7 @@ in
                     }];
                 };
 
+                networking.firewall.allowedTCPPorts = [ port ];
 
                 virtualisation.oci-containers.containers = let hostDnsName = "host.docker.internal"; in {
                   apple-health-ingester = {
