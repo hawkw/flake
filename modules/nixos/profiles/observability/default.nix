@@ -159,7 +159,7 @@ in
             eclssScrapeTargets =
               let
                 mkScrapeConfig = (instance: config: {
-                  targets = [ "${instance}:${toString config.services.eclssd.server.port}" ];
+                  targets = [ "${instance}.eclss.home.${cfg.observer.rootDomain}:${toString config.services.eclssd.server.port}" ];
                   labels = {
                     inherit instance;
                     location = "${config.services.eclssd.location}";
@@ -324,7 +324,7 @@ in
                         {
                           title = "Noctis BMC";
                           icon = "mdi-console-network-outline";
-                          url = "https://bmc.noctis.home.${cfg.observer.rootDomain}";
+                          url = "http://bmc.noctis.home.${cfg.observer.rootDomain}";
                         }
                         {
                           title = "Rack #0 PDU #0";
