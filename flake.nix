@@ -53,7 +53,7 @@
     nixos-hardware.url = "github:nixos/nixos-hardware/master";
 
     nixos-raspberrypi = {
-      url = "github:ramblurr/nixos-raspberrypi";
+      url = "github:hawkw/nixos-raspberrypi?ref=eliza/no-noXlibs";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         nixos-hardware.follows = "nixos-hardware";
