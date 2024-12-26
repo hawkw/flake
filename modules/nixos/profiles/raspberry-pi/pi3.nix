@@ -10,6 +10,14 @@ with lib;
 
   config = mkIf cfg.pi3.enable {
     boot.kernelPackages = pkgs.linuxKernel.packages.linux_rpi3;
+
+    # The last console argument in the list that linux can find at boot will
+    # receive kernel logs.
+    boot.kernelParams = [
+      "console=ttyS0,115200n8" # serial
+      "console=ttyS1,115200n8" # other serial
+      "console=tty0" # HDMI
+    ];
     hardware.deviceTree = {
       enable = true;
       filter = "*rpi-3*.dtb";

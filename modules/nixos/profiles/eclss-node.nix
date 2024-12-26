@@ -34,6 +34,7 @@ with lib;
         enable = mkForce true;
         secretsFile = "/var/secrets/wireless.env";
         networks."ManyPaws".psk = "@PSK_MANYPAWS@";
+        networks."ElizaNet".psk = "@PSK_ELIZANET@";
       };
 
       networkmanager.enable = mkForce false;
