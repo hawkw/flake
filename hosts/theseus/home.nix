@@ -13,6 +13,7 @@
     oxide = {
       enable = true;
     };
+    terminal.font.family = "TX-02";
   };
 
   home.packages = with pkgs; [
