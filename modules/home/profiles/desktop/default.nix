@@ -56,6 +56,8 @@ in {
         ### chat clients & stuff
         element-desktop
         mumble
+        # terminals
+        ghostty
       ] ++ unfreePkgs);
     #############################################################################
     ## Programs                                                                 #

@@ -42,6 +42,10 @@ in
 
         # asciidoc
         asciidoctor-with-extensions
+
+        # stuff for decoding various things
+        hwloc
+        dmidecode
       ];
 
       home.sessionPath = [ "$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin" ];

@@ -19,7 +19,7 @@
   ############################################################################
   #### INPUTS ################################################################
   inputs = {
-    nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
     # nixpkgs-stable.follows = "nixos-cosmic/nixpkgs-stable";
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
     # NOTE:change "nixpkgs" to "nixpkgs-stable" to use stable NixOS release
@@ -117,6 +117,14 @@
         flake-utils.follows = "flake-utils";
       };
     };
+
+    ghostty = {
+      url = "github:ghostty-org/ghostty";
+      inputs = {
+        nixpkgs-unstable.follows = "nixpkgs";
+        nixpkgs-stable.follows = "nixpkgs-stable";
+      };
+    };
   };
 
   ############################################################################
@@ -149,7 +157,11 @@
         rust-overlay.overlays.default
         # inputs.atuin.overlays.default
 
+        # add ghostty package
+        (_: prev: { ghostty = inputs.ghostty.packages.${prev.system}.ghostty; })
+        # add ECLSSD
         (_: prev: { eclssd = inputs.eclssd.packages.${prev.system}.eclssd; })
+        # add fw-ectool package
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
