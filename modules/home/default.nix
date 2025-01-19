@@ -36,16 +36,6 @@ rec {
     ];
 
     packages = with pkgs; [
-      ### networking tools ##
-      nmap
-      slurm
-      bandwhich
-      nghttp2
-      inetutils
-      # assorted wiresharks
-      termshark
-      tcpdump
-
       ### stuff ###
       neofetch
       pfetch
@@ -58,6 +48,8 @@ rec {
 
       ### "crypto" ###
       gnupg
+
+      iputils # ping, traceroute, etc.
     ];
   };
   # configure discord to launch even when an update is available

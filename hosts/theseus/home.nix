@@ -10,6 +10,11 @@
       enable = true;
       enablePython = true;
     };
+    opstools = {
+      enable = true;
+      net.enable = true;
+      supermicro.enable = true;
+    };
     oxide = {
       enable = true;
     };
@@ -23,6 +28,5 @@
     pkg-config
     qemu
     screen
-    ipmicfg
   ];
 }

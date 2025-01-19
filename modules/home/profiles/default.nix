@@ -10,5 +10,6 @@
     ./rusty.nix
     ./k8s.nix
     ./nix-tools.nix
+    ./opstools.nix
   ];
 }

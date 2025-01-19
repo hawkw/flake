@@ -46,6 +46,9 @@ in
         # stuff for decoding various things
         hwloc
         dmidecode
+
+        ### networking stuff ###
+        nghttp2
       ];
 
       home.sessionPath = [ "$HOME/.config/Code/User/globalStorage/ms-vscode-remote.remote-containers/cli-bin" ];
