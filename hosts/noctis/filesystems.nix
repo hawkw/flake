@@ -29,7 +29,7 @@
   };
 
   fileSystems."/boot" = {
-    device = "/dev/disk/by-id/nvme-ADATA_SX8100NP_2J4620041364-part1";
+    device = "/dev/disk/by-id/nvme-Sabrent_17A807051DBE02076339-part1";
     fsType = "vfat";
   };
 
@@ -64,10 +64,10 @@
       fsType = "ext4";
     };
 
-  swapDevices = [
-    {
-      device = "/dev/disk/by-id/nvme-ADATA_SX8100NP_2J4620041364-part2";
-      randomEncryption.enable = true;
-    }
-  ];
+  # swapDevices = [
+  #   {
+  #     device = "/dev/disk/by-id/nvme-ADATA_SX8100NP_2J4620041364-part2";
+  #     randomEncryption.enable = true;
+  #   }
+  # ];
 }
