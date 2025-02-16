@@ -25,13 +25,11 @@ with lib;
     ### networking tools ###
     (mkIf cfg.net.enable {
       home.packages = with pkgs; [
-        mtr
         nmap
         slurm
         bandwhich
         # assorted wiresharks
         termshark
-        wireshark
         tcpdump
         # misc
         inetutils
@@ -41,12 +39,25 @@ with lib;
       ];
     })
 
+    # If the destkop profile is enabled, enable GUI tools too
+    (mkIf config.profiles.desktop.enable {
+      home.packages = with pkgs; mkMerge [
+        (mkIf cfg.net.enable [
+          mtr-gui
+          wireshark
+        ])
+        (mkIf cfg.supermicro.enable [
+          ipmiview
+        ])
+      ];
+    })
+
     ### Supermicro IPMI tools ###
     (mkIf cfg.supermicro.enable {
-      home.packages = with pkgs; [
-        ipmicfg
-        ipmiview
-      ];
+      home.packages = with pkgs;
+        [
+          ipmicfg
+        ];
     })
   ]);
 }

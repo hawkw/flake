@@ -26,11 +26,6 @@ in {
       in
       ([
 
-        ### networking tools ##
-        mtr-gui
-        slurm
-        wireshark
-
         ### images, media, etc ###
         ark
         darktable

@@ -19,6 +19,7 @@
         enableUnifi = true;
         inherit rootDomain;
       };
+      snmp.enable = true;
     };
     nginx = {
       enable = true;

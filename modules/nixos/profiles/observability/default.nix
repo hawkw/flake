@@ -18,7 +18,7 @@ let
         # accessing its attributes is an error.
         "minio"
         # The option `tor' can no longer be used since it's been removed. The
-        # Tor exporter has been removed, as it was broken and unmaintained. 
+        # Tor exporter has been removed, as it was broken and unmaintained.
         "tor"
       ];
     in
@@ -93,6 +93,10 @@ in
         };
       };
     };
+
+    snmp = {
+      enable = mkEnableOption "SNMP";
+    };
   };
 
   config = mkIf cfg.enable
@@ -102,7 +106,10 @@ in
         services.prometheus.exporters = {
           node = {
             enable = mkDefault true;
-            enabledCollectors = [ "systemd" "zfs" ];
+            enabledCollectors = [
+              "systemd "
+              "zfs"
+            ];
             port = mkDefault 9002;
             openFirewall = mkDefault true;
           };
@@ -126,6 +133,15 @@ in
           (name: value: { name = "${name}-exporter"; value = mkPromExporterAvahiService name; })
           (enabledExporters config));
       })
+
+      ### OBSERVEE: snmpd ###
+      # FIXME(eliz): make this actually work
+      # (mkIf cfg.snmp.enable {
+      #   services.snmpd = {
+      #     enable = true;
+      #     openFirewall = true;
+      #   };
+      # })
 
       #### OBSERVER ############################################################
       (mkIf cfg.observer.enable
@@ -168,56 +184,73 @@ in
                 eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enable) allHostConfigs;
               in
               (mapAttrsToList mkScrapeConfig eclssHosts);
-            scrapeConfigs = [
-              # tailscale service discovery
-              {
-                job_name = "tailscale";
-                scrape_interval = "10s";
-                scrape_timeout = "8s";
-                metrics_path = "/metrics";
-                scheme = "http";
-                static_configs = tailscaleScrapeTargets;
-                relabel_configs = [
-                  {
-                    source_labels = [ "__address__" ];
-                    target_label = "address";
-                  }
-                ];
-              }
-              # eclss
-              {
-                job_name = "eclss";
-                scrape_interval = "10s";
-                scrape_timeout = "8s";
-                metrics_path = "/metrics";
-                scheme = "http";
-                static_configs = eclssScrapeTargets;
-                relabel_configs = [
-                  {
-                    source_labels = [ "__address__" ];
-                    target_label = "address";
-                  }
-                  {
-                    "if" = ''{instance=~"clavius.*"}'';
-                    target_label = "location";
-                    replacement = "office";
-                  }
-                ];
-              }
-              # local services
-              {
-                job_name = "${config.networking.hostName}";
-                static_configs =
-                  [
+
+            scrapeConfigs = mkMerge [
+              ([
+                # tailscale service discovery
+                {
+                  job_name = "tailscale";
+                  scrape_interval = "10s";
+                  scrape_timeout = "8s";
+                  metrics_path = "/metrics";
+                  scheme = "http";
+                  static_configs = tailscaleScrapeTargets;
+                  relabel_configs = [
                     {
-                      targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
+                      source_labels = [ "__address__" ];
+                      target_label = "address";
+                    }
+                  ];
+                }
+                # eclss
+                {
+                  job_name = "eclss";
+                  scrape_interval = "10s";
+                  scrape_timeout = "8s";
+                  metrics_path = "/metrics";
+                  scheme = "http";
+                  static_configs = eclssScrapeTargets;
+                  relabel_configs = [
+                    {
+                      source_labels = [ "__address__" ];
+                      target_label = "address";
+                    }
+                    {
+                      "if" = ''{instance=~"clavius.*"}'';
+                      target_label = "location";
+                      replacement = "office";
+                    }
+                  ];
+                }
+                # local services
+                {
+                  job_name = "${config.networking.hostName}";
+                  static_configs =
+                    [
+                      {
+                        targets = [ "127.0.0.1:${toString cfg.loki.port}" ];
+                        labels = {
+                          service = "loki";
+                          instance = "${config.networking.hostName}";
+                        };
+                      }
+                    ];
+                }
+              ])
+              (mkIf cfg.snmp.enable [
+                {
+                  job_name = "snmp_exporter";
+                  static_configs = [
+                    {
+                      targets = [ "127.0.0.1:${toString config.services.prometheus.exporters.snmp.port}" ];
                       labels = {
-                        service = "loki";
+                        service = "snmp-exporter";
                         instance = "${config.networking.hostName}";
                       };
                     }
                   ];
-              }
+                }
+              ])
             ];
           in
           mkMerge [
@@ -542,7 +575,22 @@ in
                 }
               ];
             })
+            ### OBSERVER: snmp ####
+            (mkIf cfg.snmp.enable {
+              services.prometheus.exporters.snmp = {
+                enable = true;
+                configuration = {
+                  auths = {
+                    public_v2 = {
+                      community = "public";
+                      version = 2;
+                    };
+                  };
+                };
+              };
+            })
 
+            #### OBSERVER: victoriametrics ####
             (mkIf cfg.observer.victoriametrics.enable (
               let
                 grafanaDataource = "victoriametrics-datasource";
