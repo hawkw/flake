@@ -23,7 +23,6 @@
     # global pkgconfig too
     pkg-config
     lm_sensors
-    wally-cli
     conky
   ];
 
