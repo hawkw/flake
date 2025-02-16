@@ -83,12 +83,13 @@
 
     # for secureboot support on theseus
     lanzaboote = {
-      url = "github:nix-community/lanzaboote/v0.3.0";
+      url = "github:nix-community/lanzaboote/v0.4.2";
 
       # Optional but recommended to limit the size of your system closure.
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
+        rust-overlay.follows = "rust-overlay";
+        flake-parts.follows = "flake-parts";
       };
     };
 
