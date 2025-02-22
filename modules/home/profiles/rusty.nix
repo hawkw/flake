@@ -25,7 +25,7 @@ in with lib; {
       {
         home.packages = with pkgs; [
           tokei
-          xsv
+          xan
           ripgrep
           fd
           # ytop

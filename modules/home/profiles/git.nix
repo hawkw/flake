@@ -134,7 +134,7 @@ with lib; {
           init.defaultBranch = "main";
           # use 1password to manage commit signing if available
           gpg = {
-            format = "ssh";
+            format = lib.mkForce "ssh";
             # "ssh".program = lib.mkIf enable1PasswordSshAgent
             #   "${pkgs._1password-gui}/bin/op-ssh-sign";
           };
