@@ -170,17 +170,17 @@
     printing.enable = lib.mkForce false;
   };
 
-  services.tailscale =
-    let
-      labMgmtNet = "10.0.50.0/24";
-      labServerNet = "10.0.60.0/24";
-    in
-    {
-      useRoutingFeatures = "server";
-      extraUpFlags = [
-        "--advertise-routes=${labMgmtNet},${labServerNet}"
-      ];
-    };
+  # services.tailscale =
+  #   let
+  #     labMgmtNet = "10.0.50.0/24";
+  #     labServerNet = "10.0.60.0/24";
+  #   in
+  #   {
+  #     useRoutingFeatures = "server";
+  #     extraUpFlags = [
+  #       "--advertise-routes=${labMgmtNet},${labServerNet}"
+  #     ];
+  #   };
 
   # disable the Gnome keyring, since we are using 1password to manage secrets
   # instead.
