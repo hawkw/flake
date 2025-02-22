@@ -2,7 +2,7 @@
 
 {
 
-  imports = [ ./hardware-configuration.nix ./filesystems.nix ./disko-config.nix ];
+  imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
   system.stateVersion = "24.11";
 
