@@ -3,11 +3,11 @@
 {
   imports = [
     ./nix.nix
-    ./profiles/arm-cross-dev.nix
     ./hardware/ergodox.nix
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/probes.nix
+    ./profiles/arm-cross-dev.nix
     ./profiles/desktop
     ./profiles/docs.nix
     ./profiles/eclss-node.nix
@@ -19,6 +19,7 @@
     ./profiles/perftools.nix
     ./profiles/raspberry-pi
     ./profiles/vu-dials.nix
+    ./profiles/zfs.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix

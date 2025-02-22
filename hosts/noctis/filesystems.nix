@@ -2,26 +2,7 @@
 
 {
 
-  boot = {
-    supportedFilesystems = [ "zfs" "xfs" "ext4" ];
-    kernelParams = [ "elevator=none" ];
-    # zfs.enableUnstable = true;
-  };
-
-  # ZFS configuration
-  services.zfs = {
-    # Enable TRIM
-    trim.enable = true;
-    # Enable automatic scrubbing and snapshotting.
-    autoScrub.enable = true;
-    autoSnapshot = {
-      enable = true;
-      frequent = 4;
-      daily = 3;
-      weekly = 2;
-      monthly = 2;
-    };
-  };
+  boot.supportedFilesystems = [ "zfs" "xfs" "ext4" ];
 
   fileSystems."/" = {
     device = "nvme-pool/system/root";

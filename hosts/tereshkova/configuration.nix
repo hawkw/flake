@@ -11,6 +11,7 @@
     desktop = {
       gnome3.enable = true;
     };
+    zfs.enable = true;
     # observability = {
     #   enable = true;
     #   observer = {
@@ -42,7 +43,7 @@
 
     # Use this to track the latest Linux kernel that has ZFS support.
     # This is generally not as necessary while using `zfsUnstable = true`.
-    kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
+    # kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
     # The Zen kernel is tuned for better performance on desktop/workstation
     # machines, rather than power efficiency on laptops/small devices. Use that!
