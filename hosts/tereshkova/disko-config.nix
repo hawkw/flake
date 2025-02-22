@@ -71,8 +71,8 @@ in
                 mountpoint = "/";
                 options = {
                   ${autosnapshot} = "true";
-                  postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
                 };
+                postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
               };
               "${systemDataset}/var" = {
                 type = zfs_fs;
