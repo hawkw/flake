@@ -86,16 +86,16 @@
     ];
     initrd.network = {
       enable = true;
-      ssh = {
-        enable = true;
-        port = 22;
-        authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
-        # WARNING: these must actually exist :)
-        hostKeys = [
-          "/etc/ssh/ssh_host_rsa_key"
-          "/etc/ssh/ssh_host_ed25519_key"
-        ];
-      };
+      # ssh = {
+      #   enable = true;
+      #   port = 22;
+      #   authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
+      #   # WARNING: these must actually exist :)
+      #   hostKeys = [
+      #     "/etc/ssh/ssh_host_rsa_key"
+      #     "/etc/ssh/ssh_host_ed25519_key"
+      #   ];
+      # };
     };
 
   };
