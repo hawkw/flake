@@ -45,6 +45,12 @@
       };
     };
 
+    # declarative disk partitioning
+    disko = {
+      url = "github:nix-community/disko/latest";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     home = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -189,6 +195,7 @@
               inputs.vu-server.nixosModules.default
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
+              inputs.disko.nixosModules.disko
               # inputs.nixos-cosmic.nixosModules.default
             ];
           };
@@ -244,6 +251,8 @@
               };
 
               noctis = mkNode { hostname = "noctis"; };
+
+              tereshkova = mkNode { hostname = "tereshkova"; };
             };
 
 

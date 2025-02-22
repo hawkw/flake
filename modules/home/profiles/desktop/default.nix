@@ -43,7 +43,6 @@ in {
 
         ### stuff ###
         pywal
-        wally-cli
         chromium
         torrential
         usbutils
