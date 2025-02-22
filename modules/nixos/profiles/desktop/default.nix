@@ -15,7 +15,7 @@ in {
 
     ### pipewire ###
     # Use PipeWire as the system audio/video bus
-    hardware.pulseaudio.enable = false;
+    services.pulseaudio.enable = false;
     security.rtkit.enable = true;
     services.pipewire = {
       enable = true;
