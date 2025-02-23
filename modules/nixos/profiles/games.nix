@@ -6,9 +6,9 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    # some steam games need 32-bit driver support
+    services.pulseaudio.support32Bit = true;
     hardware = {
-      # some steam games need 32-bit driver support
-      pulseaudio.support32Bit = true;
       graphics = {
         extraPackages32 = with pkgs.pkgsi686Linux; [ libva ];
         enable32Bit = true;
