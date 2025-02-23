@@ -18,6 +18,7 @@
     ./profiles/observability
     ./profiles/perftools.nix
     ./profiles/raspberry-pi
+    ./profiles.server.nix
     ./profiles/vu-dials.nix
     ./profiles/zfs.nix
     ./programs/openrgb.nix

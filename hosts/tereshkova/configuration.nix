@@ -11,6 +11,7 @@
     desktop = {
       gnome3.enable = true;
     };
+    server.enable = true;
     zfs.enable = true;
     # observability = {
     #   enable = true;
