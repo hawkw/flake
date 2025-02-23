@@ -252,7 +252,14 @@
 
               noctis = mkNode { hostname = "noctis"; };
 
-              tereshkova = mkNode { hostname = "tereshkova"; };
+              tereshkova = {
+                hostname = "tereshkova.sys.home.elizas.website";
+                profiles.system = ({
+                  sshUser = "eliza";
+                  path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.tereshkova;
+                  user = "root";
+                });
+              };
             };
 
 
