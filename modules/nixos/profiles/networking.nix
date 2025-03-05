@@ -83,7 +83,7 @@ in with lib; {
       networkmanager
       networkmanagerapplet
       openssh
-      bluedevil
+      kdePackages.bluedevil
       bluez
       tailscale
       ethtool
