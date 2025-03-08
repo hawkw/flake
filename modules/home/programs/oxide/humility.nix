@@ -1,15 +1,15 @@
-{ pkgs }:
+{ pkgs, lib }:
 
 with pkgs;
 let
   pname = "humility";
-  rev = "e94bc0d65b5c99753511c060027fc2a220cf5987";
+  rev = "4e9b9f9efb455d62b44345b7c8659dcd962c73da";
   src = fetchFromGitHub
     {
       owner = "oxidecomputer";
       repo = pname;
       inherit rev;
-      hash = "sha256-Hq8cddJFJp0WgGBMPFu9jMDCxCradATzq1HcnOsPMCM=";
+      hash = "sha256-BzLduU2Wu4UhmgDvvuCEXsABO/jPC7AjptDW8/zePEk=";
     };
   # use the Rust toolchain specified in the project's rust-toolchain.toml
   configuredRustPlatform =
@@ -38,8 +38,9 @@ configuredRustPlatform.buildRustPackage {
       "humpty-0.1.3" = "sha256-efeb+RaAjQs9XU3KkfVo8mVK2dGyv+2xFKSVKS0vyTc=";
       "idol-0.3.0" = "sha256-s6ZM/EyBE1eOySPah5GtT0/l7RIQKkeUPybMmqUpmt8=";
       "idt8a3xxxx-0.1.0" = "sha256-S36fS9hYTIn57Tt9msRiM7OFfujJEf8ED+9R9p0zgK4=";
+      "ipcc-data-0.0.1" = "sha256-x6E08l28GNPvL2K9+yYWMM/KHWFrNOnN58pVSvcsNFk=";
       "libusb1-sys-0.5.0" = "sha256-7Bb1lpZvCb+OrKGYiD6NV+lMJuxFbukkRXsufaro5OQ=";
-      "pmbus-0.1.2" = "sha256-NFSrh4yD7PCqYhGuioRYWFmFIcpFvDO1qh6Lp9tsJ9E=";
+      "pmbus-0.1.4" = "sha256-Sw/GYrBQSt3I49qZg4kK3q3kSYXd1qpWzlCt7ks9x/0=";
       "probe-rs-0.12.0" = "sha256-/L+85K6uxzUmz/TlLLFbMlyekoXC/ClO33EQ/yYjQKU=";
       "spd-0.1.0" = "sha256-X6XUx+huQp77XF5EZDYYqRqaHsdDSbDMK8qcuSGob3E=";
       "tlvc-0.2.0" = "sha256-HiqDRqmKOTxz6UQSXNMOZdWdc5W+cFGuKBkNrqFvIIE=";
