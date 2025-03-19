@@ -54,6 +54,10 @@ with lib; {
               basePath = "/home/eliza/Code/oxide/hubris/target";
             in
             {
+              "sn17" = {
+                probe = "0483:3754:003200124741500820383733";
+                archive = "/gimlet/hubris/archives/build-gimlet-b-dev-image-default.zip";
+              };
               "gimletlet" = {
                 probe = "0483:3754:000B00154D46501520383832";
                 archive = "${basePath}/gimletlet/dist/default/build-gimletlet-image-default.zip";
