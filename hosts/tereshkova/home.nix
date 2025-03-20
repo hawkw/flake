@@ -7,5 +7,6 @@
         supermicro.enable = true;
       };
     };
+    oxide.enable = true;
   };
 }

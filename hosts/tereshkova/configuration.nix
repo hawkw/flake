@@ -1,6 +1,6 @@
 { config, pkgs, lib, ... }:
 
-{
+with pkgs; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
@@ -28,6 +28,18 @@
     #   acmeSubdomain = "home";
     # };
   };
+
+  hardware = {
+    probes = {
+      cmsis-dap.enable = true;
+      espressif.enable = true;
+      st-link.enable = true;
+    };
+  };
+
+  environment.systemPackages = [
+    picocom
+  ];
 
   #### Boot configuration ####
   boot = {
