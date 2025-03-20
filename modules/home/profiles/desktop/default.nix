@@ -27,7 +27,7 @@ in {
       ([
 
         ### images, media, etc ###
-        ark
+        kdePackages.ark
         darktable
         inkscape
         obs-studio
