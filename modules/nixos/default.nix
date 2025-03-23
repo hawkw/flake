@@ -61,6 +61,7 @@
       git
       nano
       pciutils
+      usbutils
       home-manager
       lm_sensors
       smartmontools

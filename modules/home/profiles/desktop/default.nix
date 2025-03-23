@@ -45,7 +45,6 @@ in {
         pywal
         chromium
         torrential
-        usbutils
 
         ### chat clients & stuff
         element-desktop
