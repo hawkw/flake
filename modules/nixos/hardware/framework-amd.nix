@@ -13,14 +13,18 @@ in with lib; {
 
   config = mkIf cfg.enable
     {
-      ### enable services ###
+      environment.systemPackages = with pkgs; [
+        fprintd
+        fw-ectool
+      ];
 
+      ### enable services ###
       services = {
         # use `fwupdmgr` for updating Framework firmware
-        fwupd.enable = lib.mkDefault true;
+        fwupd.enable = mkDefault true;
 
         # For fingerprint support
-        fprintd.enable = lib.mkDefault true;
+        fprintd.enable = mkDefault true;
 
         # AMD has better battery life with PPD over TLP:
         # https://community.frame.work/t/responded-amd-7040-sleep-states/38101/13
@@ -29,11 +33,11 @@ in with lib; {
         # support is currently only in `nixos-unstable` (my flake currently is
         # pointed at unstable, but please bear this in mind if you're copying my
         # configs.)
-        power-profiles-daemon.enable = lib.mkDefault true;
+        power-profiles-daemon.enable = mkDefault true;
       };
 
       # enable the TPM profile
-      hardware.tpm.enable = lib.mkDefault true;
+      hardware.tpm.enable = mkDefault true;
 
       ### misc hardware support tweaks ###
 
@@ -53,10 +57,6 @@ in with lib; {
       boot.extraModprobeConfig = ''
         options cfg80211 ieee80211_regdom="US"
       '';
-
-      environment.systemPackages = with pkgs; [
-        fw-ectool
-      ];
     };
 
 }
