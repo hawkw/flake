@@ -47,7 +47,10 @@ with lib; {
 
       programs.oxide = {
         looker.enable = true;
-        sp3-uart.enable = true;
+        sp3-uart = {
+          enable = true;
+          logDir = "/var/log";
+        };
         humility = {
           enable = true;
           environment =
