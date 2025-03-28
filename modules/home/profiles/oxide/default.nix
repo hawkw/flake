@@ -49,7 +49,7 @@ with lib; {
         looker.enable = true;
         sp3-uart = {
           enable = true;
-          logDir = "/var/log";
+          # logDir = "/var/log";
         };
         humility = {
           enable = true;
