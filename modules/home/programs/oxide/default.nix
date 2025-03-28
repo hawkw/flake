@@ -104,7 +104,7 @@ with lib; {
           name = "sp3-uart";
           runtimeInputs = [ picocom ];
           text = ''
-            logfile=${cfg.sp3-uart.logDir}/sp3-uart.`basename $1`.out.`date +%s`
+            logfile=${cfg.sp3-uart.logDir}/sp3-uart.$(basename "$1").out.$(date +%s)
 
             set -o xtrace
 
@@ -114,8 +114,8 @@ with lib; {
                 --flow h \
                 --imap lfcrlf \
                 --omap crlf,delbs \
-                --log $logfile \
-                -b 3000000 $1
+                --log "$logfile" \
+                -b 3000000 "$1"
           '';
         };
       in
