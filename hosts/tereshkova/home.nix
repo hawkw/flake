@@ -5,6 +5,8 @@
       net.enable = true;
       supermicro.enable = true;
     };
-    oxide.enable = true;
+    oxide = {
+      enable = true;
+    };
   };
 }

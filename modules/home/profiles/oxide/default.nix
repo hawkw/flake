@@ -47,6 +47,7 @@ with lib; {
 
       programs.oxide = {
         looker.enable = true;
+        sp3-uart.enable = true;
         humility = {
           enable = true;
           environment =
@@ -65,7 +66,6 @@ with lib; {
                     "get" = "humility -t ${sn17} hiffy -c 'Sequencer.get_state'";
                     "console" = ''/bin/sh -c "sp3-uart /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG00RVDP-if00-port0"'';
                   };
-
                 };
               };
               "gimletlet" = {

@@ -34,6 +34,7 @@ with pkgs; {
       cmsis-dap.enable = true;
       espressif.enable = true;
       st-link.enable = true;
+      ftdi.enable = true;
     };
   };
 

@@ -98,11 +98,11 @@ with lib; {
       })
     ]))
 
-    (mkIf cfg.gimletScripts.enable (
+    (mkIf cfg.sp3-uart.enable (
       let
-        sp3-uart = writeShellApplication {
+        sp3-uart = with pkgs; writeShellApplication {
           name = "sp3-uart";
-          runtimeInputs = with pkgs; [ picocom ];
+          runtimeInputs = [ picocom ];
           text = ''
             logfile=${cfg.sp3-uart.logDir}/sp3-uart.`basename $1`.out.`date +%s`
 

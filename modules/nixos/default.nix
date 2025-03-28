@@ -60,7 +60,9 @@
       testdisk
       git
       nano
+      # for lspci etc
       pciutils
+      # for lsusb etc
       usbutils
       home-manager
       lm_sensors
