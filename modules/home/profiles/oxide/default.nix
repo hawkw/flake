@@ -60,12 +60,12 @@ with lib; {
                 probe = "0483:3754:003200124741500820383733";
                 archive = "/gimlet/hubris/archives/build-gimlet-b-dev-image-default.zip";
                 cmds = {
-                  "state" = {
-                    "a0" = "humility -t ${sn17} hiffy -c 'Sequencer.set_state' -a 'state=A0'";
-                    "a2" = "humility -t ${sn17} hiffy -c 'Sequencer.set_state' -a 'state=A2'";
-                    "get" = "humility -t ${sn17} hiffy -c 'Sequencer.get_state'";
-                    "console" = ''/bin/sh -c "sp3-uart /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG00RVDP-if00-port0"'';
+                  power = {
+                    on = "humility -t ${sn17} hiffy -c Sequencer.set_state -a state=A0";
+                    off = "humility -t ${sn17} hiffy -c Sequencer.set_state -a state=A2";
+                    state = "humility -t ${sn17} hiffy -c Sequencer.get_state";
                   };
+                  console = ''/bin/sh -c "sp3-uart /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG00RVDP-if00-port0"'';
                 };
               };
               "gimletlet" = {
