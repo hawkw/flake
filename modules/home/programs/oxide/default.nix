@@ -42,11 +42,11 @@ with lib; {
                   description = "Archive path(s) for this target";
                   example = "/gimlet/hubris/archives/grimey/build-gimlet.zip";
                 };
-              };
-              cmds = mkOption {
-                type = nullOr attrs;
-                description = "An attribute set defining commands for this target.";
-                default = null;
+                cmds = mkOption {
+                  type = nullOr attrs;
+                  description = "An attribute set defining commands for this target.";
+                  default = null;
+                };
               };
             });
           default = { };
