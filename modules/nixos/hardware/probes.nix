@@ -5,6 +5,7 @@ in with lib; {
     st-link.enable = mkEnableOption "udev rules for ST-Link debug probes";
     cmsis-dap.enable = mkEnableOption "udev rules for CMSIS-DAP debug probes (such as NXP MCU-Link)";
     espressif.enable = mkEnableOption "udev rules for Espressif USB JTAG/serial debug units";
+    ftdi.enable = mkEnableOption "udev rules for FTDI UART dongles";
   };
 
   config =
@@ -105,6 +106,27 @@ in with lib; {
         in
         {
           services.udev.packages = [ v2Rules v2_1Rules v3Rules ];
+        }
+      ))
+      (mkIf cfg.ftdi.enable (
+        let
+          vendor = mkVendorId "0403";
+          subsystemTty = ''SUBSYSTEM=="tty"'';
+          rules = pkgs.writeTextFile
+            {
+              name = "49-ftdi.rules";
+              text = concatStrings [
+                ''
+                  ACTION=="remove", GOTO="ftdi_usb_uart_end"
+                  SUBSYSTEM!="tty", GOTO="ftdi_usb_uart_end"
+                  ${subsystemTty}, ${vendor}, ${mode}, ${uaccess}, ${mkNumberedSymlink "tty%E{ID_MODEL}"}, SYMLINK+="ttyFTDI_%E{ID_SERIAL_SHORT}"
+                  LABEL="ftdi_usb_uart_end"
+                ''
+              ];
+            };
+        in
+        {
+          services.udev.packages = [ rules ];
         }
       ))
     ]);
