@@ -12,6 +12,14 @@ with lib; {
         description = "Whether to enable Looker, a Bunyan log viewer";
       };
     };
+    sp3-uart = {
+      enable = mkEnableOption "bench gimlet SP3 UART script";
+      logDir = mkOption {
+        type = types.path;
+        default = "/gimlet/logs";
+        description = "path for sp3-uart logs";
+      };
+    };
     humility = {
       enable = mkOption {
         type = types.bool;
@@ -35,6 +43,11 @@ with lib; {
                   example = "/gimlet/hubris/archives/grimey/build-gimlet.zip";
                 };
               };
+              cmds = mkOption {
+                type = nullOr attrs;
+                description = "An attribute set defining commands for this target.";
+                default = null;
+              };
             });
           default = { };
         };
@@ -42,47 +55,71 @@ with lib; {
   };
 
   config = mkMerge [
-      {}
-      # looker package
-      (mkIf cfg.looker.enable (
-        let
-          looker = with pkgs;
-            let
-              pname = "looker";
-              rev = "173a93c92ac78068569b252d3ec8a1cef4be1de6";
-              src = fetchFromGitHub
-                {
-                  owner = "oxidecomputer";
-                  repo = pname;
-                  inherit rev;
-                  hash = "sha256-V5hnr3e+GyxejcQSoqo+R/2tAXM3mfUtXR2ezKKVV7Q=";
-                };
-            in
-            rustPlatform.buildRustPackage
+    { }
+    # looker package
+    (mkIf cfg.looker.enable (
+      let
+        looker = with pkgs;
+          let
+            pname = "looker";
+            rev = "173a93c92ac78068569b252d3ec8a1cef4be1de6";
+            src = fetchFromGitHub
               {
-                inherit src pname;
-                version = rev;
-                cargoLock = {
-                  lockFile = "${src}/Cargo.lock";
-                };
+                owner = "oxidecomputer";
+                repo = pname;
+                inherit rev;
+                hash = "sha256-V5hnr3e+GyxejcQSoqo+R/2tAXM3mfUtXR2ezKKVV7Q=";
               };
-        in
-        { home.packages = [ looker ]; }
-      ))
-      # humility package
-      (mkIf cfg.humility.enable (mkMerge [
-        {
-          home.packages = [ (pkgs.callPackage ./humility.nix { }) ];
-        }
-        (mkIf (cfg.humility.environment != { }) {
-          xdg.configFile."humility/environment.json".text = builtins.toJSON cfg.humility.environment;
-          programs.zsh.initExtra = ''
-            export HUMILITY_ENVIRONMENT=${config.xdg.configHome}/humility/environment.json;
+          in
+          rustPlatform.buildRustPackage
+            {
+              inherit src pname;
+              version = rev;
+              cargoLock = {
+                lockFile = "${src}/Cargo.lock";
+              };
+            };
+      in
+      { home.packages = [ looker ]; }
+    ))
+    # humility package
+    (mkIf cfg.humility.enable (mkMerge [
+      {
+        home.packages = [ (pkgs.callPackage ./humility.nix { }) ];
+      }
+      (mkIf (cfg.humility.environment != { }) {
+        xdg.configFile."humility/environment.json".text = builtins.toJSON cfg.humility.environment;
+        programs.zsh.initExtra = ''
+          export HUMILITY_ENVIRONMENT=${config.xdg.configHome}/humility/environment.json;
+        '';
+        home.sessionVariables = {
+          HUMILITY_ENVIRONMENT = "${config.xdg.configHome}/humility/environment.json";
+        };
+      })
+    ]))
+
+    (mkIf cfg.gimletScripts.enable (
+      let
+        sp3-uart = writeShellApplication {
+          name = "sp3-uart";
+          runtimeInputs = with pkgs; [ picocom ];
+          text = ''
+            logfile=${cfg.sp3-uart.logDir}/sp3-uart.`basename $1`.out.`date +%s`
+
+            set -o xtrace
+
+            exec picocom \
+                -v 'rx -X' \
+                -s 'sx -Xk' \
+                --flow h \
+                --imap lfcrlf \
+                --omap crlf,delbs \
+                --log $logfile \
+                -b 3000000 $1
           '';
-          home.sessionVariables = {
-            HUMILITY_ENVIRONMENT = "${config.xdg.configHome}/humility/environment.json";
-          };
-        })
-      ]))
-    ];
+        };
+      in
+      { home.packages = [ sp3-uart ]; }
+    ))
+  ];
 }
