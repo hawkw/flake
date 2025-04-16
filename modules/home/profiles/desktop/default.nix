@@ -49,14 +49,13 @@ in {
         ### chat clients & stuff
         element-desktop
         mumble
-        # terminals
-        ghostty
       ] ++ unfreePkgs);
     #############################################################################
     ## Programs                                                                 #
     #############################################################################
     programs = {
       firefox.enable = true;
+      ghostty.enable = true;
       _1password-gui.enableSshAgent = true;
       keychain = {
         enable = true;

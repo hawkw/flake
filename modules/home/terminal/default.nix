@@ -14,7 +14,7 @@ in
     font = {
       family = mkOption {
         type = uniq str;
-        default = "Berkeley Mono";
+        default = "TX-02";
         example = "Berkeley Mono";
         description = "The font family to use in the terminal.";
       };
@@ -134,6 +134,9 @@ in
         })
       ]
     ))
+    #
+    # WezTerm
+    #
     (mkIf config.programs.wezterm.enable (
       let
         waylandGnomeScript = "wayland_gnome";
@@ -173,6 +176,7 @@ in
 
             config.enable_tab_bar = true
             config.hide_tab_bar_if_only_one_tab = true
+            config.window_decorations ="INTEGRATED_BUTTONS|RESIZE"
             config.window_frame = {
               font = wezterm.font { family = '${cfg.font.family}', weight = 'Bold', },
               font_size = ${toString cfg.font.sizePt}.0,
@@ -214,5 +218,17 @@ in
       }
     )
     )
+    #
+    # GhosTTY
+    #
+    (mkIf config.programs.ghostty.enable
+      {
+        programs.ghostty = {
+          settings = {
+            font-family = cfg.font.family;
+            font-size = cfg.font.sizePt;
+          };
+        };
+      })
   ];
 }

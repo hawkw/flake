@@ -6,7 +6,7 @@ let
     email = "eliza@elizas.website";
   };
 in
-rec {
+with lib; rec {
   imports = [
     ./fonts.nix
     ./profiles
@@ -23,9 +23,9 @@ rec {
 
   home = {
     sessionVariables = {
-      EDITOR = "code --wait";
+      EDITOR = lib.mkDefault "vim";
       BROWSER = "firefox";
-      TERMINAL = "alacritty";
+      TERMINAL = "wezterm";
       CARGO_TERM_COLOR = "auto";
       RUST_BACKTRACE = "1";
     };
