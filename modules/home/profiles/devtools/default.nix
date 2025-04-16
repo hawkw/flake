@@ -14,7 +14,6 @@ in
     (mkIf cfg.enable {
       home.packages = with pkgs; [
         vscode
-        zed-editor
         # ## toolchains ###
         rustup
         # clang
@@ -55,6 +54,9 @@ in
 
       # Dev tools with extra configuration
       programs = {
+        zed-editor = {
+          enable = config.profiles.desktop.enable;
+        };
         # Nice terminal UI for gdb
         gdb.dashboard = {
           enable = mkDefault true;
@@ -80,6 +82,15 @@ in
     (mkIf cfg.enablePython {
       home.packages = with pkgs;
         [ python312Packages.pip ];
+    })
+
+    (mkIf config.programs.zed-editor.enable {
+      # the Nix package for zed calls the binary "zeditor", which is annoying
+      home.shellAliases = {
+        zed = "${config.programs.zed-editor.package}/bin/zeditor";
+      };
+      # Make Zed the default editor.
+      home.sessionVariables.EDITOR = mkForce "${config.programs.zed-editor.package}/bin/zeditor --wait";
     })
   ];
 }
