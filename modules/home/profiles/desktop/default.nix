@@ -15,7 +15,7 @@ in {
         unfreePkgs = [
           slack
           discord
-          signal-desktop
+          signal-desktop-bin
           zoom-us
           keybase
           keybase-gui
