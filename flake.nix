@@ -132,6 +132,14 @@
         nixpkgs-stable.follows = "nixpkgs-stable";
       };
     };
+
+    # Nix formatter in Rust
+    alejandra = {
+      url = "github:kamadorueda/alejandra/3.1.0";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
 
   ############################################################################
@@ -164,6 +172,8 @@
         rust-overlay.overlays.default
         # inputs.atuin.overlays.default
 
+        # add alejandra package
+        (_: prev: { alejandra = inputs.alejandra.defaultPackage.${prev.system}; })
         # add ghostty package
         (_: prev: { ghostty = inputs.ghostty.packages.${prev.system}.ghostty; })
         # add ECLSSD

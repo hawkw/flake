@@ -179,6 +179,7 @@ in with lib; {
       (mkMerge [
         {
           home.packages = with pkgs; [
+            alejandra
             nil
             nixpkgs-fmt
             nix-output-monitor
