@@ -64,6 +64,7 @@
       pciutils
       # for lsusb etc
       usbutils
+      lshw
       home-manager
       lm_sensors
       smartmontools
