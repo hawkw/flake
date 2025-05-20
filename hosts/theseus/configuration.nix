@@ -15,7 +15,7 @@ with lib; {
       enable = true;
       gnome3.enable = true;
     };
-    vu-dials.enable = true;
+    # vu-dials.enable = true;
     observability.enable = true;
     arm-cross-dev.enable = true;
     nix-ld.enable = true;

@@ -45,6 +45,7 @@ let cfg = config.profiles.zfs; in with lib; {
           weekly = mkDefault 2;
           monthly = mkDefault 2;
         };
+        zed.enableMail = false;
       };
 
     }

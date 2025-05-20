@@ -132,7 +132,6 @@ in with lib; {
 
       # If aliases are enabled, alias common unix utils with their rustier replacements.
       (mkIf cfg.enableAliases {
-        programs.lsd.enableAliases = true;
         home.shellAliases = {
           tree = "${pkgs.lsd}/bin/lsd --tree";
           grep = "${pkgs.ripgrep}/bin/rg";
