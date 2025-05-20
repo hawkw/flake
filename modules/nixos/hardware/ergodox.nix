@@ -24,7 +24,7 @@ in with lib; {
             # Rule for the Moonlander
             SUBSYSTEM=="${subsys-usb}", ATTR{idVendor}=="${vid-3297}", ATTR{idProduct}=="1969", GROUP="${group-plugdev}"
             # Rule for the Ergodox EZ
-            SUBSYSTEM=="${subsys-usb}"` ATTR{idVendor}=="${vid-feed}", ATTR{idProduct}=="1307", GROUP="${group-plugdev}"
+            SUBSYSTEM=="${subsys-usb}", ATTR{idVendor}=="${vid-feed}", ATTR{idProduct}=="1307", GROUP="${group-plugdev}"
             # Rule for the Planck EZ
             SUBSYSTEM=="${subsys-usb}", ATTR{idVendor}=="${vid-feed}", ATTR{idProduct}=="6060", GROUP="${group-plugdev}"
 
