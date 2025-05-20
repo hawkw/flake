@@ -1,6 +1,6 @@
 { config, pkgs, lib, ... }:
 
-with pkgs; {
+with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
@@ -142,6 +142,25 @@ with pkgs; {
     #     wlp4s0 = { inherit useDHCP; };
     #     wlp7s0 = { inherit useDHCP; };
     #   };
+  };
+
+  #
+  # systemd-networkd
+  #
+  networking.networkmanager.enable = mkForce false;
+  systemd.services."systemd-networkd".environment.SYSTEMD_LOG_LEVEL = "debug";
+  systemd.network.wait-online.anyInterface = true;
+  systemd.network = {
+    enable = true;
+    networks."10-lan" = {
+      matchConfig.Type = "ether";
+      networkConfig = {
+        # start a DHCP Client for IPv4 Addressing/Routing
+        DHCP = "ipv4";
+        # accept Router Advertisements for Stateless IPv6 Autoconfiguraton (SLAAC)
+        IPv6AcceptRA = true;
+      };
+    };
   };
 
   #### Services ####
