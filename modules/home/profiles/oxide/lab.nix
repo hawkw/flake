@@ -78,6 +78,16 @@ with lib; {
           );
         labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" ];
         racklettes = [
+          # racklette: berlin
+          {
+            name = "berlin";
+            scrimletSerials = [ "BRM42220023" "BRM42220082"];
+          }
+          # racklette: dublin
+          {
+            name = "dublin";
+            scrimletSerials = ["BRM42220026" "BRM23230018"];
+          }
           # racklette: madrid
           {
             name = "madrid";
