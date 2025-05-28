@@ -7,7 +7,7 @@ with lib; {
   config = mkIf cfg.enable {
     programs.ssh.matchBlocks =
       let
-        jeeves = "jeeves";
+        castle = "castle";
         engDomain = "eng.oxide.computer";
         all-racklettes = "all-racklettes";
         racklette-gimlets = "racklette-gimlets";
@@ -21,7 +21,7 @@ with lib; {
           }: (
             let
               brm = "${name}BRM";
-              mkPilotProxyCommand = (cmd: tgt: "ssh ${jeeves} pilot -r ${name} ${cmd} nc ${tgt} %p");
+              mkPilotProxyCommand = (cmd: tgt: "ssh ${castle} pilot -r ${name} ${cmd} nc ${tgt} %p");
               scrimletGzs =
                 let
                   mkGz =
@@ -67,12 +67,12 @@ with lib; {
                 {
                   host = "${brm}*";
                   extraOptions = {
-                    ProxyCommand = ''ssh ${jeeves} pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
+                    ProxyCommand = ''ssh ${castle} pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
                   };
                 };
             } // scrimletGzs // switches
           );
-        labMachines = [ jeeves "atrium" "cadbury" "yuban" "lurch" "alfred" ];
+        labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" ];
         racklettes = [
           # racklette: madrid
           {
@@ -105,7 +105,11 @@ with lib; {
         # connect to the VPN first. Don't do this if already on the VPN,
         # because it makes the SSH connection take longer to establish.
         ${labNoVpnBlock} = {
-          match = ''host "!vpn.${engDomain},*.${engDomain}" !exec "nmcli con show --active | grep 'oxide.*vpn'"'';
+          match = let
+            checkVpnActive = "nmcli con show --active | grep 'oxide.*vpn'";
+          in ''
+            host "!vpn.${engDomain},*.${engDomain}" !exec "${checkVpnActive}"
+          '';
           proxyJump = "vpn.${engDomain}";
         };
 
@@ -117,7 +121,7 @@ with lib; {
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
           ];
-          proxyCommand = ''ssh ${jeeves} pilot -r $(echo "%h" | sed 's/gc.*//') tp nc any $(echo "%h" | sed 's/.*gc//') %p'';
+          proxyCommand = ''ssh ${castle} pilot -r $(echo "%h" | sed 's/gc.*//') tp nc any $(echo "%h" | sed 's/.*gc//') %p'';
           forwardAgent = true;
         };
 
@@ -130,7 +134,7 @@ with lib; {
             (concatStringsSep " ")
           ];
           user = "root";
-          proxyJump = "jeeves.eng.oxide.computer";
+          proxyJump = "${castle}.eng.oxide.computer";
           extraOptions = {
             # Every time the racklet is reset, the host key changes, so
             # silence all of openssh's warnings that "SOMEONE MIGHT BE
