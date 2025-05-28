@@ -67,7 +67,11 @@ with lib; {
                 {
                   host = "${brm}*";
                   extraOptions = {
-                    ProxyCommand = ''ssh ${castle} pilot -r ${name} tp nc any $(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]") %p'';
+                    ProxyCommand = let
+                        host = ''$(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]")'';
+                    in ''
+                      ssh ${castle} pilot -r ${name} tp nc any ${host} %p
+                    '';
                   };
                 };
             } // scrimletGzs // switches
@@ -121,7 +125,14 @@ with lib; {
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
           ];
-          proxyCommand = ''ssh ${castle} pilot -r $(echo "%h" | sed 's/gc.*//') tp nc any $(echo "%h" | sed 's/.*gc//') %p'';
+          proxyCommand = let
+            # extract the racklette from the ssh host
+            racklette = ''$(echo "%h" | sed 's/gc.*//')'';
+            # extract the cubby from the ssh host
+            cubby = ''$(echo "%h" | sed 's/.*gc//')'';
+          in ''
+            ssh ${castle} pilot -r ${racklette} tp nc any ${cubby} %p
+          '';
           forwardAgent = true;
         };
 
