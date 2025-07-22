@@ -127,7 +127,7 @@ in
           };
         }
         (mkIf config.programs.zsh.enable {
-          programs.zsh.initExtra = fixTermEnvVar;
+          programs.zsh.initContent = fixTermEnvVar;
         })
         (mkIf config.programs.bash.enable {
           programs.bash.initExtra = fixTermEnvVar;

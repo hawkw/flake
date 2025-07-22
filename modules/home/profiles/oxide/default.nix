@@ -35,14 +35,9 @@ with lib; {
         in
         [ atrium-sync atrium-run lookall ];
 
-      # use Nix flake in the Omicron repo.
-      programs.zsh.initExtra = ''
-        export OMICRON_USE_FLAKE=1;
-      '';
-
       home.sessionVariables = {
         # Tell direnv to opt in to using the Nix flake for Omicron.
-        OMICRON_USE_FLAKE = " 1 ";
+        OMICRON_USE_FLAKE = "1";
       };
 
       programs.oxide = {

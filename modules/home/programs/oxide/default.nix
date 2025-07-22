@@ -89,9 +89,6 @@ with lib; {
       }
       (mkIf (cfg.humility.environment != { }) {
         xdg.configFile."humility/environment.json".text = builtins.toJSON cfg.humility.environment;
-        programs.zsh.initExtra = ''
-          export HUMILITY_ENVIRONMENT=${config.xdg.configHome}/humility/environment.json;
-        '';
         home.sessionVariables = {
           HUMILITY_ENVIRONMENT = "${config.xdg.configHome}/humility/environment.json";
         };
