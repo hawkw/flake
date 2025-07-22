@@ -128,8 +128,8 @@
     ghostty = {
       url = "github:ghostty-org/ghostty";
       inputs = {
-        nixpkgs-unstable.follows = "nixpkgs";
-        nixpkgs-stable.follows = "nixpkgs-stable";
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
       };
     };
 
