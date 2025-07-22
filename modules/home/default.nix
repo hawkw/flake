@@ -43,6 +43,7 @@ with lib; rec {
       dtrx # Do The Right eXtraction --- extract any kind of archive file
       unzip
       btop
+      file
 
       asciinema
 
