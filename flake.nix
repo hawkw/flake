@@ -140,6 +140,12 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    lix-module = {
+      url = "https://git.lix.systems/lix-project/nixos-module/archive/2.93.2-1.tar.gz";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
   };
 
   ############################################################################
@@ -154,6 +160,7 @@
     , rust-overlay
     , deploy-rs
     , flake-parts
+    , lix-module
     , ...
     }@inputs:
     let
@@ -202,6 +209,7 @@
               utils.nixosModules.autoGenFromInputs
               self.nixosModules.default
               home.nixosModules.home-manager
+              lix-module.nixosModules.default
               inputs.vu-server.nixosModules.default
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
