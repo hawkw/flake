@@ -29,4 +29,6 @@
     qemu
     screen
   ];
+
+  programs.lutris.enable = true;
 }
