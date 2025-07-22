@@ -37,7 +37,7 @@ in {
         gimp
         syncplay
         vlc
-        plex-media-player
+        plex-desktop
         ghostscriptX
         losslesscut-bin
 
