@@ -67,26 +67,28 @@ with lib; {
                 {
                   host = "${brm}*";
                   extraOptions = {
-                    ProxyCommand = let
+                    ProxyCommand =
+                      let
                         host = ''$(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]")'';
-                    in ''
-                      ssh ${castle} pilot -r ${name} tp nc any ${host} %p
-                    '';
+                      in
+                      ''
+                        ssh ${castle} pilot -r ${name} tp nc any ${host} %p
+                      '';
                   };
                 };
             } // scrimletGzs // switches
           );
-        labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" ];
+        labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" "hudson" "edgar" ];
         racklettes = [
           # racklette: berlin
           {
             name = "berlin";
-            scrimletSerials = [ "BRM42220023" "BRM42220082"];
+            scrimletSerials = [ "BRM42220023" "BRM42220082" ];
           }
           # racklette: dublin
           {
             name = "dublin";
-            scrimletSerials = ["BRM42220026" "BRM23230018"];
+            scrimletSerials = [ "BRM42220026" "BRM23230018" ];
           }
           # racklette: madrid
           {
@@ -119,11 +121,13 @@ with lib; {
         # connect to the VPN first. Don't do this if already on the VPN,
         # because it makes the SSH connection take longer to establish.
         ${labNoVpnBlock} = {
-          match = let
-            checkVpnActive = "nmcli con show --active | grep 'oxide.*vpn'";
-          in ''
-            host "!vpn.${engDomain},*.${engDomain}" !exec "${checkVpnActive}"
-          '';
+          match =
+            let
+              checkVpnActive = "nmcli con show --active | grep 'oxide.*vpn'";
+            in
+            ''
+              host "!vpn.${engDomain},*.${engDomain}" !exec "${checkVpnActive}"
+            '';
           proxyJump = "vpn.${engDomain}";
         };
 
@@ -135,14 +139,16 @@ with lib; {
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
           ];
-          proxyCommand = let
-            # extract the racklette from the ssh host
-            racklette = ''$(echo "%h" | sed 's/gc.*//')'';
-            # extract the cubby from the ssh host
-            cubby = ''$(echo "%h" | sed 's/.*gc//')'';
-          in ''
-            ssh ${castle} pilot -r ${racklette} tp nc any ${cubby} %p
-          '';
+          proxyCommand =
+            let
+              # extract the racklette from the ssh host
+              racklette = ''$(echo "%h" | sed 's/gc.*//')'';
+              # extract the cubby from the ssh host
+              cubby = ''$(echo "%h" | sed 's/.*gc//')'';
+            in
+            ''
+              ssh ${castle} pilot -r ${racklette} tp nc any ${cubby} %p
+            '';
           forwardAgent = true;
         };
 
