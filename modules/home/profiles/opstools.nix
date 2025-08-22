@@ -20,6 +20,7 @@ with lib;
         rust-petname
         ### IPMI ###
         freeipmi
+        ipmitool
       ];
     })
     ### networking tools ###
