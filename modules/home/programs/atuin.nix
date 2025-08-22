@@ -11,8 +11,8 @@ with lib;
   config = mkIf cfg.enable (mkMerge [
     {
       programs.atuin.settings = {
-        style = "auto";
-        # style = "compact";
+        # style = "auto";
+        style = "compact";
         # inline_height = 20;
         dialect = "us";
         auto_sync = true;
@@ -50,7 +50,7 @@ with lib;
         };
 
         # Unix socket activation for atuin shell history daemon.
-        # See: https://github.com/Nemo157/dotfiles/commit/967719ddc17c1d0060240106df1ca14c058936d2 
+        # See: https://github.com/Nemo157/dotfiles/commit/967719ddc17c1d0060240106df1ca14c058936d2
         systemd.user.sockets.${name} = {
           Unit = {
             Description = "Unix socket activation for atuin shell history daemon";
