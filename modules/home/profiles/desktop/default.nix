@@ -49,6 +49,9 @@ in {
         ### chat clients & stuff
         element-desktop
         mumble
+
+        ### kicad
+        kicad
       ] ++ unfreePkgs);
     #############################################################################
     ## Programs                                                                 #
