@@ -57,6 +57,7 @@ in
   options.profiles.observability = with types; {
     enable = mkEnableOption "observability";
     prometheusMdns.enable = mkEnableOption "Prometheus mDNS service discovery";
+    scrapeTailscale = mkEnableOption "prometheus scrapes over tailscale";
 
     observer = {
       enable = mkEnableOption "observability collector";
@@ -108,7 +109,7 @@ in
             enable = mkDefault true;
             enabledCollectors = [
               "systemd "
-              "zfs"
+              # "zfs"
             ];
             port = mkDefault 9002;
             openFirewall = mkDefault true;
@@ -156,31 +157,62 @@ in
             uptimeKumaDomain = "uptime.${cfg.observer.rootDomain}";
             appleHealthPort = 6969;
 
+            # All systems configured by the flake. Used to generate scrape targets.
             allHostConfigs = mapAttrs (_: system: system.config) self.outputs.nixosConfigurations;
+
+            newMkExporter = { instance, hostname ? instance }: (service: exporter: {
+              targets = [ "${hostname}:${toString exporter.port}" ];
+              labels = {
+                inherit instance service;
+              };
+            });
+
+            # tailscale scrape targets
             tailscaleScrapeTargets =
               let
+                hostConfigs = filterAttrs (_: config: config.profiles.observability.scrapeTailscale) allHostConfigs;
+                mkHostExporters =
+                  (instance: config:
+                    let
+                      mkExporter = newMkExporter {
+                        inherit instance;
+                      };
+                    in
+                    mapAttrsToList mkExporter (enabledExporters config));
+              in
+              concatLists (mapAttrsToList mkHostExporters hostConfigs);
+            # local domain scrape targets
+            lanScrapeTargets =
+              let
+                hostConfigs = filterAttrs (_: config: !config.profiles.observability.scrapeTailscale) allHostConfigs;
                 mkHostExporters = (instance: config:
                   let
-                    mkExporter =
-                      (service: exporter: {
-                        targets = [ "${instance}:${toString exporter.port}" ];
-                        labels = {
-                          inherit instance service;
-                        };
-                      });
+                    subdomain = "${instance}.sys.home.${ cfg.observer.rootDomain}";
+                    mkExporter = newMkExporter {
+                      inherit instance;
+                      hostname = subdomain;
+                    };
                   in
                   mapAttrsToList mkExporter (enabledExporters config));
               in
-              concatLists (mapAttrsToList mkHostExporters allHostConfigs);
+              concatLists (mapAttrsToList mkHostExporters hostConfigs);
+
+            # eclssd scrape targets
             eclssScrapeTargets =
               let
-                mkScrapeConfig = (instance: config: {
-                  targets = [ "${instance}.eclss.home.${cfg.observer.rootDomain}:${toString config.services.eclssd.server.port}" ];
-                  labels = {
-                    inherit instance;
-                    location = "${config.services.eclssd.location}";
-                  };
-                });
+                mkScrapeConfig = (instance: config:
+                  let
+                    subdomain = "${ instance}.eclss.home.${ cfg. observer. rootDomain}";
+                    eclssdPort = config.services.eclssd.server.port;
+                  in
+                  {
+                    targets = [ "${subdomain}:${toString eclssdPort}" ];
+                    labels = {
+                      inherit instance;
+                      location = "${config.services.eclssd.location}";
+                    };
+                  }
+                );
                 eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enable) allHostConfigs;
               in
               (mapAttrsToList mkScrapeConfig eclssHosts);
@@ -195,6 +227,21 @@ in
                   metrics_path = "/metrics";
                   scheme = "http";
                   static_configs = tailscaleScrapeTargets;
+                  relabel_configs = [
+                    {
+                      source_labels = [ "__address__" ];
+                      target_label = "address";
+                    }
+                  ];
+                }
+                # local DNS service discovery
+                {
+                  job_name = "lan";
+                  scrape_interval = "10s";
+                  scrape_timeout = "8s";
+                  metrics_path = "/metrics";
+                  scheme = "http";
+                  static_configs = lanScrapeTargets;
                   relabel_configs = [
                     {
                       source_labels = [ "__address__" ];
@@ -357,17 +404,17 @@ in
                         {
                           title = "Noctis BMC";
                           icon = "mdi-console-network-outline";
-                          url = "http://bmc.noctis.home.${cfg.observer.rootDomain}";
+                          url = "http://noctis-bmc.sys.home.${cfg.observer.rootDomain}";
                         }
                         {
-                          title = "Rack #0 PDU #0";
+                          title = "Rack #1 PDU #1";
                           icon = "mdi-power-socket-us";
-                          url = "http://pdu0.rack0.home.${cfg.observer.rootDomain}";
+                          url = "http://pdu1.rack1.home.${cfg.observer.rootDomain}";
                         }
                       ] ++ (lists.optional cfg.observer.victoriametrics.enable {
                         title = "VictoriaMetrics";
                         icon = "si-victoriametrics";
-                        url = "https://noctis.home.${cfg.observer.rootDomain}:${toString cfg.observer.victoriametrics.port}";
+                        url = "https://${config.networking.hostName}.sys.home.${cfg.observer.rootDomain}:${toString cfg.observer.victoriametrics.port}";
                       });
                     }
                   ];

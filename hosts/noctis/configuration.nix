@@ -13,19 +13,19 @@
       gnome3.enable = true;
     };
     observability = {
-      enable = true;
-      observer = {
-        enable = true;
-        enableUnifi = true;
-        inherit rootDomain;
-      };
+      # enable = true;
+      # observer = {
+      #   enable = true;
+      #   enableUnifi = true;
+      #   inherit rootDomain;
+      # };
       snmp.enable = true;
     };
-    nginx = {
-      enable = true;
-      domain = rootDomain;
-      acmeSubdomain = "home";
-    };
+    # nginx = {
+    #   enable = true;
+    #   domain = rootDomain;
+    #   acmeSubdomain = "home";
+    # };
     # enable the correct perf tools for this kernel version
     perftools.enable = true;
     vu-dials.enable = true;
@@ -113,7 +113,6 @@
         ];
       };
     };
-
   };
 
   #### System configuration ####
