@@ -5,9 +5,6 @@ with pkgs; with lib; {
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
   profiles =
-    # let
-    # rootDomain = "elizas.website";
-    # in
     {
       docs.enable = true;
       games.enable = true;
@@ -16,18 +13,8 @@ with pkgs; with lib; {
       };
       observability = {
         enable = true;
-        # observer = {
-        #   enable = true;
-        #   enableUnifi = true;
-        #   inherit rootDomain;
-        # };
         snmp.enable = true;
       };
-      # nginx = {
-      #   enable = true;
-      #   domain = rootDomain;
-      #   acmeSubdomain = "home";
-      # };
       # enable the correct perf tools for this kernel version
       perftools.enable = true;
       vu-dials.enable = true;
@@ -51,7 +38,7 @@ with pkgs; with lib; {
     # machine's hostname
     hostName = "hekate";
     # this has to be a unique 32-bit number. ZFS requires us to define this.
-    hostId = "00HECA7E";
+    hostId = "4ECA7E00";
 
     # The global useDHCP flag is deprecated, therefore explicitly set to false here.
     # Per-interface useDHCP will be mandatory in the future, so this generated config
