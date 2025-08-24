@@ -61,75 +61,75 @@ in
           device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645";
           content = zfsContent;
         };
-        zpool =
-          {
-            ${rpool} = {
-              type = "zpool";
-              rootFsOptions = {
-                # https://wiki.archlinux.org/title/Install_Arch_Linux_on_ZFS
-                acltype = "posixacl";
-                atime = "off";
-                compression = "zstd";
-                mountpoint = "none";
-                xattr = "sa";
+      };
+      zpool =
+        {
+          ${rpool} = {
+            type = "zpool";
+            rootFsOptions = {
+              # https://wiki.archlinux.org/title/Install_Arch_Linux_on_ZFS
+              acltype = "posixacl";
+              atime = "off";
+              compression = "zstd";
+              mountpoint = "none";
+              xattr = "sa";
+            };
+            mode = {
+              topology = {
+                type = "topology";
+                vdev = [
+                  {
+                    mode = "raidz2";
+                    members = [ "nvme01" "nvme02" "nvme03" "nvme04" ];
+                  }
+                ];
               };
-              mode = {
-                topology = {
-                  type = "topology";
-                  vdev = [
-                    {
-                      mode = "raidz2";
-                      members = [ "nvme01" "nvme02" "nvme03" "nvme04" ];
-                    }
-                  ];
+            };
+            # Dataset layout based on https://grahamc.com/blog/nixos-on-zfs/
+            datasets = {
+              ${localDataset} = {
+                type = zfs_fs;
+                options.mountpoint = "none";
+              };
+              "${localDataset}/nix" = {
+                type = zfs_fs;
+                mountpoint = "/nix";
+                options = {
+                  ${autosnapshot} = "false";
                 };
               };
-              # Dataset layout based on https://grahamc.com/blog/nixos-on-zfs/
-              datasets = {
-                ${localDataset} = {
-                  type = zfs_fs;
-                  options.mountpoint = "none";
+              ${systemDataset} = {
+                type = zfs_fs;
+                options.mountpoint = "none";
+              };
+              "${systemDataset}/root" = {
+                type = zfs_fs;
+                mountpoint = "/";
+                options = {
+                  ${autosnapshot} = "true";
                 };
-                "${localDataset}/nix" = {
-                  type = zfs_fs;
-                  mountpoint = "/nix";
-                  options = {
-                    ${autosnapshot} = "false";
-                  };
+                postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
+              };
+              "${systemDataset}/var" = {
+                type = zfs_fs;
+                mountpoint = "/var";
+                options = {
+                  ${autosnapshot} = "false";
                 };
-                ${systemDataset} = {
-                  type = zfs_fs;
-                  options.mountpoint = "none";
-                };
-                "${systemDataset}/root" = {
-                  type = zfs_fs;
-                  mountpoint = "/";
-                  options = {
-                    ${autosnapshot} = "true";
-                  };
-                  postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
-                };
-                "${systemDataset}/var" = {
-                  type = zfs_fs;
-                  mountpoint = "/var";
-                  options = {
-                    ${autosnapshot} = "false";
-                  };
-                };
-                ${userDataset} = {
-                  type = zfs_fs;
-                  options.mountpoint = "none";
-                };
-                "${userDataset}/home" = {
-                  type = zfs_fs;
-                  mountpoint = "/home";
-                  options = {
-                    ${autosnapshot} = "true";
-                  };
+              };
+              ${userDataset} = {
+                type = zfs_fs;
+                options.mountpoint = "none";
+              };
+              "${userDataset}/home" = {
+                type = zfs_fs;
+                mountpoint = "/home";
+                options = {
+                  ${autosnapshot} = "true";
                 };
               };
             };
           };
-      };
+        };
     };
 }
