@@ -209,7 +209,7 @@
               utils.nixosModules.autoGenFromInputs
               self.nixosModules.default
               home.nixosModules.home-manager
-              lix-module.nixosModules.default
+              lix-module.nixosModules.lixFromNixpkgs
               inputs.vu-server.nixosModules.default
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
