@@ -10,17 +10,16 @@ in with lib; {
     profiles.desktop.enable = mkDefault true;
 
     services = {
-      displayManager.defaultSession = mkDefault "gnome";
-      xserver = {
-        # Enable the GNOME Desktop Environment.
-        desktopManager.gnome.enable = true;
-        displayManager = {
-          gdm = {
-            enable = mkDefault true;
-            wayland = mkDefault true;
-          };
+      # Enable the GNOME Desktop Environment.
+      desktopManager.gnome.enable = true;
+      displayManager = {
+        defaultSession = mkDefault "gnome";
+        gdm = {
+          enable = mkDefault true;
+          wayland = mkDefault true;
         };
       };
+
 
       dbus.packages = with pkgs; [ dconf ];
       udev.packages = with pkgs; [ gnome-settings-daemon ];
