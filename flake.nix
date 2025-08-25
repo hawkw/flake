@@ -196,7 +196,12 @@
     flake-parts.lib.mkFlake { inherit inputs; }
       {
         perSystem = { pkgs, system, ... }: with pkgs; with lib; {
-          devShells.default = mkShell { buildInputs = [ deploy-rs.packages.${system}.default ]; };
+          devShells.default = mkShell {
+            buildInputs = [
+              deploy-rs.packages.${system}.default
+              inputs.disko.packages.${system}.disko
+            ];
+          };
         };
         flake = {
           ###########
