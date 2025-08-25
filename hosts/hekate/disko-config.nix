@@ -6,7 +6,7 @@ let
   userDataset = "${cryptDataset}/user";
   homeDataset = "${userDataset}/home";
   zfs_fs = "zfs_fs";
-  optAutosnapshot = "com.sun:optAutosnapshot";
+  optAutosnapshot = "com.sun:autosnapshot";
   optSystemd = "org.openzfs:systemd";
   zfsContent = {
     type = "gpt";
