@@ -1,6 +1,6 @@
 { config, pkgs, lib, ... }:
 
-with pkgs; with lib; {
+{
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
@@ -44,22 +44,6 @@ with pkgs; with lib; {
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
     useDHCP = false;
-    # interfaces =
-    #   let
-    #     wakeOnLan = {
-    #       enable = true;
-    #       policy = [ "unicast" "magic" ];
-    #     };
-    #     # disable dhcpd and use networkmanager instead.
-    #     useDHCP = true;
-    #   in
-    #   {
-    #     enp5s0 = { inherit wakeOnLan useDHCP; };
-    #     enp7s0 = { inherit wakeOnLan useDHCP; };
-    #     enp8s0f1u1u1u2 = { inherit wakeOnLan useDHCP; };
-    #     wlp4s0 = { inherit useDHCP; };
-    #     wlp7s0 = { inherit useDHCP; };
-    #   };
   };
 
   #### Boot configuration ####
@@ -68,28 +52,11 @@ with pkgs; with lib; {
       # Use the systemd-boot EFI boot loader.
       systemd-boot = {
         enable = true;
-        # don't keep more than 32 old configurations, to keep the /boot
-        # partition from filling up.
-        configurationLimit = 32;
+        configurationLimit = 64;
       };
       efi.canTouchEfiVariables = true;
     };
 
-    # Use this to track the latest Linux kernel that has ZFS support.
-    # This is generally not as necessary while using `zfsUnstable = true`.
-    # kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
-
-    ### configuration for unlocking the encrypted ZFS root dataset over SSH ###
-    # based on
-    # https://gitlab.com/usmcamp0811/dotfiles/-/blob/nixos/modules/nixos/system/zfs/default.nix
-    #
-    # TO REMOTELY UNLOCK ZPOOL:
-    #
-    # ssh root@10.0.10.69 -p 22
-    # zfs load-key -a
-    # <enter password>
-    #
-    # kernel modules for network adapters
     kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     # TODO(eliza): this could be a static IP so that we don't depend on DHCP
     # working to boot...
@@ -122,16 +89,16 @@ with pkgs; with lib; {
     ];
     initrd.network = {
       enable = true;
-      ssh = {
-        enable = true;
-        port = 22;
-        authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
-        # WARNING: these must actually exist :)
-        hostKeys = [
-          "/etc/ssh/ssh_host_rsa_key"
-          "/etc/ssh/ssh_host_ed25519_key"
-        ];
-      };
+      # ssh = {
+      #   enable = true;
+      #   port = 22;
+      #   authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
+      #   # WARNING: these must actually exist :)
+      #   hostKeys = [
+      #     "/etc/ssh/ssh_host_rsa_key"
+      #     "/etc/ssh/ssh_host_ed25519_key"
+      #   ];
+      # };
     };
   };
 
