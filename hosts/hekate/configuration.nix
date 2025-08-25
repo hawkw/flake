@@ -7,7 +7,7 @@
   profiles =
     {
       docs.enable = true;
-      games.enable = true;
+      server.enable = true;
       desktop = {
         gnome3.enable = true;
       };
