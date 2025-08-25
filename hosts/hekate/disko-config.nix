@@ -2,10 +2,12 @@ let
   rpool = "hekate-rpool";
   localDataset = "local";
   systemDataset = "system";
-  userDataset = "user";
   cryptDataset = "crypt";
+  userDataset = "${cryptDataset}/user";
+  homeDataset = "${userDataset}/home";
   zfs_fs = "zfs_fs";
-  autosnapshot = "com.sun:autosnapshot";
+  optAutosnapshot = "com.sun:optAutosnapshot";
+  optSystemd = "org.openzfs:systemd";
   zfsContent = {
     type = "gpt";
     partitions = {
@@ -96,7 +98,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/nix";
                 options = {
-                  ${autosnapshot} = "false";
+                  ${optAutosnapshot} = "false";
                 };
               };
               ${systemDataset} = {
@@ -107,7 +109,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/";
                 options = {
-                  ${autosnapshot} = "true";
+                  ${optAutosnapshot} = "true";
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
               };
@@ -115,7 +117,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
-                  ${autosnapshot} = "false";
+                  ${optAutosnapshot} = "false";
                 };
               };
               ${cryptDataset} = {
@@ -128,19 +130,27 @@ in
                   keylocation = "prompt";
                 };
               };
-              "${cryptDataset}/${userDataset}" = {
+              "${userDataset}" = {
                 type = zfs_fs;
                 options.mountpoint = "none";
               };
-              "${userDataset}/home" = {
+              "${homeDataset}" = {
                 type = zfs_fs;
                 mountpoint = "/home";
                 options = {
-                  ${autosnapshot} = "true";
+                  ${optAutosnapshot} = "true";
+                  "${optSystemd}:ignore" = "on";
                 };
               };
             };
           };
         };
     };
+
+  # Unlock user datasets on login.
+  security.pam.zfs = {
+    enable = true;
+    homes = "${rpool}/${homeDataset}";
+  };
+
 }
