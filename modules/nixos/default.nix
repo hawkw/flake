@@ -126,6 +126,7 @@
   #### users ####
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.mutableUsers = true;
   users.users.eliza = {
     isNormalUser = true;
     extraGroups = [
@@ -140,6 +141,7 @@
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
     ];
+    initialPassword = "changethis";
   };
 
   security = {
