@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, ... }:
 
 {
 
@@ -65,9 +65,6 @@
     # working to boot...
     kernelParams = [
       "ip=dhcp"
-      #  enable serial console
-      "console=tty1"
-      "console=ttyS0,115200"
     ];
 
     # additional kernel modules
