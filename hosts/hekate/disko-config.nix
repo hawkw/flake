@@ -3,6 +3,7 @@ let
   localDataset = "local";
   systemDataset = "system";
   userDataset = "user";
+  cryptDataset = "crypt";
   zfs_fs = "zfs_fs";
   autosnapshot = "com.sun:autosnapshot";
   zfsContent = {
@@ -117,7 +118,17 @@ in
                   ${autosnapshot} = "false";
                 };
               };
-              ${userDataset} = {
+              ${cryptDataset} = {
+                type = zfs_fs;
+                options = {
+                  mountpoint = "none";
+                  encryption = "aes-256-gcm";
+                  keyformat = "passphrase";
+                  #keylocation = "file:///tmp/secret.key";
+                  keylocation = "prompt";
+                };
+              };
+              "${cryptDataset}/${userDataset}" = {
                 type = zfs_fs;
                 options.mountpoint = "none";
               };
