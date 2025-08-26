@@ -251,8 +251,8 @@
           #####################
           deploy.nodes =
             let
-              mkNode = { hostname, system ? "x86_64-linux", extraOpts ? { } }: {
-                inherit hostname;
+              mkNode = { hostname, domain ? ".sys.home.elizas.website", system ? "x86_64-linux", extraOpts ? { } }: {
+                hostname = "${hostname}${domain}";
                 profiles.system = ({
                   sshUser = "eliza";
                   path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.${hostname};
@@ -275,14 +275,9 @@
 
               noctis = mkNode { hostname = "noctis"; };
 
-              tereshkova = {
-                hostname = "tereshkova.sys.home.elizas.website";
-                profiles.system = ({
-                  sshUser = "eliza";
-                  path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.tereshkova;
-                  user = "root";
-                });
-              };
+              tereshkova = mkNode { hostname = "tereshkova"; };
+
+              hekate = mkNode { hostname = "hekate"; };
             };
 
 
