@@ -154,20 +154,26 @@ in
                 type = zfs_fs;
                 options = {
                   mountpoint = "none";
-                  canmount = "noauto";
                   # Snapshot all user datasets.
                   ${optAutosnapshot} = "true";
                   # Systemd should not mount encrypted datasets on boot.
+                  canmount = "off";
                   "${optSystemd}:ignore" = "on";
                 } // optsCrypt; # enable encryption
               };
               "${homeDataset}" = {
                 type = zfs_fs;
                 mountpoint = "/home";
+                options = {
+                  canmount = "noauto";
+                };
               };
               "${homeDataset}/eliza" = {
                 type = zfs_fs;
                 mountpoint = "/home/eliza";
+                options = {
+                  canmount = "noauto";
+                };
               };
             };
           };
