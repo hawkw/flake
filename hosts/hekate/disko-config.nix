@@ -1,81 +1,83 @@
 let
   rpool = "hekate-rpool";
-  localDataset = "local";
-  systemDataset = "system";
-  cryptDataset = "crypt";
-  userDataset = "${cryptDataset}/user";
-  homeDataset = "${userDataset}/home";
+  userDataset = "user";
+  cryptDataset = "${userDataset}/crypt";
+  homeDataset = "${cryptDataset}/home";
   zfs_fs = "zfs_fs";
-  optAutosnapshot = "com.sun:autosnapshot";
-  optSystemd = "org.openzfs:systemd";
-  zfsContent = {
-    type = "gpt";
-    partitions = {
-      zfs = {
-        size = "100%";
-        content = {
-          type = "zfs";
-          pool = rpool;
+  sn840ids = [ "A079DDAA" "A079E3F9" "A079E4D6" "A084A645" ];
+  mkSn840 = (id: {
+    name = "sn840-${id}";
+    value = {
+      type = "disk";
+      device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_${id}";
+      content = {
+        type = "gpt";
+        partitions = {
+          zfs = {
+            size = "100%";
+            content = {
+              type = "zfs";
+              pool = rpool;
+            };
+          };
         };
       };
     };
-  };
+  }
+  );
 in
 {
   disko.devices =
     {
-      disk = {
-        boot = {
-          type = "disk";
-          device = "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H";
-          content = {
-            type = "gpt";
-            partitions = {
-              ESP = {
-                size = "1G";
-                type = "EF00";
-                content = {
-                  type = "filesystem";
-                  format = "vfat";
-                  mountpoint = "/boot";
-                  mountOptions = [ "umask=0077" "nofail" ];
+      disk =
+        let
+          sn840s = builtins.listToAttrs (map mkSn840 sn840ids);
+        in
+        {
+          boot = {
+            type = "disk";
+            device = "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H";
+            content = {
+              type = "gpt";
+              partitions = {
+                ESP = {
+                  size = "1G";
+                  type = "EF00";
+                  content = {
+                    type = "filesystem";
+                    format = "vfat";
+                    mountpoint = "/boot";
+                    mountOptions = [ "umask=0077" "nofail" ];
+                  };
                 };
               };
             };
           };
-        };
-        nvme01 = {
-          type = "disk";
-          device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA";
-          content = zfsContent;
-        };
-        nvme02 = {
-          type = "disk";
-          device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9";
-          content = zfsContent;
-        };
-        nvme03 = {
-          type = "disk";
-          device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6";
-          content = zfsContent;
-        };
-        nvme04 = {
-          type = "disk";
-          device = "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645";
-          content = zfsContent;
-        };
-      };
+        } // sn840s;
       zpool =
+        let
+          localDataset = "local";
+          systemDataset = "system";
+          optAutosnapshot = "com.sun:auto-snapshot";
+          optSystemd = "org.openzfs.systemd";
+          # default options for encrypted datasets
+          optsCrypt =
+            {
+              encryption = "aes-256-gcm";
+              keyformat = "passphrase";
+              keylocation = "prompt";
+            };
+        in
         {
           ${rpool} = {
             type = "zpool";
             rootFsOptions = {
-              # https://wiki.archlinux.org/title/Install_Arch_Linux_on_ZFS
-              acltype = "posixacl";
+              # Using "compression = on" instead of explicitly specifiying
+              # compression allows ZFS to pick the best one.
+              compression = "on";
+              # Nix doesn’t use atime, so atime=off on the /nix dataset is fine.
               atime = "off";
-              compression = "zstd";
               mountpoint = "none";
-              xattr = "sa";
             };
             mode = {
               topology = {
@@ -83,7 +85,7 @@ in
                 vdev = [
                   {
                     mode = "raidz2";
-                    members = [ "nvme01" "nvme02" "nvme03" "nvme04" ];
+                    members = map (id: "sn840-${id}") sn840ids;
                   }
                 ];
               };
@@ -117,37 +119,61 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
+                  # The dataset containing journald’s logs (where /var lives) should
+                  # have xattr = sa and acltype=posixacl set to allow regular users
+                  # to read their journal.
+                  acltype = "posixacl";
+                  xattr = "sa";
+                  # Disable autosnapshot for `/var`.
                   ${optAutosnapshot} = "false";
                 };
               };
-              ${cryptDataset} = {
+              "${systemDataset}/etc" = {
                 type = zfs_fs;
+                mountpoint = "/etc";
                 options = {
-                  mountpoint = "none";
-                  encryption = "aes-256-gcm";
-                  keyformat = "passphrase";
-                  #keylocation = "file:///tmp/secret.key";
-                  keylocation = "prompt";
+                  # The dataset containing journald’s logs (where /var lives) should
+                  # have xattr = sa and acltype=posixacl set to allow regular users
+                  # to read their journal.
+                  acltype = "posixacl";
+                  xattr = "sa";
+                  # Disable autosnapshot for `/etc` --- this should all come
+                  # from the nix store!
+                  ${optAutosnapshot} = "false";
                 };
               };
               "${userDataset}" = {
                 type = zfs_fs;
-                options.mountpoint = "none";
+                options = {
+                  mountpoint = "none";
+                  # Snapshot all user datasets.
+                  ${optAutosnapshot} = "true";
+                };
+              };
+              "${cryptDataset}" = {
+                type = zfs_fs;
+                options = {
+                  mountpoint = "none";
+                  # Snapshot all user datasets.
+                  ${optAutosnapshot} = "true";
+                  # Systemd should not mount encrypted datasets on boot.
+                  "${optSystemd}:ignore" = "on";
+                } // optsCrypt; # enable encryption
               };
               "${homeDataset}" = {
                 type = zfs_fs;
                 mountpoint = "/home";
-                options = {
-                  ${optAutosnapshot} = "true";
-                  "${optSystemd}:ignore" = "on";
-                };
+              };
+              "${homeDataset}/eliza" = {
+                type = zfs_fs;
+                mountpoint = "/home/eliza";
               };
             };
           };
         };
     };
 
-  # Unlock user datasets on login.
+  # Unlock user datasets on user login, rather than on boot..
   security.pam.zfs = {
     enable = true;
     homes = "${rpool}/${homeDataset}";

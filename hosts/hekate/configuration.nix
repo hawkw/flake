@@ -57,7 +57,6 @@
       efi.canTouchEfiVariables = true;
     };
 
-    supportedFilesystems = [ "zfs" ];
     initrd.supportedFilesystems = [ "zfs" ];
 
     kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
@@ -105,7 +104,6 @@
   # This is a deskop machine. Use the high-performance frequency profile rather
   # than the low-power one.
   powerManagement.cpuFreqGovernor = "performance";
-  programs.coolercontrol.enable = true;
 
   # enable ssh early
   systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
