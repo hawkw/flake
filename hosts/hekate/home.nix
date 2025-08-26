@@ -29,6 +29,9 @@
     screen
   ];
 
+  programs.atuin =
+    { enable = true; enableDaemon = true; };
+
 
   services = {
     gpg-agent = {
