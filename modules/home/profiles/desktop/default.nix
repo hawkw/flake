@@ -28,7 +28,8 @@ in {
 
         ### images, media, etc ###
         kdePackages.ark
-        darktable
+        # FIXME(eliza): doesn't build
+        # darktable
         inkscape
         obs-studio
         # broken due to https://github.com/NixOS/nixpkgs/issues/188525
