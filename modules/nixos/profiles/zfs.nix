@@ -13,7 +13,7 @@ let cfg = config.profiles.zfs; in with lib; {
             (builtins.match "linux_[0-9]+_[0-9]+" name) != null
             && (builtins.tryEval kernelPackages).success
             && (
-              (!isUnstable && !kernelPackages.zfs.meta.broken)
+              (!isUnstable && !kernelPackages.${pkgs.zfs.kernelModuleAttribute}.meta.broken)
               || (isUnstable && !kernelPackages.zfs_unstable.meta.broken)
             )
         )
