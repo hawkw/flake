@@ -58,7 +58,7 @@
     };
 
     initrd.supportedFilesystems = [ "zfs" ];
-    # zfs.requestEncryptionCredentials = false;
+    zfs.requestEncryptionCredentials = [ "hekate-rpool/local" "hekate-rpool/system" ];
 
     kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     # TODO(eliza): this could be a static IP so that we don't depend on DHCP
