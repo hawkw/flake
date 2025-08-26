@@ -154,6 +154,7 @@ in
                 type = zfs_fs;
                 options = {
                   mountpoint = "none";
+                  canmount = "noauto";
                   # Snapshot all user datasets.
                   ${optAutosnapshot} = "true";
                   # Systemd should not mount encrypted datasets on boot.
