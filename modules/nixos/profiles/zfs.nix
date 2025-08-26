@@ -26,7 +26,7 @@ let cfg = config.profiles.zfs; in with lib; {
     in
     {
       boot = {
-        # Note this might jump back and worth as kernel get added or removed.
+        # Note this might jump back and forth as kernel get added or removed.
         kernelPackages = latestZfsKernel;
         supportedFilesystems = [ "zfs" ];
         kernelParams = [ "elevator=none" ];
