@@ -209,4 +209,11 @@ in
       homes = "${rpool}/${homeDataset}";
     };
   };
+
+  # Ensure that sshd always asks for a password.
+  services.openssh.settings = {
+    PubkeyAuthentication = true;
+    KbdInteractiveAuthentication = true;
+    AuthenticationMethods = "publickey,keyboard-interactive";
+  };
 }
