@@ -203,7 +203,8 @@ in
 
   # Unlock user datasets on user login, rather than on boot..
   security.pam = {
-    mount.enable = true;
+    # mount.enable = true;
+    enableGnomeKeyring = true;
     zfs = {
       enable = true;
       homes = "${rpool}/${homeDataset}";
