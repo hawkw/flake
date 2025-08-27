@@ -100,7 +100,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/nix";
                 options = {
-                  mountpoint = "legacy";
                   ${optAutosnapshot} = "false";
                 };
               };
@@ -108,7 +107,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/tmp";
                 options = {
-                  mountpoint = "legacy";
                   ${optAutosnapshot} = "false";
                 };
               };
@@ -120,7 +118,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/";
                 options = {
-                  mountpoint = "legacy";
                   ${optAutosnapshot} = "true";
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
@@ -129,7 +126,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
-                  mountpoint = "legacy";
                   # The dataset containing journald’s logs (where /var lives) should
                   # have xattr = sa and acltype=posixacl set to allow regular users
                   # to read their journal.
@@ -143,7 +139,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/etc";
                 options = {
-                  mountpoint = "legacy";
                   # The dataset containing journald’s logs (where /var lives) should
                   # have xattr = sa and acltype=posixacl set to allow regular users
                   # to read their journal.
@@ -157,6 +152,9 @@ in
               "${userDataset}" = {
                 type = zfs_fs;
                 options = {
+                  # Systemd should not mount encrypted datasets on boot.
+                  canmount = "off";
+                  "${optSystemd}:ignore" = "on";
                   mountpoint = "none";
                   # Snapshot all user datasets.
                   ${optAutosnapshot} = "true";
@@ -177,6 +175,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/home";
                 options = {
+                  "${optSystemd}:ignore" = "on";
                   canmount = "noauto";
                 };
               };
@@ -184,6 +183,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/home/eliza";
                 options = {
+                  "${optSystemd}:ignore" = "on";
                   canmount = "noauto";
                 };
               };
@@ -191,11 +191,4 @@ in
           };
         };
     };
-
-  # Unlock user datasets on user login, rather than on boot..
-  security.pam.zfs = {
-    enable = true;
-    homes = "${rpool}/${homeDataset}";
-  };
-
 }
