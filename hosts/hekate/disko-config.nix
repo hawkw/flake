@@ -100,6 +100,15 @@ in
                 type = zfs_fs;
                 mountpoint = "/nix";
                 options = {
+                  mountpoint = "legacy";
+                  ${optAutosnapshot} = "false";
+                };
+              };
+              "${localDataset}/tmp" = {
+                type = zfs_fs;
+                mountpoint = "/tmp";
+                options = {
+                  mountpoint = "legacy";
                   ${optAutosnapshot} = "false";
                 };
               };
@@ -111,6 +120,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/";
                 options = {
+                  mountpoint = "legacy";
                   ${optAutosnapshot} = "true";
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
@@ -119,6 +129,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
+                  mountpoint = "legacy";
                   # The dataset containing journald’s logs (where /var lives) should
                   # have xattr = sa and acltype=posixacl set to allow regular users
                   # to read their journal.
@@ -132,6 +143,7 @@ in
                 type = zfs_fs;
                 mountpoint = "/etc";
                 options = {
+                  mountpoint = "legacy";
                   # The dataset containing journald’s logs (where /var lives) should
                   # have xattr = sa and acltype=posixacl set to allow regular users
                   # to read their journal.
