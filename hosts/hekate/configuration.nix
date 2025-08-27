@@ -109,9 +109,6 @@
   # enable ssh early
   systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
 
-  # high-DPI console font
-  console.font = "${pkgs.terminus_font}/share/consolefonts/ter-u28n.psf.gz";
-
   # i have 24 cores
   nix.settings.max-jobs = 48;
 
