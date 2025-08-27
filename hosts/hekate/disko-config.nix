@@ -103,13 +103,6 @@ in
                   ${optAutosnapshot} = "false";
                 };
               };
-              "${localDataset}/tmp" = {
-                type = zfs_fs;
-                mountpoint = "/tmp";
-                options = {
-                  ${optAutosnapshot} = "false";
-                };
-              };
               ${systemDataset} = {
                 type = zfs_fs;
                 options.mountpoint = "none";
