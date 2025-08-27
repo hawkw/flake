@@ -168,6 +168,14 @@ in
                 type = zfs_fs;
                 options = {
                   "${optSystemd}:ignore" = "on";
+                  # EXTREMELY IMPORTANT: This must be `options.mountpoint`,
+                  # rather than `mountpoint`! The `options.mountpoint` key ONLY
+                  # sets the ZFS mountpoint option, while `mountpoint` also
+                  # tells Disko to generate systemd mount units for the dataset
+                  # that will try to moun tit on boot. Since we want it to be
+                  # mounted by PAM on login, we must set the mountpoint for ZFS
+                  # but we must *not* generate any other systemd mount
+                  # configuration.
                   mountpoint = "/home";
                   canmount = "noauto";
                 };
@@ -175,6 +183,14 @@ in
               "${homeDataset}/eliza" = {
                 type = zfs_fs;
                 options = {
+                  # EXTREMELY IMPORTANT: This must be `options.mountpoint`,
+                  # rather than `mountpoint`! The `options.mountpoint` key ONLY
+                  # sets the ZFS mountpoint option, while `mountpoint` also
+                  # tells Disko to generate systemd mount units for the dataset
+                  # that will try to moun tit on boot. Since we want it to be
+                  # mounted by PAM on login, we must set the mountpoint for ZFS
+                  # but we must *not* generate any other systemd mount
+                  # configuration.
                   mountpoint = "/home/eliza";
                   "${optSystemd}:ignore" = "on";
                   canmount = "noauto";
@@ -184,4 +200,13 @@ in
           };
         };
     };
+
+  # Unlock user datasets on user login, rather than on boot..
+  security.pam = {
+    mount.enable = true;
+    zfs = {
+      enable = true;
+      homes = "${rpool}/${homeDataset}";
+    };
+  };
 }
