@@ -140,9 +140,11 @@
 
 
   # Unlock user datasets on user login, rather than on boot..
-  security.pam.zfs = {
-    enable = true;
-    homes = "hekate-rpool/user/home";
+  security.pam = {
+    pamMount = true;
+    zfs = {
+      enable = true;
+      homes = "hekate-rpool/user/home";
+    };
   };
-
 }
