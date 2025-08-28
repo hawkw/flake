@@ -194,7 +194,7 @@ in
                   # configuration.
                   mountpoint = "/home/eliza";
                   "${optSystemd}:ignore" = "on";
-                  canmount = "noauto";
+                  canmount = "on";
                 } // optsCrypt;
               };
             };
