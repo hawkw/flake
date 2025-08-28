@@ -214,7 +214,11 @@ in
   # Ensure that sshd always asks for a password.
   services.openssh.settings = {
     PubkeyAuthentication = true;
-    KbdInteractiveAuthentication = true;
-    AuthenticationMethods = "publickey,keyboard-interactive";
+    PasswordAuthentication = true;
+
+    # Always authenticate using the public key, but additionally, ask for the
+    # password, so that the password is available to PAM to unlock encrypted ZFS
+    # datasets.
+    AuthenticationMethods = "publickey,password";
   };
 }
