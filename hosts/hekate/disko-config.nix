@@ -1,8 +1,7 @@
 let
   rpool = "hekate-rpool";
   userDataset = "user";
-  cryptDataset = "${userDataset}/crypt";
-  homeDataset = "${cryptDataset}/home";
+  homeDataset = "${userDataset}/home";
   zfs_fs = "zfs_fs";
   sn840ids = [ "A079DDAA" "A079E3F9" "A079E4D6" "A084A645" ];
   mkSn840 = (id: {
@@ -41,6 +40,7 @@ in
               type = "gpt";
               partitions = {
                 ESP = {
+                  label = "EFI";
                   size = "1G";
                   type = "EF00";
                   content = {
@@ -77,7 +77,13 @@ in
               compression = "on";
               # Nix doesn’t use atime, so atime=off on the /nix dataset is fine.
               atime = "off";
+              acltype = "posixacl";
+              xattr = "sa";
               mountpoint = "none";
+            };
+            options = {
+              ashift = "12";
+              autotrim = "on";
             };
             mode = {
               topology = {
@@ -94,12 +100,24 @@ in
             datasets = {
               ${localDataset} = {
                 type = zfs_fs;
-                options.mountpoint = "none";
+                options = {
+                  mountpoint = "none";
+                  dnodesize = "auto";
+                };
               };
               "${localDataset}/nix" = {
                 type = zfs_fs;
                 mountpoint = "/nix";
                 options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
+              "${localDataset}/reserved" = {
+                type = zfs_fs;
+                options = {
+                  mountpoint = "none";
+                  canmount = "off";
+                  refreservation = "50G";
                   ${optAutosnapshot} = "false";
                 };
               };
@@ -112,6 +130,7 @@ in
                 mountpoint = "/";
                 options = {
                   ${optAutosnapshot} = "true";
+                  dnodesize = "auto";
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
               };
@@ -119,50 +138,32 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
-                  # The dataset containing journald’s logs (where /var lives) should
-                  # have xattr = sa and acltype=posixacl set to allow regular users
-                  # to read their journal.
-                  acltype = "posixacl";
-                  xattr = "sa";
                   # Disable autosnapshot for `/var`.
                   ${optAutosnapshot} = "false";
+                  dnodesize = "auto";
                 };
               };
               "${systemDataset}/etc" = {
                 type = zfs_fs;
                 mountpoint = "/etc";
                 options = {
-                  # The dataset containing journald’s logs (where /var lives) should
-                  # have xattr = sa and acltype=posixacl set to allow regular users
-                  # to read their journal.
-                  acltype = "posixacl";
-                  xattr = "sa";
                   # Disable autosnapshot for `/etc` --- this should all come
                   # from the nix store!
                   ${optAutosnapshot} = "false";
+                  dnodesize = "auto";
                 };
               };
               "${userDataset}" = {
                 type = zfs_fs;
                 options = {
                   # Systemd should not mount encrypted datasets on boot.
-                  canmount = "noauto";
+                  canmount = "off";
                   "${optSystemd}:ignore" = "on";
                   mountpoint = "none";
+                  dnodesize = "auto";
                   # Snapshot all user datasets.
                   ${optAutosnapshot} = "true";
                 };
-              };
-              "${cryptDataset}" = {
-                type = zfs_fs;
-                options = {
-                  mountpoint = "none";
-                  # Snapshot all user datasets.
-                  ${optAutosnapshot} = "true";
-                  # Systemd should not mount encrypted datasets on boot.
-                  canmount = "noauto";
-                  "${optSystemd}:ignore" = "on";
-                } // optsCrypt; # enable encryption
               };
               "${homeDataset}" = {
                 type = zfs_fs;
@@ -172,7 +173,7 @@ in
                   # rather than `mountpoint`! The `options.mountpoint` key ONLY
                   # sets the ZFS mountpoint option, while `mountpoint` also
                   # tells Disko to generate systemd mount units for the dataset
-                  # that will try to moun tit on boot. Since we want it to be
+                  # that will try to mount it on boot. Since we want it to be
                   # mounted by PAM on login, we must set the mountpoint for ZFS
                   # but we must *not* generate any other systemd mount
                   # configuration.
@@ -187,14 +188,14 @@ in
                   # rather than `mountpoint`! The `options.mountpoint` key ONLY
                   # sets the ZFS mountpoint option, while `mountpoint` also
                   # tells Disko to generate systemd mount units for the dataset
-                  # that will try to moun tit on boot. Since we want it to be
+                  # that will try to mount it on boot. Since we want it to be
                   # mounted by PAM on login, we must set the mountpoint for ZFS
                   # but we must *not* generate any other systemd mount
                   # configuration.
                   mountpoint = "/home/eliza";
                   "${optSystemd}:ignore" = "on";
                   canmount = "noauto";
-                };
+                } // optsCrypt;
               };
             };
           };
