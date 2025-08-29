@@ -90,8 +90,18 @@ in
                 type = "topology";
                 vdev = [
                   {
-                    mode = "raidz2";
-                    members = map (id: "sn840-${id}") sn840ids;
+                    mode = "mirror";
+                    members = [
+                      "sn840-A079DDAA"
+                      "sn840-A079E3F9"
+                    ];
+                  }
+                  {
+                    mode = "mirror";
+                    members = [
+                      "sn840-A079E4D6"
+                      "sn840-A084A645"
+                    ];
                   }
                 ];
               };
