@@ -119,6 +119,20 @@
     ${config.networking.hostName}: engineering
   '';
 
+  services.smfc = {
+    enable = true;
+    smartmontools.enable = true;
+    nvidia-smi.enable = false;
+    logLevel = "info";
+    zones.hd.hd_names = [
+      "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H"
+      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA"
+      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9"
+      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6"
+      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645"
+    ];
+  };
+
   # This option defines the first version of NixOS you have installed on this particular machine,
   # and is used to maintain compatibility with application data (e.g. databases) created on older NixOS versions.
   #
@@ -136,5 +150,7 @@
   # and migrated your data accordingly.
   #
   # For more information, see `man configuration.nix` or https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
-  system.stateVersion = "25.05"; # Did you read the comment?
+  system.stateVersion = "
+      25.05
+      "; # Did you read the comment?
 }

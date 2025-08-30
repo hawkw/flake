@@ -146,6 +146,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    smfc = {
+      url = "github:hawkw/smfc-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
   };
 
   ############################################################################
@@ -219,6 +224,7 @@
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
               inputs.disko.nixosModules.disko
+              inputs.smfc.nixosModules.default
               # inputs.nixos-cosmic.nixosModules.default
             ];
           };
