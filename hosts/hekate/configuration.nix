@@ -124,13 +124,25 @@
     smartmontools.enable = true;
     nvidia-smi.enable = false;
     logLevel = "info";
-    zones.hd.hd_names = [
-      "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H"
-      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA"
-      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9"
-      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6"
-      "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645"
-    ];
+    zones.hd = {
+      enabled = true;
+      ipmi_zone = [ 1 ];
+      temp_calc = 1;
+      steps = 4;
+      polling = 10;
+      sensitivity = 2.0;
+      min_temp = 32.0;
+      max_temp = 46.0;
+      min_level = 35;
+      max_level = 100;
+      hd_names = [
+        "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H"
+        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA"
+        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9"
+        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6"
+        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645"
+      ];
+    };
   };
 
   # This option defines the first version of NixOS you have installed on this particular machine,

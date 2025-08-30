@@ -759,11 +759,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1756580324,
-        "narHash": "sha256-fk1KKjjfISFnQ+UNDWBC1i9jdjdhiAVoVNQKgE9/4vA=",
+        "lastModified": 1756582887,
+        "narHash": "sha256-PXRffOPACJ9n7kzkTp3aiDYdnIhDUHiOGl6ckgoieW8=",
         "owner": "hawkw",
         "repo": "smfc-flake",
-        "rev": "678a577bd09eb585df7f232d99a5d36fcdeb5310",
+        "rev": "2705a903203d406017158531f2b22acd84abc50f",
         "type": "github"
       },
       "original": {
