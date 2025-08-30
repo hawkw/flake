@@ -120,7 +120,7 @@
   '';
 
   services.smfc = {
-    enable = true;
+    enable = false;
     smartmontools.enable = true;
     nvidia-smi.enable = false;
     logLevel = "info";
