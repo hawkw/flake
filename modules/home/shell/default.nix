@@ -7,7 +7,7 @@
 #
 { config, lib, ... }: with lib; {
   imports = [
-    ./zsh.nix
+    ./zsh
     ./starship.nix
   ];
 
