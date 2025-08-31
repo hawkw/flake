@@ -18,8 +18,10 @@ with lib;
           enable = true;
           matchBlocks =
             let
+              hekate = "hekate";
               noctis = "noctis";
               noctis-tailscale = "${noctis}-tailscale";
+              sys-domain = "sys.home.elizas.website";
             in
             {
               # "${noctis}-local" = hm.dag.entryBefore [ noctis-tailscale ] {
@@ -27,8 +29,12 @@ with lib;
               #   hostname = "noctis.local";
               # };
               ${noctis-tailscale} = hm.dag.entryBefore [ "notSsh" ] {
-                host = "noctis";
-                hostname = "noctis";
+                host = noctis;
+                hostname = noctis;
+              };
+              ${hekate} = hm.dag.entryBefore [ "notSsh" ] {
+                host = hekate;
+                hostname = "${hekate}.${sys-domain}";
               };
             };
         }
