@@ -1,5 +1,5 @@
 # kubernetes`
-{ config, pkgs, lib, home, ... }:
+{ config, pkgs, lib, ... }:
 
 let cfg = config.profiles.k8s;
 in {
@@ -8,11 +8,21 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = with pkgs; [
+    home.packages = with pkgs; let
+      k3d-import-all = writeShellApplication {
+        name = "k3d-import-all";
+        runtimeInputs = [ k3d docker ];
+        text = ''
+          docker images "$1" --format "{{.Repository}}:{{.Tag}}" | xargs k3d image import
+        '';
+      };
+    in
+    [
       kubectl
       kubespy
       # kube3d
       k3d
+      k3d-import-all
       kubectx
       kubelogin
       azure-cli
@@ -24,12 +34,7 @@ in {
 
     programs.zsh = {
       shellAliases = { k = "kubectl"; };
-      initExtra = ''
-        # Import all docker images matching a glob into k3d.
-        function k3d-import-all() {
-            docker images "$1" --format "{{.Repository}}:{{.Tag}}" | xargs k3d image import
-        }
-      '';
+
     };
   };
 }

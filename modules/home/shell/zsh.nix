@@ -22,7 +22,7 @@ with lib; {
           share = true;
         };
 
-        initExtra = ''
+        initContent = ''
           # xterm title setting stuff
           autoload -Uz add-zsh-hook
 
