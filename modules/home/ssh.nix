@@ -16,6 +16,9 @@ with lib;
       mkMerge [
         {
           enable = true;
+          # `enableDefaultConfig` is deprecated; these settings are now in
+          # `matchBlocks."*".
+          enableDefaultConfig = false;
           matchBlocks =
             let
               hekate = "hekate";
@@ -36,11 +39,27 @@ with lib;
                 host = hekate;
                 hostname = "${hekate}.${sys-domain}";
               };
+              "*" = {
+                # Settings previously provided by
+                # `programs.ssh.enableDefaultConfig`, which has been deprecated.
+                # Note that this does *not* set `ForwardAgent no` or
+                # `AddKeysToAgent no`, because I don't want to disable those.
+                compression = false;
+                serverAliveInterval = 0;
+                serverAliveCountMax = 3;
+                hashKnownHosts = false;
+                userKnownHostsFile = "~/.ssh/known_hosts";
+                controlMaster = "no";
+                controlPath = "~/.ssh/master-%r@%n:%p";
+                controlPersist = "no";
+              };
             };
         }
         (mkIf _1passwordAgent.enable {
-          forwardAgent = _1passwordAgent.enable;
-          addKeysToAgent = "yes";
+          matchBlocks."*" = {
+            forwardAgent = true;
+            addKeysToAgent = "yes";
+          };
           matchBlocks."notSsh" = {
             match = ''host * exec "test -z $SSH_CONNECTION"'';
             extraOptions = {
