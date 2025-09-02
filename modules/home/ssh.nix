@@ -34,16 +34,20 @@ with lib;
               ${noctis-tailscale} = hm.dag.entryBefore [ "notSsh" ] {
                 host = noctis;
                 hostname = noctis;
+                forwardAgent = true;
+                addKeysToAgent = "yes";
               };
               ${hekate} = hm.dag.entryBefore [ "notSsh" ] {
                 host = hekate;
                 hostname = "${hekate}.${sys-domain}";
+                forwardAgent = true;
+                addKeysToAgent = "yes";
               };
               "*" = {
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
-                # Note that this does *not* set `ForwardAgent no` or
-                # `AddKeysToAgent no`, because I don't want to disable those.
+                forwardAgent = false;
+                addKeysToAgent = "no";
                 compression = false;
                 serverAliveInterval = 0;
                 serverAliveCountMax = 3;
@@ -56,10 +60,6 @@ with lib;
             };
         }
         (mkIf _1passwordAgent.enable {
-          matchBlocks."*" = {
-            forwardAgent = true;
-            addKeysToAgent = "yes";
-          };
           matchBlocks."notSsh" = {
             match = ''host * exec "test -z $SSH_CONNECTION"'';
             extraOptions = {
