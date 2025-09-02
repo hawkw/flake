@@ -229,6 +229,6 @@ in
     # Always authenticate using the public key, but additionally, ask for the
     # password, so that the password is available to PAM to unlock encrypted ZFS
     # datasets.
-    AuthenticationMethods = "publickey,password";
+    AuthenticationMethods = "password,publickey";
   };
 }
