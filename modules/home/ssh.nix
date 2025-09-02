@@ -40,6 +40,11 @@ with lib;
               ${hekate} = hm.dag.entryBefore [ "sysdomain" ] {
                 host = hekate;
                 hostname = "${hekate}.${sysdomain}";
+                forwardAgent = true;
+                addKeysToAgent = "yes";
+                extraOptions = {
+                  PubkeyAuthentication = "unbound";
+                };
               };
               sysdomain = hm.dag.entryBefore [ "notSsh" ] {
                 host = "*.${sysdomain}";
