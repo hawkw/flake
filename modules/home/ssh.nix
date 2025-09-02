@@ -24,7 +24,7 @@ with lib;
               hekate = "hekate";
               noctis = "noctis";
               noctis-tailscale = "${noctis}-tailscale";
-              sys-domain = "sys.home.elizas.website";
+              sysdomain = "sys.home.elizas.website";
             in
             {
               # "${noctis}-local" = hm.dag.entryBefore [ noctis-tailscale ] {
@@ -37,11 +37,17 @@ with lib;
                 forwardAgent = true;
                 addKeysToAgent = "yes";
               };
-              ${hekate} = hm.dag.entryBefore [ "notSsh" ] {
+              ${hekate} = hm.dag.entryBefore [ "sysdomain" ] {
                 host = hekate;
-                hostname = "${hekate}.${sys-domain}";
+                hostname = "${hekate}.${sysdomain}";
+              };
+              sysdomain = hm.dag.entryBefore [ "notSsh" ] {
+                host = "*.${sysdomain}";
                 forwardAgent = true;
                 addKeysToAgent = "yes";
+                extraOptions = {
+                  PubkeyAuthentication = "unbound";
+                };
               };
               "*" = {
                 # Settings previously provided by
