@@ -62,7 +62,7 @@ in {
       ghostty.enable = true;
       _1password-gui.enableSshAgent = true;
       keychain = {
-        enable = true;
+        enable = false;
         enableXsessionIntegration = true;
         keys = [ "id_ed25519" ];
       };

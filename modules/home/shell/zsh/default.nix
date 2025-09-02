@@ -7,7 +7,6 @@ with lib; {
     programs = {
       # enable zsh integration options on other packages
       direnv.enableZshIntegration = true;
-      keychain.enableZshIntegration = true;
       starship.enableZshIntegration = true;
 
       alacritty.settings.shell.program = "zsh";
