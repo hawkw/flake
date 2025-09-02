@@ -48,7 +48,11 @@ in with lib; {
       # Enable the OpenSSH daemon.
       openssh = {
         enable = true;
-        settings = { X11Forwarding = true; };
+        settings = {
+          X11Forwarding = true;
+          # Necessary to use forwarded SSH keys for Git signing etc.
+          AllowAgentForwarding = true;
+        };
       };
 
       # DNS configurations --- Avahi (mDNS)
