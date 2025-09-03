@@ -78,7 +78,7 @@ with lib; {
                 };
             } // scrimletGzs // switches
           );
-        labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" "hudson" "edgar" ];
+        labMachines = [ castle "jeeves" "atrium" "cadbury" "yuban" "lurch" "alfred" "hudson" "edgar" "niles" ];
         racklettes = [
           # racklette: berlin
           {
