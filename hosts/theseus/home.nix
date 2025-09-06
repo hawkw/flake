@@ -14,6 +14,7 @@
       enable = true;
       net.enable = true;
       supermicro.enable = true;
+      _1password.enable = true;
     };
     oxide = {
       enable = true;
