@@ -102,14 +102,14 @@
     };
   };
 
-  # This is a deskop machine. Use the high-performance frequency profile rather
+  # This is a desktop machine. Use the high-performance frequency profile rather
   # than the low-power one.
   powerManagement.cpuFreqGovernor = "performance";
 
   # enable ssh early
   systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
 
-  # i have 24 cores
+  # i have 48 threads
   nix.settings.max-jobs = 48;
 
   users.motd = ''
