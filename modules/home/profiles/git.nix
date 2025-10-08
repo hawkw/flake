@@ -128,7 +128,7 @@ with lib; {
             #   line comments (`//`) are out...
             # - I can't think of any compelling reason to begin a line with `;`...
             commentchar = ";";
-            editor = "code --wait";
+            editor = lib.mkDefault config.home.sessionVariables.EDITOR;
           };
           # Set the default branch name to `main`.
           init.defaultBranch = "main";
