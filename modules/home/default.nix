@@ -40,6 +40,7 @@ with lib; rec {
       neofetch
       pfetch
       fastfetch
+      inxi
       dtrx # Do The Right eXtraction --- extract any kind of archive file
       unzip
       btop
