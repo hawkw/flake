@@ -57,7 +57,7 @@ in {
       environment.systemPackages = with pkgs; [ powertop ];
 
       # Setup suspend then hibernate.
-      services.logind.lidSwitch =
+      services.logind.settings.Login.HandleLidSwitch =
         if cfg.suspendThenHibernate.enable then
           "suspend-then-hibernate"
         else
