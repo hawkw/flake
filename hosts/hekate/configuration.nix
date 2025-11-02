@@ -145,10 +145,12 @@
     };
   };
 
-  # fwupd: firmware update
   environment.systemPackages = with pkgs; [
     fwupd
+    storcli
   ];
+
+  # fwupd: firmware update
   services.fwupd.enable = true;
 
   # This option defines the first version of NixOS you have installed on this particular machine,
