@@ -147,7 +147,7 @@
 
   environment.systemPackages = with pkgs; [
     fwupd
-    storcli
+    storcli2
   ];
 
   # fwupd: firmware update
