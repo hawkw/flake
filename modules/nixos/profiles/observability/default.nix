@@ -216,9 +216,46 @@ in
                 eclssHosts = filterAttrs (_: cfg: cfg.services.eclssd.enable) allHostConfigs;
               in
               (mapAttrsToList mkScrapeConfig eclssHosts);
+          in
+          mkMerge [
+            #### OBSERVER: defaults ####
+            {
+              environment.systemPackages = with pkgs;
+                [ prometheusMdns ];
 
-            scrapeConfigs = mkMerge [
-              ([
+              # grafana
+              services.grafana = {
+                enable = true;
+                settings = {
+                  # auth.disable_login_form = true;
+                  "auth.anonymous".enable = true;
+                  "auth.anonymous".enabled = true;
+                  "auth.anonymous".org_name = "randos";
+                  "auth.anonymous".org_role = "Viewer";
+
+                  server = {
+                    domain = "grafana.${cfg.observer.rootDomain}";
+                    serve_from_sub_path = true;
+                    http_port = mkDefault 9094;
+                    http_addr = "127.0.0.1";
+                  };
+                  security = {
+                    admin_user = "admin";
+                    admin_password = "admin";
+                  };
+                };
+              };
+
+              # prometheus
+              services.prometheus.exporters = {
+                nginx = {
+                  enable = config.services.nginx.enable;
+                  port = mkDefault 9113;
+                  scrapeUri = "http://localhost/nginx_status";
+                };
+                nginxlog.enable = config.services.nginx.enable;
+              };
+              services.prometheus.scrapeConfigs = [
                 # tailscale service discovery
                 {
                   job_name = "tailscale";
@@ -262,11 +299,11 @@ in
                       source_labels = [ "__address__" ];
                       target_label = "address";
                     }
-                    {
-                      "if" = ''{instance=~"clavius.*"}'';
-                      target_label = "location";
-                      replacement = "office";
-                    }
+                    # {
+                    #   "if" = ''{instance=~"clavius.*"}'';
+                    #   target_label = "location";
+                    #   replacement = "office";
+                    # }
                   ];
                 }
                 # local services
@@ -283,61 +320,7 @@ in
                       }
                     ];
                 }
-              ])
-              (mkIf cfg.snmp.enable [
-                {
-                  job_name = "snmp_exporter";
-                  static_configs = [
-                    {
-                      targets = [ "127.0.0.1:${toString config.services.prometheus.exporters.snmp.port}" ];
-                      labels = {
-                        service = "snmp-exporter";
-                        instance = "${config.networking.hostName}";
-                      };
-                    }
-                  ];
-                }
-              ])
-            ];
-          in
-          mkMerge [
-            #### OBSERVER: defaults ####
-            {
-              environment.systemPackages = with pkgs;
-                [ prometheusMdns ];
-
-              # grafana
-              services.grafana = {
-                enable = true;
-                settings = {
-                  # auth.disable_login_form = true;
-                  "auth.anonymous".enable = true;
-                  "auth.anonymous".enabled = true;
-                  "auth.anonymous".org_name = "randos";
-                  "auth.anonymous".org_role = "Viewer";
-
-                  server = {
-                    domain = "grafana.${cfg.observer.rootDomain}";
-                    serve_from_sub_path = true;
-                    http_port = mkDefault 9094;
-                    http_addr = "127.0.0.1";
-                  };
-                  security = {
-                    admin_user = "admin";
-                    admin_password = "admin";
-                  };
-                };
-              };
-
-              # prometheus
-              services.prometheus.exporters = {
-                nginx = {
-                  enable = config.services.nginx.enable;
-                  port = mkDefault 9113;
-                  scrapeUri = "http://localhost/nginx_status";
-                };
-                nginxlog.enable = config.services.nginx.enable;
-              };
+              ];
 
               services.docker-dashy = {
                 enable = true;
@@ -488,7 +471,6 @@ in
               services.prometheus = {
                 enable = true;
                 port = mkDefault 9001;
-                inherit scrapeConfigs;
               };
               services.nginx.virtualHosts.${promDomain} = {
                 forceSSL = true;
@@ -651,7 +633,7 @@ in
                   extraOptions =
                     let
                       scrapeConfigFile = (pkgs.formats.yaml { }).generate "prom-scrape-config.yml" {
-                        scrape_configs = scrapeConfigs;
+                        scrape_configs = config.services.prometheus.scrapeConfigs;
                       };
                     in
                     [
@@ -746,7 +728,24 @@ in
                 }];
               };
             })
+            (mkIf cfg.snmp.enable {
+              services.prometheus.scrapeConfigs = [
+                {
+                  job_name = "snmp_exporter";
+                  static_configs = [
+                    {
+                      targets = [ "127.0.0.1:${toString config.services.prometheus.exporters.snmp.port}" ];
+                      labels = {
+                        service = "snmp-exporter";
+                        instance = "${config.networking.hostName}";
+                      };
+                    }
+                  ];
+                }
+              ];
+            })
           ]
-        ))
+        )
+      )
     ]);
 }

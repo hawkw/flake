@@ -13,20 +13,20 @@ with pkgs; with lib; {
     };
     server.enable = true;
     zfs.enable = true;
-    # observability = {
-    #   enable = true;
-    #   observer = {
-    #     enable = true;
-    #     enableUnifi = true;
-    #     inherit rootDomain;
-    #   };
-    #   snmp.enable = true;
-    # };
-    # nginx = {
-    #   enable = true;
-    #   domain = rootDomain;
-    #   acmeSubdomain = "home";
-    # };
+    observability = {
+      enable = true;
+      observer = {
+        enable = true;
+        # enableUnifi = true;
+        inherit rootDomain;
+      };
+      snmp.enable = true;
+    };
+    nginx = {
+      enable = true;
+      domain = rootDomain;
+      acmeSubdomain = "home";
+    };
   };
 
   hardware = {
