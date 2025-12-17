@@ -39,7 +39,6 @@ in with lib; {
       gpaste.enable = true;
 
       firefox = {
-        package = pkgs.firefox-wayland;
         # nativeMessagingHosts.packages = with pkgs; [ gnome-browser-connector ];
       };
     };

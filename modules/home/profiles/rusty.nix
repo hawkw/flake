@@ -32,7 +32,7 @@ in with lib; {
           bottom
           glances
           # dust: like `du` but good
-          du-dust
+          dust
           # procs: list processes
           procs
         ];

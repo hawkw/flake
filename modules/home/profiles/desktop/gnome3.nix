@@ -54,8 +54,6 @@ with lib; {
         ocs-url
       ] ++ gnome_extensions ++ themes;
 
-    programs.firefox = { package = pkgs.firefox-wayland; };
-
     #### gnome-keyring ########################################################
     services.gnome-keyring = {
       enable = true;

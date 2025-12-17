@@ -59,8 +59,7 @@ in
     # noto as a UI font...
     noto-fonts
     noto-fonts-cjk-sans
-    noto-fonts-emoji
-    noto-fonts-extra
+    noto-fonts-color-emoji
     noto-fonts-monochrome-emoji
     # fontconfig binary
     fontconfig

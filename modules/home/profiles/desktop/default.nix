@@ -20,7 +20,7 @@ in {
           keybase
           keybase-gui
           spotify
-          tdesktop
+          telegram-desktop
           obsidian
         ];
       in
@@ -45,7 +45,6 @@ in {
         ### stuff ###
         pywal
         chromium
-        torrential
 
         ### chat clients & stuff
         element-desktop
