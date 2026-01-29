@@ -49,9 +49,9 @@
       # Use the systemd-boot EFI boot loader.
       systemd-boot = {
         enable = true;
-        # don't keep more than 32 old configurations, to keep the /boot
+        # don't keep more than 16 old configurations, to keep the /boot
         # partition from filling up.
-        configurationLimit = 32;
+        configurationLimit = 16;
       };
       efi.canTouchEfiVariables = true;
     };

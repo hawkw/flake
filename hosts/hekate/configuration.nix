@@ -52,7 +52,7 @@
       # Use the systemd-boot EFI boot loader.
       systemd-boot = {
         enable = true;
-        configurationLimit = 64;
+        configurationLimit = 16;
       };
       efi.canTouchEfiVariables = true;
     };
