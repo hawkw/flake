@@ -15,7 +15,7 @@ in with lib; {
     {
       environment.systemPackages = with pkgs; [
         fprintd
-        fw-ectool
+        # fw-ectool
       ];
 
       ### enable services ###
