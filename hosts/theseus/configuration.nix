@@ -80,11 +80,11 @@ with lib; {
   # COSMIC
   services = {
     desktopManager.cosmic.enable = true;
-    displayManager = {
-      cosmic-greeter.enable = true;
-      defaultSession = "cosmic";
-      gdm.enable = false;
-    };
+    # displayManager = {
+    #   # cosmic-greeter.enable = true;
+    #   defaultSession = "cosmic";
+    #   gdm.enable = false;
+    # };
   };
 
   # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
