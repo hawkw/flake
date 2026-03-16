@@ -27,6 +27,7 @@
     pkg-config
     qemu
     screen
+    claude-code
   ];
 
   programs.atuin =

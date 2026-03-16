@@ -29,6 +29,7 @@
     pkg-config
     qemu
     screen
+    claude-code
   ];
 
   programs.lutris.enable = true;

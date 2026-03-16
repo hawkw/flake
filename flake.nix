@@ -162,6 +162,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
   ############################################################################
@@ -205,6 +212,7 @@
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
+        inputs.claude-code.overlays.default
       ];
 
       lib = import ./lib;
