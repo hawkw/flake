@@ -12,7 +12,7 @@ with lib;
       description = "The rclone package to use";
     };
     mountdir = mkOption {
-      type = types.path;
+      type = types.str;
       default = "~/mnt";
       description = "The directory to mount the remote to";
     };
@@ -23,35 +23,40 @@ with lib;
     };
   };
 
-  config =
-    let
-      mkRcloneService = { remote }: {
-        systemd.services.user."rclone-${remote}" = {
-          description = "rclone: FUSE filesystem for remote ${remote}";
-          documentation = "man:rclone(1)";
-          after = [ "network-online.target" ];
-          wants = [ "network-online.target" ];
-          script = "${cfg.package}/bin/rclone mount";
-          scriptArgs = ''
-            --config=%h/.config/rclone/rclone.conf \
-            --vfs-cache-mode writes \
-            --vfs-cache-max-size 100M \
-            --umask 022 \
-            --allow-other \
-            --log-systemd \
-            ${remote}: ${cfg.mountdir}/${remote}
-          '';
-          preStart = ''
-            ${pkgs.coreutils}/bin/mkdir -p ${cfg.mountdir}/${remote}
-          '';
-          postStop = ''
-            /run/wrappers/bin/fusermount -u ${cfg.mountdir}/${remote}
-          '';
-          serviceConfig = {
-            Type = "notify";
+  config = mkIf cfg.enable {
+    systemd.user.services =
+      let
+        mkRcloneService = remote: {
+          "rclone-${remote}" = {
+            Unit = {
+              Description = "rclone: FUSE filesystem for remote ${remote}";
+              Documentation = "man:rclone(1)";
+              After = [ "network-online.target" ];
+              Wants = [ "network-online.target" ];
+            };
+            Service = {
+              Type = "notify";
+              ExecStartPre = ''
+                ${pkgs.coreutils}/bin/mkdir -p ${cfg.mountdir}/${remote}
+              '';
+              ExecStart = ''
+                ${cfg.package}/bin/rclone mount \
+                --config=%h/.config/rclone/rclone.conf \
+                --vfs-cache-mode writes \
+                --vfs-cache-max-size 100M \
+                --umask 022 \
+                --allow-other \
+                --log-systemd \
+                ${remote}: ${cfg.mountdir}/${remote}
+              '';
+              ExecStop =
+                ''
+                  /run/wrappers/bin/fusermount -u ${cfg.mountdir}/${remote}
+                '';
+            };
           };
         };
-      };
-    in
-    mkIf cfg.enable (map (remote: mkRcloneService { inherit remote; }) cfg.remotes);
+      in
+      mkMerge (map mkRcloneService cfg.remotes);
+  };
 }
