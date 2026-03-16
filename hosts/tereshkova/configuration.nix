@@ -149,19 +149,24 @@ with pkgs; with lib; {
   #
   networking.networkmanager.enable = mkForce false;
   systemd.services."systemd-networkd".environment.SYSTEMD_LOG_LEVEL = "debug";
-  systemd.network.wait-online.anyInterface = true;
-  systemd.network = {
-    enable = true;
-    networks."10-lan" = {
-      matchConfig.Type = "ether";
-      networkConfig = {
-        # start a DHCP Client for IPv4 Addressing/Routing
-        DHCP = "ipv4";
-        # accept Router Advertisements for Stateless IPv6 Autoconfiguraton (SLAAC)
-        IPv6AcceptRA = true;
+  systemd.network =
+    let
+      enp7s0f1 = "enp7s0f1";
+    in
+    {
+      wait-online.anyInterface = true;
+      enable = true;
+      networks."10-eth" = {
+        matchConfig.Type = "ether";
+        # matchConfig.Name = "${enp7s0f1}";
+        networkConfig = {
+          # start a DHCP Client for IPv4 Addressing/Routing
+          DHCP = "ipv4";
+          # accept Router Advertisements for Stateless IPv6 Autoconfiguraton (SLAAC)
+          IPv6AcceptRA = true;
+        };
       };
     };
-  };
 
   #### Services ####
   services = {
