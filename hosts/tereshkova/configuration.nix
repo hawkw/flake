@@ -56,7 +56,7 @@ with pkgs; with lib; {
     };
 
     # Use this to track the latest Linux kernel that has ZFS support.
-    # This is generally not as necessary while using `zfsUnstable = true`.
+    # This is generally not as necessary while using `zfs_unstable = true`.
     # kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
     # The Zen kernel is tuned for better performance on desktop/workstation
