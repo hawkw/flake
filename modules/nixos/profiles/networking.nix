@@ -17,7 +17,7 @@ in with lib; {
         plugins = with pkgs; [ networkmanager-openvpn ];
       };
       # disable wpa_supplicant, as NetworkManager is used instead.
-      wireless.enable = false;
+      # wireless.enable = false;
       # `dhcpcd` conflicts with NetworkManager's `dhclient`, as they try to bind
       # the same address; it needs to be explicitly disabled.
       dhcpcd.enable = false;
