@@ -13,7 +13,7 @@ in
   config = mkIf cfg {
     environment.systemPackages = with pkgs; [
       # use the correct version of `perf` for the configured `linuxPackages`
-      linuxpkgs.perf
+      perf
       # also include userspace perf-tools and flamegraph scripts
       perf-tools
       flamegraph
