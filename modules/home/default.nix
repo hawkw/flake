@@ -11,6 +11,7 @@ with lib; rec {
     ./fonts.nix
     ./profiles
     ./programs
+    ./services
     ./shell
     ./ssh.nix
     ./terminal
@@ -52,6 +53,9 @@ with lib; rec {
       gnupg
 
       iputils # ping, traceroute, etc.
+
+      ## other utils ###
+      picocom
     ];
   };
   # configure discord to launch even when an update is available
@@ -97,6 +101,7 @@ with lib; rec {
     zsh.enable = lib.mkDefault true;
     # zellij.enable = lib.mkDefault false;
     starship.enable = lib.mkDefault true;
+    rclone.enable = lib.mkDefault true;
 
     htop = {
       enable = lib.mkDefault true;
