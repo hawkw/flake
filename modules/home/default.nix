@@ -38,7 +38,6 @@ with lib; rec {
 
     packages = with pkgs; [
       ### stuff ###
-      neofetch
       pfetch
       fastfetch
       inxi
