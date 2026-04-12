@@ -12,7 +12,7 @@ with lib; {
       nixpkgs.config.allowUnfree = true;
 
       nix = {
-        package = pkgs.lix;
+        package = pkgs.lixPackageSets.stable.lix;
         extraOptions = ''
           experimental-features = nix-command flakes
         '';

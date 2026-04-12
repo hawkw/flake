@@ -146,11 +146,6 @@
       };
     };
 
-    lix-module = {
-      url = "https://git.lix.systems/lix-project/nixos-module/archive/2.93.2-1.tar.gz";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     smfc = {
       url = "github:hawkw/smfc-flake";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -177,7 +172,6 @@
     , rust-overlay
     , deploy-rs
     , flake-parts
-    , lix-module
     , ...
     }@inputs:
     let
@@ -194,6 +188,14 @@
       overlays = [
         (import ./pkgs/overlay.nix)
         rust-overlay.overlays.default
+        # lix overlay
+        (final: prev: {
+          inherit (prev.lixPackageSets.stable)
+            nixpkgs-review
+            nix-eval-jobs
+            nix-fast-build
+            colmena;
+        })
         # inputs.atuin.overlays.default
         # add alejandra package
         (_: prev: { alejandra = inputs.alejandra.defaultPackage.${prev.system}; })
@@ -231,7 +233,6 @@
               utils.nixosModules.autoGenFromInputs
               self.nixosModules.default
               home.nixosModules.home-manager
-              lix-module.nixosModules.lixFromNixpkgs
               inputs.vu-server.nixosModules.default
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
