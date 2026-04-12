@@ -35,7 +35,7 @@ in {
     # };
   };
 
-  config = with lib; mkIf cfg.enable
+  config = with lib; mkIf cfg.enable (mkMerge [
     {
       # Enabling the laptop profile automatically enables the
       # desktop profile too.
@@ -49,12 +49,13 @@ in {
         thermald.enable = mkDefault true;
       };
 
-      # Enable light to control backlight.
-      programs.light.enable = mkDefault true;
-
       powerManagement.powertop.enable = mkDefault true;
 
-      environment.systemPackages = with pkgs; [ powertop ];
+      environment.systemPackages = with pkgs; [
+        # Enable brightnessctl to control backlight.
+        brightnessctl
+        powertop
+      ];
 
       # Setup suspend then hibernate.
       services.logind.settings.Login.HandleLidSwitch =
@@ -62,11 +63,12 @@ in {
           "suspend-then-hibernate"
         else
           "suspend";
-      systemd.sleep.extraConfig =
-        lib.optionalString cfg.suspendThenHibernate.enable ''
-          HibernateDelaySec=${
-            builtins.toString cfg.suspendThenHibernate.delayHours
-          }h
-        '';
-    };
+    }
+
+    (mkIf cfg.suspendThenHibernate.enable {
+      systemd.sleep.settings.Sleep = {
+        HibernateDelaySec = "${builtins.toString cfg.suspendThenHibernate.delayHours}h";
+      };
+    })
+  ]);
 }

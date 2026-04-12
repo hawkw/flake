@@ -91,7 +91,7 @@ with lib; {
           systemd
           vulkan-loader
           libx11
-          libxcrnsaver
+          libxscrnsaver
           libxcomposite
           libxcursor
           libxdamage
@@ -101,7 +101,7 @@ with lib; {
           libxrandr
           libxrender
           libxtst
-          xorglibxcb
+          libxcb
           libxkbfile
           libxshmfence
           zlib
