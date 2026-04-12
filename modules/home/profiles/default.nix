@@ -2,6 +2,7 @@
 
 {
   imports = [
+    ./age.nix
     ./desktop
     ./devtools
     ./oxide

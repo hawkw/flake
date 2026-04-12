@@ -156,11 +156,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    age-plugin-op = {
-      url = "github:bromanko/age-plugin-op";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     claude-code = {
       url = "github:sadjow/claude-code-nix";
       inputs = {
@@ -200,7 +195,6 @@
         (import ./pkgs/overlay.nix)
         rust-overlay.overlays.default
         # inputs.atuin.overlays.default
-        (_: prev: { age-plugin-op = inputs.age-plugin-op.defaultPackage.${prev.system}; })
         # add alejandra package
         (_: prev: { alejandra = inputs.alejandra.defaultPackage.${prev.system}; })
         # add ghostty package

@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "age-plugin-op": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1760321496,
-        "narHash": "sha256-em5Heor01988U9sZs6hmbCIM8wag8GPP5f0r30kTRfw=",
-        "owner": "bromanko",
-        "repo": "age-plugin-op",
-        "rev": "3601d836bbaeb5eac9583175804da8b76396bd51",
-        "type": "github"
-      },
-      "original": {
-        "owner": "bromanko",
-        "repo": "age-plugin-op",
-        "type": "github"
-      }
-    },
     "alejandra": {
       "inputs": {
         "fenix": "fenix",
@@ -761,7 +741,6 @@
     },
     "root": {
       "inputs": {
-        "age-plugin-op": "age-plugin-op",
         "alejandra": "alejandra",
         "claude-code": "claude-code",
         "deploy-rs": "deploy-rs",

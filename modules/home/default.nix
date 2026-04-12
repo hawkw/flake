@@ -64,6 +64,8 @@ with lib; rec {
   #############################################################################
   # my custom config modules
   profiles = {
+    age.enable = lib.mkDefault true;
+
     # use a collection of Rust versions of common unix utilities.
     rustyUtils = {
       enable = lib.mkDefault true;
