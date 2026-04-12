@@ -11,11 +11,11 @@ with lib;
   config = mkIf cfg.enable (
     mkMerge [
       {
-        home.packages = [ pkgs.age ];
+        environment.systemPackages = [ pkgs.age ];
       }
       # If 1Password is enabled, add the 1password age plugin.
       (mkIf config.programs._1password.enable {
-        home.packages = [ pkgs.age-plugin-1p ];
+        environment.systemPackages = [ pkgs.age-plugin-1p ];
       })
     ]
   );

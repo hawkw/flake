@@ -7,6 +7,7 @@
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/probes.nix
+    ./profiles/age.nix
     ./profiles/arm-cross-dev.nix
     ./profiles/desktop
     ./profiles/docs.nix
@@ -86,6 +87,8 @@
   profiles = {
     # custom networking settings
     networking.enable = lib.mkDefault true;
+
+    age.enable = lib.mkDefault true;
 
     # makes dynamic binaries not built for NixOS work! :D
     # see: https://github.com/Mic92/nix-ld
