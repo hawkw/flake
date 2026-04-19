@@ -6,6 +6,8 @@
 
   system.stateVersion = "22.11";
 
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMaqZ66pN9kyfJa3D+uKEekxiQaDq4+E2xO+j+YaZ/oW";
+
   profiles = let rootDomain = "elizas.website"; in {
     docs.enable = true;
     games.enable = true;

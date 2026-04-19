@@ -187,7 +187,7 @@ in
                 hostConfigs = filterAttrs (_: config: !config.profiles.observability.scrapeTailscale) allHostConfigs;
                 mkHostExporters = (instance: config:
                   let
-                    subdomain = "${instance}.sys.home.${ cfg.observer.rootDomain}";
+                    subdomain = "${instance}.sys.home.${cfg.observer.rootDomain}";
                     mkExporter = newMkExporter {
                       inherit instance;
                       hostname = subdomain;
@@ -703,6 +703,7 @@ in
               }
             ))
             (mkIf cfg.observer.enableUnifi {
+              age.secrets.unpoller-copernicus.rekeyFile = ../unpoller-copernicus.age;
               services.prometheus.exporters.unpoller = {
                 enable = true;
                 log.prometheusErrors = true;
@@ -711,7 +712,7 @@ in
                 };
                 controllers = [{
                   user = "readonly2";
-                  pass = /etc/secrets/unpoller-dream-machine.password;
+                  pass = config.age.secrets.unpoller-copernicus.path;
                   # Per the Unpoller docs:
                   # > When configuring make sure that you do not include :8443
                   # > on the url of the controller if you are using unifios.

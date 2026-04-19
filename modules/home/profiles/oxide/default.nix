@@ -9,6 +9,7 @@ with lib; {
 
   options.profiles.oxide = {
     enable = mkEnableOption "personal configuration for Oxide utilities";
+    enableRclone = mkEnableOption "rclone mounts";
   };
 
   config =

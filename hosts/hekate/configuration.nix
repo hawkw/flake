@@ -4,6 +4,9 @@
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
+
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMu+TAtHZlbC9+dXzt57UwlTz2ghsXfSac4qdiRDy5tr";
+
   profiles =
     {
       docs.enable = true;

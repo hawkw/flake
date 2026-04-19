@@ -35,6 +35,25 @@
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
+    # agenix and agenix-rekey
+    agenix = {
+      url = "github:ryantm/agenix";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        # don't download nix-darwin deps as this flake only contains Linux
+        # configurations.
+        ### NOTE: remove this line to enable nix-darwin support!!! ###
+        darwin.follows = "";
+      };
+    };
+    agenix-rekey = {
+      url = "github:oddlama/agenix-rekey";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-parts.follows = "flake-parts";
+      };
+    };
+
     # for building Rust packages
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -214,14 +233,25 @@
     in
     flake-parts.lib.mkFlake { inherit inputs; }
       {
-        perSystem = { pkgs, system, ... }: with pkgs; with lib; {
+        imports = [
+          inputs.agenix-rekey.flakeModule
+        ];
+
+        perSystem = { config, pkgs, system, ... }: with pkgs; with lib; {
           devShells.default = mkShell {
             buildInputs = [
               deploy-rs.packages.${system}.default
               inputs.disko.packages.${system}.disko
             ];
+            nativeBuildInputs = [
+              # Add `agenix-rekey` to the dev shell so that the `agenix` command is
+              # always avaialable.
+              config.agenix-rekey.package
+              # config.programs._1password.package
+            ];
           };
         };
+
         flake = {
           ###########
           ## NixOS ##
@@ -238,7 +268,9 @@
               inputs.eclssd.nixosModules.default
               inputs.disko.nixosModules.disko
               inputs.smfc.nixosModules.default
-              # inputs.nixos-cosmic.nixosModules.default
+              # agenix
+              inputs.agenix.nixosModules.default
+              inputs.agenix-rekey.nixosModules.default
             ];
           };
 
@@ -263,7 +295,6 @@
               clavius = mkPiImage { hostname = "clavius"; };
               tycho = mkPiImage { hostname = "tycho"; };
             };
-
 
           #####################
           ## deploy-rs nodes ##
@@ -309,7 +340,6 @@
             user = "eliza";
 
             baseModules = [ self.homeModules.default ];
-
           };
 
           homeModules.default = import ./modules/home;

@@ -1,5 +1,7 @@
 { ... }: {
 
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdQIWK+nhrz+m9EmI0kX0NOUMuRbw5yjRwwuoeqBxI7";
+
   raspberry-pi.hardware = {
     platform.type = "rpi3";
   };

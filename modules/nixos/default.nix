@@ -61,14 +61,18 @@
       testdisk
       git
       nano
+      time
+      home-manager
       # for lspci etc
       pciutils
       # for lsusb etc
       usbutils
+      # misc hardware admin tools
+      inxi
       lshw
-      home-manager
       lm_sensors
       smartmontools
+      nvme-cli
     ];
 
     # "Don't forget to add `environment.pathsToLink = [ "/share/zsh" ];` to your

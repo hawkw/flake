@@ -6,6 +6,7 @@ with pkgs; with lib; {
 
   system.stateVersion = "24.11";
 
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAU1QZirkCNKWTt8hx+uxEI3VfxqmcqvRLT5W6/L7jRk";
   profiles = let rootDomain = "elizas.website"; in {
     docs.enable = true;
     desktop = {
@@ -17,7 +18,7 @@ with pkgs; with lib; {
       enable = true;
       observer = {
         enable = true;
-        # enableUnifi = true;
+        enableUnifi = true;
         inherit rootDomain;
       };
       snmp.enable = true;

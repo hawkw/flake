@@ -6,6 +6,8 @@ with lib; {
     ./hardware-configuration.nix
   ];
 
+  age.rekey.hostPubkey = "AAAAC3NzaC1lZDI1NTE5AAAAIEJLA1+OlP+jULnVvoP0wBZJIKeXadYQB4V90YAJnm3T";
+
   networking.hostName = "theseus"; # Define your hostname.
 
   profiles = {
@@ -87,8 +89,6 @@ with lib; {
     # };
   };
 
-  # NO!! i DON'T WANT wpa_supplicant! stop making it be there!
-  networking.wireless.enable = mkForce false;
 
   users.motd = ''
     ┌┬────────────────┐
