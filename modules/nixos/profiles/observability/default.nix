@@ -614,7 +614,9 @@ in
               ];
             })
             ### OBSERVER: snmp ####
+            # XXX THIS DOESNT WORK
             (mkIf cfg.snmp.enable {
+              warnings = ["i haven't finished the SNMP config so this probly wont work"];
               services.prometheus.exporters.snmp = {
                 enable = true;
                 configuration = {

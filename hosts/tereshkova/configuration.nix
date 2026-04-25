@@ -25,7 +25,8 @@ with pkgs; with lib; {
         inherit rootDomain;
         grafana.secretKeyFile = config.age.secrets.tereshkova-grafana-secret.path;
       };
-      snmp.enable = true;
+      # TODO(eliza): actually make snmp work
+      snmp.enable = false;
     };
     nginx = {
       enable = true;
