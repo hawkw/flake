@@ -92,6 +92,10 @@ in
             "eliza-ops" = "bc53c5457dbd4705bb0d56e67f57408c";
           };
         };
+
+        secretKeyFile = mkOption {
+          type = path;
+        };
       };
     };
 
@@ -241,7 +245,12 @@ in
                   };
                   security = {
                     admin_user = "admin";
+                    # default, pls changeme
+                    # TODO: put this in an agenix secret so it doesn't have to be changed post install..
                     admin_password = "admin";
+                    # using the Grafana file provider:
+                    # https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#file-provider
+                    secret_key = "$__file{${toString cfg.observer.grafana.secretKeyFile}}";
                   };
                 };
               };
@@ -703,7 +712,7 @@ in
               }
             ))
             (mkIf cfg.observer.enableUnifi {
-              age.secrets.unpoller-copernicus.rekeyFile = ../unpoller-copernicus.age;
+              age.secrets.unpoller-copernicus.rekeyFile = ./unpoller-copernicus.age;
               services.prometheus.exporters.unpoller = {
                 enable = true;
                 log.prometheusErrors = true;

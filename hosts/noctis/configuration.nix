@@ -8,34 +8,38 @@
 
   age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMaqZ66pN9kyfJa3D+uKEekxiQaDq4+E2xO+j+YaZ/oW";
 
-  profiles = let rootDomain = "elizas.website"; in {
-    docs.enable = true;
-    games.enable = true;
-    desktop = {
-      gnome3.enable = true;
-    };
-    observability = {
-      # enable = true;
-      # observer = {
+  profiles =
+    # let
+    #   rootDomain = "elizas.website";
+    # in
+    {
+      docs.enable = true;
+      games.enable = true;
+      desktop = {
+        gnome3.enable = true;
+      };
+      observability = {
+        # enable = true;
+        # observer = {
+        #   enable = true;
+        #   enableUnifi = true;
+        #   inherit rootDomain;
+        # };
+        snmp.enable = true;
+      };
+      # nginx = {
       #   enable = true;
-      #   enableUnifi = true;
-      #   inherit rootDomain;
+      #   domain = rootDomain;
+      #   acmeSubdomain = "home";
       # };
-      snmp.enable = true;
-    };
-    # nginx = {
-    #   enable = true;
-    #   domain = rootDomain;
-    #   acmeSubdomain = "home";
-    # };
-    # enable the correct perf tools for this kernel version
-    perftools.enable = true;
-    vu-dials.enable = true;
-    zfs.enable = true;
+      # enable the correct perf tools for this kernel version
+      perftools.enable = true;
+      vu-dials.enable = true;
+      zfs.enable = true;
 
-    arm-cross-dev.enable = true;
-    nix-ld.enable = true;
-  };
+      arm-cross-dev.enable = true;
+      nix-ld.enable = true;
+    };
 
   hardware = {
     probes = {
