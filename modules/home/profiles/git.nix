@@ -39,11 +39,39 @@ with lib; {
 
       git = {
         enable = true;
-        userName = cfg.user.name;
-        userEmail = cfg.user.email;
+        settings = {
+          user = {
+            name = cfg.user.name;
+            email = cfg.user.email;
+          };
+
+          # use rebase in `git pull` to avoid gross merge commits.
+          pull.rebase = true;
+          push.autoSetupRemote = true;
+          # when fetching, prune unreachable objects in the local repository.
+          fetch.prune = true;
+          # differentiate between moved and added lines in diffs
+          diff.colorMoved = "zebra";
+          core = {
+            # Assembly-style commit message comments (`;` as the comment delimiter).
+            # Why use `;`?
+            # - The default character, `#`, conflicts with both Markdown headings
+            #   and with GitHub issue links beginning a line (which I need to be
+            #   able to use in commit messages).
+            # - `*` conflicts with Markdown lists
+            # - Git only supports a single character comment delimiter, so C-style
+            #   line comments (`//`) are out...
+            # - I can't think of any compelling reason to begin a line with `;`...
+            commentchar = ";";
+            editor = lib.mkDefault config.home.sessionVariables.EDITOR;
+          };
+          # Set the default branch name to `main`.
+          init.defaultBranch = "main";
+          commit.gpgsign = true;
+        };
 
         # aliases
-        aliases = {
+        settings.alias = {
           # list all aliases
           aliases = "config --get-regexp '^alias.'";
 
@@ -108,39 +136,10 @@ with lib; {
           ".direnv/"
         ];
 
-        # extra git config
-        extraConfig = {
-          # use rebase in `git pull` to avoid gross merge commits.
-          pull.rebase = true;
-          push.autoSetupRemote = true;
-          # when fetching, prune unreachable objects in the local repository.
-          fetch.prune = true;
-          # differentiate between moved and added lines in diffs
-          diff.colorMoved = "zebra";
-          core = {
-            # Assembly-style commit message comments (`;` as the comment delimiter).
-            # Why use `;`?
-            # - The default character, `#`, conflicts with both Markdown headings
-            #   and with GitHub issue links beginning a line (which I need to be
-            #   able to use in commit messages).
-            # - `*` conflicts with Markdown lists
-            # - Git only supports a single character comment delimiter, so C-style
-            #   line comments (`//`) are out...
-            # - I can't think of any compelling reason to begin a line with `;`...
-            commentchar = ";";
-            editor = lib.mkDefault config.home.sessionVariables.EDITOR;
-          };
-          # Set the default branch name to `main`.
-          init.defaultBranch = "main";
-          # use 1password to manage commit signing if available
-          gpg = {
-            format = lib.mkForce "ssh";
-            # "ssh".program = lib.mkIf enable1PasswordSshAgent
-            #   "${pkgs._1password-gui}/bin/op-ssh-sign";
-          };
-          commit.gpgsign = true;
-          user.signingkey =
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s";
+        signing = {
+          format = "ssh";
+          key =
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s";
         };
       };
     };
@@ -165,7 +164,7 @@ with lib; {
       in
       {
         home.packages = [ signingScript ];
-        programs.git.extraConfig.gpg."ssh".program = "ssh-sign";
+        programs.git.settings.gpg."ssh".program = "ssh-sign";
       }
     ))]);
 }
