@@ -8,7 +8,10 @@ with pkgs; with lib; {
 
   age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAU1QZirkCNKWTt8hx+uxEI3VfxqmcqvRLT5W6/L7jRk";
 
-  age.secrets.tereshkova-grafana-secret.rekeyFile = ./secrets/grafana_secret.age;
+  age.secrets.tereshkova-grafana-secret = {
+    rekeyFile = ./secrets/grafana_secret.age;
+    owner = "grafana";
+  };
 
   profiles = let rootDomain = "elizas.website"; in {
     docs.enable = true;
