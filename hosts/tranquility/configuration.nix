@@ -54,13 +54,12 @@ with pkgs; with lib; {
   # fwupd: firmware update
   services.fwupd.enable = true;
 
-
   #### System configuration ####
   networking = {
     # machine's hostname
     hostName = "tranquility";
     # this has to be a unique 32-bit number. ZFS requires us to define this.
-    hostId = "C0FFEE";
+    hostId = "00C0FFEE";
 
     # The global useDHCP flag is deprecated, therefore explicitly set to false here.
     # Per-interface useDHCP will be mandatory in the future, so this generated config
@@ -115,16 +114,16 @@ with pkgs; with lib; {
     ];
     initrd.network = {
       enable = true;
-      ssh = {
-        enable = true;
-        port = 22;
-        authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
-        # # WARNING: these must actually exist :)
-        # hostKeys = [
-        #   "/etc/ssh/ssh_host_rsa_key"
-        #   "/etc/ssh/ssh_host_ed25519_key"
-        # ];
-      };
+      # ssh = {
+      #   enable = true;
+      #   port = 22;
+      #   authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
+      #   # # WARNING: these must actually exist :)
+      #   # hostKeys = [
+      #   #   "/etc/ssh/ssh_host_rsa_key"
+      #   #   "/etc/ssh/ssh_host_ed25519_key"
+      #   # ];
+      # };
     };
   };
   # enable ssh early
