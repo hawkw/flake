@@ -13,7 +13,7 @@ in
       disk = {
         nvme0n1 = {
           type = "disk";
-          device = "/dev/by-id/nvme-CT1000P510SSD5_2525E9C382B2";
+          device = "/dev/disk/by-id/nvme-CT1000P510SSD5_2525E9C382B2";
           content = {
             type = "gpt";
             partitions = {
