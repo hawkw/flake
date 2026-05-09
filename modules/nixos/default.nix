@@ -25,6 +25,7 @@
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix
+    ./services/hako-foundry.nix
   ];
 
   # Set your time zone.
