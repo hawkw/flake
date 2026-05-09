@@ -77,13 +77,15 @@ with pkgs; with lib; {
     };
 
     initrd.supportedFilesystems = [ "zfs" ];
-    zfs.requestEncryptionCredentials = false;
+    # Request ZFS encryption credentials at boot.
+    zfs.requestEncryptionCredentials = true;
 
     kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     kernelParams = [
       # console on ttyS0 to try and make IPMI SOL work...
-      "console=tty0"
-      "console=ttyS0,115200n8"
+      # UPDATE: IT TURNS OUT THAT IPMI SOL DOES NOT WORK
+      # "console=tty0"
+      # "console=ttyS0,115200n8"
 
       # TODO(eliza): this could be a static IP so that we don't depend on DHCP
       # working to boot...
