@@ -1,9 +1,9 @@
 let
   rpool = "tranquility-rpool";
   cryptDataset = "crypt";
-  localDataset = "local";
-  systemDataset = "system";
-  userDataset = "user";
+  localDataset = "${cryptDataset}/local";
+  systemDataset = "${cryptDataset}/system";
+  userDataset = "${cryptDataset}/user";
   zfs_fs = "zfs_fs";
   optAutosnapshot = "com.sun:autosnapshot";
 in
@@ -62,21 +62,21 @@ in
                   keylocation = "prompt";
                 };
               };
-              "${cryptDataset}/${localDataset}" = {
+              "${localDataset}" = {
                 type = zfs_fs;
                 options = {
                   mountpoint = "none";
                   dnodesize = "auto";
                 };
               };
-              "${cryptDataset}/${localDataset}/nix" = {
+              "${localDataset}/nix" = {
                 type = zfs_fs;
                 mountpoint = "/nix";
                 options = {
                   ${optAutosnapshot} = "false";
                 };
               };
-              "${cryptDataset}/${localDataset}/reserved" = {
+              "${localDataset}/reserved" = {
                 type = zfs_fs;
                 options = {
                   mountpoint = "none";
@@ -85,11 +85,11 @@ in
                   ${optAutosnapshot} = "false";
                 };
               };
-              "${cryptDataset}/${systemDataset}" = {
+              "${systemDataset}" = {
                 type = zfs_fs;
                 options.mountpoint = "none";
               };
-              "${cryptDataset}/${systemDataset}/root" = {
+              "${systemDataset}/root" = {
                 type = zfs_fs;
                 mountpoint = "/";
                 options = {
@@ -98,7 +98,7 @@ in
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
               };
-              "${cryptDataset}/${systemDataset}/var" = {
+              "${systemDataset}/var" = {
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
@@ -107,7 +107,7 @@ in
                   dnodesize = "auto";
                 };
               };
-              "${cryptDataset}/${systemDataset}/etc" = {
+              "${systemDataset}/etc" = {
                 type = zfs_fs;
                 mountpoint = "/etc";
                 options = {
@@ -117,7 +117,7 @@ in
                   dnodesize = "auto";
                 };
               };
-              "${cryptDataset}/${userDataset}" = {
+              "${userDataset}" = {
                 type = zfs_fs;
                 options = {
                   mountpoint = "none";
@@ -126,7 +126,7 @@ in
                   ${optAutosnapshot} = "true";
                 };
               };
-              "${cryptDataset}/${userDataset}/home" = {
+              "${userDataset}/home" = {
                 type = zfs_fs;
                 mountpoint = "/home";
                 options = {

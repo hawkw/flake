@@ -25,6 +25,9 @@ with lib;
           # your flake's root directory and not by a direct path literal like
           # ./secrets
           localStorageDir = ../../.. + "/secrets/rekeyed/${config.networking.hostName}";
+
+          # The path where all generated secrets should be stored by default. If set, this automatically sets age.secrets.<name>.rekeyFile to a default value in this directory, for any secret that defines a generator.
+          generatedSecretsDir = ../../.. + "/secrets/generated";
           agePlugins = [ pkgs.age-plugin-1p pkgs._1password-cli ];
         };
       }

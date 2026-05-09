@@ -19,12 +19,10 @@ with pkgs; with lib; {
 
 
   age.secrets.hakofoundry-secret = {
-    rekeyFile = ./secrets/hakofoundry-secret.age;
     generator.script = "base64";
   };
   # Generate a file in the .env format
   age.secrets.hakofoundry-env = {
-    rekeyFile = ./secrets/hakofoundry-env.age;
     generator = {
       dependencies = {
         inherit (config.age.secrets) hakofoundry-secret;
