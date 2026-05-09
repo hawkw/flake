@@ -67,10 +67,10 @@ in
         OPEN_ACCESS = toString cfg.openAccess;
       };
       environmentFiles = [
-        config.secretFilePath
+        cfg.secretFilePath
       ];
     };
 
-    networking.firewall = lib.mkIf cfg.openFirewall { allowedTCPPorts = [ cfg.port ]; };
+    networking.firewall = mkIf cfg.openFirewall { allowedTCPPorts = [ cfg.port ]; };
   };
 }
