@@ -4,6 +4,8 @@ with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC679UGFcXpYScZzpbeC1Zai7ck4tHpKxdp3T6Ri/mcC";
+
   profiles = {
     server.enable = true;
     desktop = {

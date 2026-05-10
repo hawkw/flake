@@ -50,9 +50,9 @@ in
       extraOptions = [
         # character devices with major number 166 are ACM USB modems (/dev/ttyACM*)
         # we need these to talk to the HakoForge powerboard
-        "--device-cgroup-rule='c 166:* rwm'"
+        "--device-cgroup-rule=c 166:* rwm"
         # block devices with major number 8 are SCSI disk devices (HDDs)
-        "--device-cgroup-rule='b 8:* rwm"
+        "--device-cgroup-rule=b 8:* rwm"
       ];
       volumes = [
         "${cfg.configPath}:/app/config"
