@@ -50,6 +50,7 @@ with pkgs; with lib; {
     lsscsi
     # seagate drive firmware utility
     openseachest
+    sg3_utils
   ];
 
   # fwupd: firmware update
