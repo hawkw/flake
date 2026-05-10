@@ -6,11 +6,7 @@ with lib; {
 
   options.programs.oxide = {
     looker = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to enable Looker, a Bunyan log viewer";
-      };
+      enable = mkEnableOption "Whether to enable Looker, a Bunyan log viewer";
     };
     sp3-uart = {
       enable = mkEnableOption "bench gimlet SP3 UART script";
@@ -21,11 +17,7 @@ with lib; {
       };
     };
     humility = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to enable Humility, the Hubris debugger.";
-      };
+      enable = mkEnableOption "Whether to enable Humility, the Hubris debugger.";
       environment = mkOption
         {
           description = "Generates a Humility environment file.";

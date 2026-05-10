@@ -42,13 +42,13 @@ with lib; {
       };
 
       programs.oxide = {
-        looker.enable = true;
+        looker.enable = mkDefault true;
         sp3-uart = {
-          enable = true;
+          enable = mkDefault true;
           # logDir = "/var/log";
         };
         humility = {
-          enable = true;
+          enable = mkDefault true;
           environment =
             let
               basePath = "/home/eliza/Code/oxide/hubris/target";
