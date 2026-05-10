@@ -328,6 +328,8 @@
               tereshkova = mkNode { hostname = "tereshkova"; };
 
               hekate = mkNode { hostname = "hekate"; };
+
+              tranquility = mkNode { hostname = "tranquility"; };
             };
 
 
