@@ -37,7 +37,7 @@ with pkgs; with lib; {
 
   services.hakoFoundry = {
     enable = true;
-    secretFilePath = config.age.secrets.hakofoundry-env.file;
+    secretFilePath = config.age.secrets.hakofoundry-env.path;
     openFirewall = true;
   };
 
