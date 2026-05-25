@@ -20,18 +20,7 @@
   #### INPUTS ################################################################
   inputs = {
     # nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
-    # nixpkgs-stable.follows = "nixos-cosmic/nixpkgs-stable";
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
-    # NOTE:change "nixpkgs" to "nixpkgs-stable" to use stable NixOS release
-    # nixpkgs.follows = "nixos-cosmic/nixpkgs";
-
-    nixos-cosmic = {
-      url = "github:lilyinstarlight/nixos-cosmic";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
