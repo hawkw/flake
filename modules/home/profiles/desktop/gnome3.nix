@@ -6,19 +6,17 @@ let
   # configure installed Gnome 3 extensions
   # note: these have to be *enabled* manually in the gnome extensions UI...
   gnome_extensions = with pkgs.gnomeExtensions; [
-    # a nicer application menu for gnome
-    arc-menu
-    # displays system status in the gnome-shell status bar
-    # system-monitor
-    # displays system temperatures, fan RPMs, and voltages
-    # freon
-    # allows selecting the sound output device in the sound menu
-    sound-output-device-chooser
-    # zfs-status-monitor
+    # # displays system status in the gnome-shell status bar
+    # # system-monitor
+    # # displays system temperatures, fan RPMs, and voltages
+    # # freon
+    # # allows selecting the sound output device in the sound menu
+    # sound-output-device-chooser
+    # # zfs-status-monitor
     # POP!_OS shell tiling extensions for Gnome 3
     pop-shell
     # dash-to-dock-for-cosmic
-    tailscale-status
+    # tailscale-status
   ];
   # configure Gnome themes
   themes = with pkgs; [

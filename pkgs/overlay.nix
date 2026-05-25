@@ -4,4 +4,5 @@ final: prev: {
   prometheusMdns = prev.callPackage ./prometheus-mdns.nix { };
   technic-launcher = prev.callPackage ./technic-launcher.nix { };
   xfel = prev.callPackage ./xfel.nix { };
+  gnomeExtensions.pop-shell = prev.callPackage ./pop-shell { };
 }
