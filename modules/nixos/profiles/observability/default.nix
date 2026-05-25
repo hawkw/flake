@@ -20,6 +20,10 @@ let
         # The option `tor' can no longer be used since it's been removed. The
         # Tor exporter has been removed, as it was broken and unmaintained.
         "tor"
+        # The option `rspamd' can no longer be used since it's been removed. The
+        # Rspamd exporter has been removed. You can use the Rspamd /metrics
+        # endpoint directly instead:
+        "rspamd"
       ];
     in
     (conf: attrsets.filterAttrs
