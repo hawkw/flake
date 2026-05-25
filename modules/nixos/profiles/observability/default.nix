@@ -206,7 +206,7 @@ in
               let
                 mkScrapeConfig = (instance: config:
                   let
-                    subdomain = "${ instance}.eclss.home.${ cfg. observer. rootDomain}";
+                    subdomain = "${instance}.eclss.home.${cfg.observer.rootDomain}";
                     eclssdPort = config.services.eclssd.server.port;
                   in
                   {
