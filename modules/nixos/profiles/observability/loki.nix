@@ -83,7 +83,7 @@ in
       # make an Avahi mDNS service for the Promtail metrics endpoint
       # networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
     })
-    (mkIf cfg.loki.enable (
+    (mkIf cfg.loki.enable && cfg.observer.enable (
       let dataDir = config.services.loki.dataDir;
       in {
 
