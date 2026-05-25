@@ -5,12 +5,6 @@ let
   cfg = config.profiles.observability;
 
   # Generate the Alloy configuration for journal log scraping.
-  #
-  # The pipeline is:
-  #   loki.source.journal -> loki.process (drop alloy's own logs) -> loki.write
-  #
-  # The relabel rules extract the systemd unit, priority keyword, and syslog
-  # identifier from journal entries.
   mkAlloyConfig = lokiUrl: ''
     loki.write "default" {
       endpoint {
@@ -18,44 +12,40 @@ let
       }
     }
 
-    // --- Journal relabeling rules ---
-    // Extract systemd unit, priority, and syslog identifier from journal
-    // fields.
-    loki.relabel "journal" {
-      forward_to = []
+    // systemd relabeling rules
+    discovery.relabel "logs_journal_scrape" {
+      targets = []
 
       rule {
         source_labels = ["__journal__systemd_unit"]
         target_label  = "unit"
       }
+
+      rule {
+        source_labels = ["__journal__boot_id"]
+        target_label  = "boot_id"
+      }
+
+      rule {
+        source_labels = ["__journal__transport"]
+        target_label  = "transport"
+      }
+
       rule {
         source_labels = ["__journal_priority_keyword"]
         target_label  = "level"
       }
-      rule {
-        source_labels = ["__journal_syslog_identifier"]
-        target_label  = "syslog_identifier"
-      }
     }
 
-    // --- Drop Alloy's own logs ---
-      forward_to = [loki.write.default.receiver]
-
-      stage.match {
-        selector = "{unit=\"alloy.service\"}"
-        action   = "drop"
-      }
-    }
-
-    // --- Journal source ---
-    loki.source.journal "read" {
-      forward_to     = [loki.process.journal.receiver]
-      relabel_rules  = loki.relabel.journal.rules
+    // read logs from journald
+    loki.source.journal "journald_logs" {
+      forward_to     = [loki.write.default.receiver]
+      relabel_rules  = discovery.relabel.logs_journal_scrape.rules
       max_age        = "12h"
       format_as_json = true
       labels         = {
         job  = "systemd-journal",
-        host = "${config.networking.hostName}",
+        instance = "${config.networking.hostName}",
       }
     }
   '';
