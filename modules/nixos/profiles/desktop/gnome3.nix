@@ -14,10 +14,7 @@ in with lib; {
       desktopManager.gnome.enable = true;
       displayManager = {
         defaultSession = mkDefault "gnome";
-        gdm = {
-          enable = mkDefault true;
-          wayland = mkDefault true;
-        };
+        gdm.enable = mkDefault true;
       };
 
 
