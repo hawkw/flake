@@ -3,6 +3,62 @@
 with lib;
 let
   cfg = config.profiles.observability;
+
+  # Generate the Alloy configuration for journal log scraping.
+  #
+  # The pipeline is:
+  #   loki.source.journal -> loki.process (drop alloy's own logs) -> loki.write
+  #
+  # The relabel rules extract the systemd unit, priority keyword, and syslog
+  # identifier from journal entries.
+  mkAlloyConfig = lokiUrl: ''
+    loki.write "default" {
+      endpoint {
+        url = "${lokiUrl}"
+      }
+    }
+
+    // --- Journal relabeling rules ---
+    // Extract systemd unit, priority, and syslog identifier from journal
+    // fields.
+    loki.relabel "journal" {
+      forward_to = []
+
+      rule {
+        source_labels = ["__journal__systemd_unit"]
+        target_label  = "unit"
+      }
+      rule {
+        source_labels = ["__journal_priority_keyword"]
+        target_label  = "level"
+      }
+      rule {
+        source_labels = ["__journal_syslog_identifier"]
+        target_label  = "syslog_identifier"
+      }
+    }
+
+    // --- Drop Alloy's own logs ---
+      forward_to = [loki.write.default.receiver]
+
+      stage.match {
+        selector = "{unit=\"alloy.service\"}"
+        action   = "drop"
+      }
+    }
+
+    // --- Journal source ---
+    loki.source.journal "read" {
+      forward_to     = [loki.process.journal.receiver]
+      relabel_rules  = loki.relabel.journal.rules
+      max_age        = "12h"
+      format_as_json = true
+      labels         = {
+        job  = "systemd-journal",
+        host = "${config.networking.hostName}",
+      }
+    }
+  '';
 in
 {
   options.profiles.observability.loki = with types; {
@@ -17,73 +73,30 @@ in
       description = "The port to run the Loki service on.";
     };
 
-    promtailPort = mkOption {
+    alloyPort = mkOption {
       type = int;
       default = 28183;
-      description = "The port to run the Promtail service on.";
+      description = "The port to run the Alloy HTTP server on.";
     };
   };
 
   config = mkMerge [
-    #### OBSERVEE: promtail loki exporter ####
+    #### OBSERVEE: Alloy log shipper ####
     (mkIf cfg.loki.enable {
-      services.promtail = {
+      services.alloy = {
         enable = true;
-        configuration = {
-          server = {
-            http_listen_port = cfg.loki.promtailPort;
-            grpc_listen_port = 0;
-          };
-
-          clients = mkDefault [{
-            url = "http://noctis:${toString cfg.loki.port}/loki/api/v1/push";
-          }];
-
-          scrape_configs = [
-            {
-              job_name = "journal";
-              journal = {
-                max_age = "12h";
-                json = true;
-                labels = {
-                  job = "systemd-journal";
-                  host = "${config.networking.hostName}";
-                };
-              };
-
-              relabel_configs = [
-                {
-                  source_labels = [ "__journal__systemd_unit" ];
-                  target_label = "unit";
-                }
-                {
-                  source_labels = [ "__journal_priority_keyword" ];
-                  target_label = "level";
-                }
-                {
-                  source_labels = [ "__journal_syslog_identifier" ];
-                  target_label = "syslog_identifier";
-                }
-              ];
-
-              pipeline_stages = [
-                # drop logs emitted by promtail itself.
-                {
-                  match = {
-                    selector = ''{unit="promtail.service"}'';
-                    action = "drop";
-                  };
-                }
-              ];
-            }
-          ];
-        };
+        extraFlags = [
+          "--server.http.listen-addr=127.0.0.1:${toString cfg.loki.alloyPort}"
+          "--disable-reporting"
+        ];
       };
 
-      # make an Avahi mDNS service for the Promtail metrics endpoint
-      # networking.firewall.allowedTCPPorts = [ cfg.loki.promtailPort ];
+      environment.etc."alloy/config.alloy".text = mkDefault
+        (mkAlloyConfig "http://tereshkova.sys.home.elizas.website:${toString cfg.loki.port}/loki/api/v1/push");
     })
-    (mkIf cfg.loki.enable && cfg.observer.enable (
+
+    #### OBSERVER: Loki server ####
+    (mkIf (cfg.loki.enable && cfg.observer.enable) (
       let dataDir = config.services.loki.dataDir;
       in {
 
@@ -98,9 +111,10 @@ in
           }
         ];
 
-        services.promtail.configuration.clients = mkForce [{
-          url = "http://localhost:${toString cfg.loki.port}/loki/api/v1/push";
-        }];
+        # On the observer node, point Alloy at the local Loki instance
+        # instead of the default remote URL.
+        environment.etc."alloy/config.alloy".text = mkForce
+          (mkAlloyConfig "http://localhost:${toString cfg.loki.port}/loki/api/v1/push");
 
         #### OBSERVER: Loki ####
         services.loki = {

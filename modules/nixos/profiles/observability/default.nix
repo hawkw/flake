@@ -570,53 +570,57 @@ in
                     };
                   };
                 };
-              systemd.services.promtail.serviceConfig =
-                {
-                  # allow promtail to read nginx logs
-                  ReadOnlyPaths = [ "/var/log/nginx" ];
-                };
-              services.promtail.configuration.scrape_configs = [
-                {
-                  job_name = "nginx";
-                  static_configs = [{
-                    targets = [ "localhost" ];
-                    labels = {
-                      __path__ = "/var/log/nginx/*log";
-                      host = config.networking.hostName;
-                      job = "nginx";
-                    };
-                  }];
-                  pipeline_stages = [{
-                    match = {
-                      selector = ''{job="nginx"}'';
-                      stages = [
-                        {
-                          regex.expression = ''^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>.*)\] "(?P<method>[^ ]*) (?P<request>[^ ]*) (?P<protocol>[^ ]*)" (?P<status>[\d]+) (?P<body_bytes_sent>[\d]+) "(?P<http_referer>[^\"]*)\" "(?P<http_user_agent>[^"]*)'';
-                        }
-                        {
-                          labels = {
-                            remote_addr = "remote_addr";
-                            remote_user = "remote_user";
-                            time_local = "time_local";
-                            method = "method";
-                            request = "request";
-                            protocol = "protocol";
-                            status = "status";
-                            body_bytes_sent = "body_bytes_sent";
-                            http_referer = "http_referer";
-                            http_user_agent = "http_user_agent";
-                          };
-                        }
-                      ];
-                    };
-                  }];
+              # Allow Alloy to read nginx logs
+              systemd.services.alloy.serviceConfig.ReadOnlyPaths = [ "/var/log/nginx" ];
+
+              # Alloy config for scraping nginx log files.
+              # This file is loaded alongside the journal config from loki.nix,
+              # and forwards parsed nginx logs to the same loki.write endpoint.
+              environment.etc."alloy/nginx.alloy".text = ''
+                // --- Nginx log file source ---
+                loki.source.file "nginx" {
+                  targets    = [
+                    {__path__ = "/var/log/nginx/*log", host = "${config.networking.hostName}", job = "nginx"},
+                  ]
+                  forward_to = [loki.process.nginx.receiver]
+                  file_match {
+                    enabled = true
+                  }
                 }
-              ];
+
+                // --- Nginx log processing pipeline ---
+                loki.process "nginx" {
+                  forward_to = [loki.write.default.receiver]
+
+                  stage.match {
+                    selector = "{job=\"nginx\"}"
+
+                    stage.regex {
+                      expression = "^(?P<remote_addr>[\\w\\.]+) - (?P<remote_user>[^ ]*) \\[(?P<time_local>.*)\\] \"(?P<method>[^ ]*) (?P<request>[^ ]*) (?P<protocol>[^ ]*)\" (?P<status>[\\d]+) (?P<body_bytes_sent>[\\d]+) \"(?P<http_referer>[^\"]*)\" \"(?P<http_user_agent>[^\"]*)\""
+                    }
+
+                    stage.labels {
+                      values = {
+                        remote_addr     = "",
+                        remote_user     = "",
+                        time_local      = "",
+                        method          = "",
+                        request         = "",
+                        protocol        = "",
+                        status          = "",
+                        body_bytes_sent = "",
+                        http_referer    = "",
+                        http_user_agent = "",
+                      }
+                    }
+                  }
+                }
+              '';
             })
             ### OBSERVER: snmp ####
             # XXX THIS DOESNT WORK
             (mkIf cfg.snmp.enable {
-              warnings = ["i haven't finished the SNMP config so this probly wont work"];
+              warnings = [ "i haven't finished the SNMP config so this probly wont work" ];
               services.prometheus.exporters.snmp = {
                 enable = true;
                 configuration = {
