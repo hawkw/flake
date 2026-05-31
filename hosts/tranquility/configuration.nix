@@ -83,8 +83,10 @@ with pkgs; with lib; {
     initrd.supportedFilesystems = [ "zfs" ];
     # Request ZFS encryption credentials at boot.
     zfs.requestEncryptionCredentials = true;
+    # Apparently leaving this on can result in data corruption?
+    zfs.forceImportRoot = false;
 
-    kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
+    kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     kernelParams = [
       # console on ttyS0 to try and make IPMI SOL work...
       # UPDATE: IT TURNS OUT THAT IPMI SOL DOES NOT WORK
@@ -107,6 +109,7 @@ with pkgs; with lib; {
       # controllers, and then looking for the "Kernel driver in use" line.
       "igb" # Intel GigaBit Ethernet
       "iwlwifi" # Intel WiFi
+      "bnxt_en" # Broadcom NetExtreme
       # other network adapters. these aren't currently present on my system, but
       # let's enable them anyway in case it grows additional hardware
       # later.abort

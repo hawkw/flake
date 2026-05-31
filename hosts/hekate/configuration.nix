@@ -62,8 +62,10 @@
 
     initrd.supportedFilesystems = [ "zfs" ];
     zfs.requestEncryptionCredentials = false;
+    # Apparently leaving this on can result in data corruption?
+    zfs.forceImportRoot = false;
 
-    kernelModules = [ "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
+    kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     # TODO(eliza): this could be a static IP so that we don't depend on DHCP
     # working to boot...
     kernelParams = [
@@ -81,6 +83,7 @@
       # controllers, and then looking for the "Kernel driver in use" line.
       "igb" # Intel GigaBit Ethernet
       "iwlwifi" # Intel WiFi
+      "bnxt_en" # Broadcom NetExtreme
       # other network adapters. these aren't currently present on my system, but
       # let's enable them anyway in case it grows additional hardware
       # later.abort
@@ -122,31 +125,31 @@
     ${config.networking.hostName}: engineering
   '';
 
-  services.smfc = {
-    enable = false;
-    smartmontools.enable = true;
-    nvidia-smi.enable = false;
-    logLevel = "info";
-    zones.hd = {
-      enabled = true;
-      ipmi_zone = [ 1 ];
-      temp_calc = 1;
-      steps = 4;
-      polling = 10;
-      sensitivity = 2.0;
-      min_temp = 32.0;
-      max_temp = 46.0;
-      min_level = 35;
-      max_level = 100;
-      hd_names = [
-        "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H"
-        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA"
-        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9"
-        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6"
-        "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645"
-      ];
-    };
-  };
+  # services.smfc = {
+  #   enable = false;
+  #   smartmontools.enable = true;
+  #   nvidia-smi.enable = false;
+  #   logLevel = "info";
+  #   zones.hd = {
+  #     enabled = true;
+  #     ipmi_zone = [ 1 ];
+  #     temp_calc = 1;
+  #     steps = 4;
+  #     polling = 10;
+  #     sensitivity = 2.0;
+  #     min_temp = 32.0;
+  #     max_temp = 46.0;
+  #     min_level = 35;
+  #     max_level = 100;
+  #     hd_names = [
+  #       "/dev/disk/by-id/ata-Samsung_SSD_850_EVO_250GB_S3PZNF0JA28518H"
+  #       "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079DDAA"
+  #       "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E3F9"
+  #       "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A079E4D6"
+  #       "/dev/disk/by-id/nvme-WUS4C6432DSP3X3_A084A645"
+  #     ];
+  #   };
+  # };
 
   environment.systemPackages = with pkgs; [
     fwupd
