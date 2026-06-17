@@ -55,6 +55,7 @@ with lib; rec {
 
       ## other utils ###
       picocom
+      bsd-finger
     ];
   };
   # configure discord to launch even when an update is available
