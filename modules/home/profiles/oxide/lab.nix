@@ -115,6 +115,7 @@ with lib; {
           host = concatStringsSep " " labMachines;
           hostname = "%h.${engDomain}";
           user = "eliza";
+          forwardAgent = true;
         };
 
         # if the Oxide VPN connection is *not* active, add a `proxyJump` to
