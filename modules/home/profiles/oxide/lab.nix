@@ -5,7 +5,7 @@ let
 in
 with lib; {
   config = mkIf cfg.enable {
-    programs.ssh.matchBlocks =
+    programs.ssh.settings =
       let
         castle = "castle";
         engDomain = "eng.oxide.computer";
@@ -26,13 +26,15 @@ with lib; {
                 let
                   mkGz =
                     (n: serial:
-                      let h = "${name}gz${toString n}"; in {
+                      let
+                        h = "${name}gz${toString n}";
+                        hostPattern = h + (if n == 0 then " ${name}gz" else "");
+                      in
+                      {
                         ${h} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                          host = h + (if n == 0 then " ${name}gz" else "");
-                          user = "root";
-                          extraOptions = {
-                            ProxyCommand = mkPilotProxyCommand "host" serial;
-                          };
+                          header = "Host ${hostPattern}";
+                          User = "root";
+                          ProxyCommand = mkPilotProxyCommand "host" serial;
                         };
                       });
                 in
@@ -42,21 +44,18 @@ with lib; {
                   mkSwitch = (n:
                     let
                       host = if n == "any" then "${name}switch" else "${name}switch${toString n}";
-                      extraOptions = {
-                        ProxyCommand = mkPilotProxyCommand "tp" n;
-                      };
+                      proxyCommand = mkPilotProxyCommand "tp" n;
                     in
                     {
+                      # The attribute name doubles as the `Host` pattern here.
                       ${host} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                        inherit host;
-                        user = "root";
-                        inherit extraOptions;
+                        User = "root";
+                        ProxyCommand = proxyCommand;
                       };
                     } // (if n == "any" then {
                       "${name}wicket" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
-                        host = "${name}wicket";
-                        user = "wicket";
-                        inherit extraOptions;
+                        User = "wicket";
+                        ProxyCommand = proxyCommand;
                       };
                     } else { }));
                 in
@@ -65,16 +64,14 @@ with lib; {
             {
               ${brm} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ]
                 {
-                  host = "${brm}*";
-                  extraOptions = {
-                    ProxyCommand =
-                      let
-                        host = ''$(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]")'';
-                      in
-                      ''
-                        ssh ${castle} pilot -r ${name} tp nc any ${host} %p
-                      '';
-                  };
+                  header = "Host ${brm}*";
+                  ProxyCommand =
+                    let
+                      host = ''$(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]")'';
+                    in
+                    ''
+                      ssh ${castle} pilot -r ${name} tp nc any ${host} %p
+                    '';
                 };
             } // scrimletGzs // switches
           );
@@ -112,35 +109,35 @@ with lib; {
         # oxide lab machines
         #
         ${labBlock} = hm.dag.entryBefore [ labNoVpnBlock ] {
-          host = concatStringsSep " " labMachines;
-          hostname = "%h.${engDomain}";
-          user = "eliza";
-          forwardAgent = true;
+          header = "Host ${concatStringsSep " " labMachines}";
+          HostName = "%h.${engDomain}";
+          User = "eliza";
+          ForwardAgent = true;
         };
 
-        # if the Oxide VPN connection is *not* active, add a `proxyJump` to
+        # if the Oxide VPN connection is *not* active, add a `ProxyJump` to
         # connect to the VPN first. Don't do this if already on the VPN,
         # because it makes the SSH connection take longer to establish.
         ${labNoVpnBlock} = {
-          match =
+          header =
             let
               checkVpnActive = "nmcli con show --active | grep 'oxide.*vpn'";
             in
             ''
-              host "!vpn.${engDomain},*.${engDomain}" !exec "${checkVpnActive}"
+              Match host "!vpn.${engDomain},*.${engDomain}" !exec "${checkVpnActive}"
             '';
-          proxyJump = "vpn.${engDomain}";
+          ProxyJump = "vpn.${engDomain}";
         };
 
         #
         # racklette gimlets by cubby number
         #
         ${racklette-gimlets} = hm.dag.entryBefore [ labBlock all-racklettes ] {
-          host = trivial.pipe rackletteNames [
+          header = "Host ${trivial.pipe rackletteNames [
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
-          ];
-          proxyCommand =
+          ]}";
+          ProxyCommand =
             let
               # extract the racklette from the ssh host
               racklette = ''$(echo "%h" | sed 's/gc.*//')'';
@@ -150,28 +147,26 @@ with lib; {
             ''
               ssh ${castle} pilot -r ${racklette} tp nc any ${cubby} %p
             '';
-          forwardAgent = true;
+          ForwardAgent = true;
         };
 
         #
         # config applied to all of the above:
         #
         ${all-racklettes} = hm.dag.entryBefore [ labBlock ] {
-          host = trivial.pipe rackletteNames [
+          header = "Host ${trivial.pipe rackletteNames [
             (map (name: "${name}*"))
             (concatStringsSep " ")
-          ];
-          user = "root";
-          proxyJump = "${castle}.eng.oxide.computer";
-          extraOptions = {
-            # Every time the racklet is reset, the host key changes, so
-            # silence all of openssh's warnings that "SOMEONE MIGHT BE
-            # DOING SOMETHING NASTY".
-            StrictHostKeyChecking = "no";
-            UserKnownHostsFile = "/dev/null";
-            LogLevel = "error";
-            ServerAliveInterval = "15";
-          };
+          ]}";
+          User = "root";
+          ProxyJump = "${castle}.eng.oxide.computer";
+          # Every time the racklet is reset, the host key changes, so
+          # silence all of openssh's warnings that "SOMEONE MIGHT BE
+          # DOING SOMETHING NASTY".
+          StrictHostKeyChecking = "no";
+          UserKnownHostsFile = "/dev/null";
+          LogLevel = "error";
+          ServerAliveInterval = "15";
         };
       }
       #

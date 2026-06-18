@@ -16,10 +16,10 @@ with lib;
       mkMerge [
         {
           enable = true;
-          # `enableDefaultConfig` is deprecated; these settings are now in
-          # `matchBlocks."*".
+          # `enableDefaultConfig` is deprecated; the equivalent defaults are
+          # set manually in `settings."*"` below.
           enableDefaultConfig = false;
-          matchBlocks =
+          settings =
             let
               hekate = "hekate";
               noctis = "noctis";
@@ -28,54 +28,49 @@ with lib;
             in
             {
               # "${noctis}-local" = hm.dag.entryBefore [ noctis-tailscale ] {
-              #   match = ''host ${noctis} exec "ping -c1 -W1 -q ${noctis}.local"'';
-              #   hostname = "noctis.local";
+              #   header = ''Match host ${noctis} exec "ping -c1 -W1 -q ${noctis}.local"'';
+              #   HostName = "noctis.local";
               # };
               ${noctis-tailscale} = hm.dag.entryBefore [ "notSsh" ] {
-                host = noctis;
-                hostname = noctis;
-                forwardAgent = true;
-                addKeysToAgent = "yes";
+                header = "Host ${noctis}";
+                HostName = noctis;
+                ForwardAgent = true;
+                AddKeysToAgent = "yes";
               };
               ${hekate} = hm.dag.entryBefore [ "sysdomain" ] {
-                host = hekate;
-                hostname = "${hekate}.${sysdomain}";
-                forwardAgent = true;
-                addKeysToAgent = "yes";
-                extraOptions = {
-                  PubkeyAuthentication = "unbound";
-                };
+                # The attribute name already equals the `Host` pattern, so the
+                # `header` is derived as `Host hekate`.
+                HostName = "${hekate}.${sysdomain}";
+                ForwardAgent = true;
+                AddKeysToAgent = "yes";
+                PubkeyAuthentication = "unbound";
               };
               sysdomain = hm.dag.entryBefore [ "notSsh" ] {
-                host = "*.${sysdomain}";
-                forwardAgent = true;
-                addKeysToAgent = "yes";
-                extraOptions = {
-                  PubkeyAuthentication = "unbound";
-                };
+                header = "Host *.${sysdomain}";
+                ForwardAgent = true;
+                AddKeysToAgent = "yes";
+                PubkeyAuthentication = "unbound";
               };
               "*" = {
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
-                forwardAgent = false;
-                addKeysToAgent = "no";
-                compression = false;
-                serverAliveInterval = 0;
-                serverAliveCountMax = 3;
-                hashKnownHosts = false;
-                userKnownHostsFile = "~/.ssh/known_hosts";
-                controlMaster = "no";
-                controlPath = "~/.ssh/master-%r@%n:%p";
-                controlPersist = "no";
+                ForwardAgent = false;
+                AddKeysToAgent = "no";
+                Compression = false;
+                ServerAliveInterval = 0;
+                ServerAliveCountMax = 3;
+                HashKnownHosts = false;
+                UserKnownHostsFile = "~/.ssh/known_hosts";
+                ControlMaster = "no";
+                ControlPath = "~/.ssh/master-%r@%n:%p";
+                ControlPersist = "no";
               };
             };
         }
         (mkIf _1passwordAgent.enable {
-          matchBlocks."notSsh" = {
-            match = ''host * exec "test -z $SSH_CONNECTION"'';
-            extraOptions = {
-              IdentityAgent = _1passwordAgent.path;
-            };
+          settings."notSsh" = {
+            header = ''Match host * exec "test -z $SSH_CONNECTION"'';
+            IdentityAgent = _1passwordAgent.path;
           };
         })
       ];
