@@ -6,42 +6,66 @@ let
   userDataset = "${cryptDataset}/user";
   zfs_fs = "zfs_fs";
   optAutosnapshot = "com.sun:autosnapshot";
-in
-{
-  disko.devices =
-    {
-      disk = {
-        nvme0n1 = {
-          type = "disk";
-          device = "/dev/disk/by-id/nvme-CT1000P510SSD5_2525E9C382B2";
-          content = {
-            type = "gpt";
-            partitions = {
-              ESP = {
-                size = "1G";
-                type = "EF00";
-                content = {
-                  type = "filesystem";
-                  format = "vfat";
-                  mountpoint = "/boot";
-                  mountOptions = [ "umask=0077" "nofail" ];
-                };
-              };
-              zfs = {
-                size = "100%";
-                content = {
-                  type = "zfs";
-                  pool = rpool;
-                };
-              };
+
+  # Each NVMe device gets its own 4G ESP plus a ZFS partition. The ESPs are
+  # mounted at distinct mountpoints (`/boot/nvme0`, `/boot/nvme1`). lanzaboote
+  # signs and installs the bootloader to *both* of them on every
+  # `nixos-rebuild` (its primary `boot.loader.efi.efiSysMountPoint` plus
+  # `boot.lanzaboote.extraEfiSysMountPoints`), so the system can boot from
+  # either device if the other fails. The ZFS partitions are combined into a
+  # single mirror vdev (`mode = "mirror"`).
+  mkDisk = { name, id }: {
+    inherit name;
+    value = {
+      type = "disk";
+      device = "/dev/disk/by-id/${id}";
+      content = {
+        type = "gpt";
+        partitions = {
+          ESP = {
+            # lanzaboote stores a full signed UKI (kernel + initrd) per
+            # generation; with `configurationLimit = 8` and this host's large
+            # ZFS + clevis initrd, 4G leaves comfortable headroom and is
+            # negligible on a 512G drive.
+            size = "4G";
+            type = "EF00";
+            content = {
+              type = "filesystem";
+              format = "vfat";
+              mountpoint = "/boot/${name}";
+              mountOptions = [ "umask=0077" "nofail" ];
+            };
+          };
+          zfs = {
+            size = "100%";
+            content = {
+              type = "zfs";
+              pool = rpool;
             };
           };
         };
       };
+    };
+  };
+in
+{
+  disko.devices =
+    {
+      disk = builtins.listToAttrs [
+        (mkDisk {
+          name = "nvme0";
+          id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y706128";
+        })
+        (mkDisk {
+          name = "nvme1";
+          id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y713948";
+        })
+      ];
       zpool =
         {
           ${rpool} = {
             type = "zpool";
+            mode = "mirror";
             rootFsOptions = {
               # https://wiki.archlinux.org/title/Install_Arch_Linux_on_ZFS
               acltype = "posixacl";
@@ -59,6 +83,10 @@ in
                   dnodesize = "auto";
                   encryption = "aes-256-gcm";
                   keyformat = "passphrase";
+                  # The key is supplied unattended by clevis from the TPM at
+                  # boot (see `boot.initrd.clevis` in configuration.nix). The
+                  # `prompt` is the fallback used on the BMC console if the TPM
+                  # ever refuses to release the key.
                   keylocation = "prompt";
                 };
               };

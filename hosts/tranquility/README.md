@@ -1,10 +1,221 @@
-## initial disko setup
+# tranquility: storage
+
+## Root Filesystem
+
+`tranquility` boots unattended from a **mirrored pair of NVMe devices** with a
+**ZFS-native-encrypted** root pool. The encryption key is released by the
+machine's **TPM2** at boot via [clevis], with the ZFS passphrase as a manual
+fallback (entered on the BMC console) if the TPM ever refuses.
+
+- **Confidentiality:** the entire usable filesystem lives under the
+  `tranquility-rpool/crypt` encryption root, so drives that leave the chassis
+  (RMA, disposal, theft of disks) are unreadable.
+- **High availability:** the two M.2s form a single ZFS mirror, and lanzaboote
+  installs + signs the bootloader to *both* ESPs (using
+  `extraEfiSysMountPoints`), so the system boots and runs from either disk
+  alone.
+- **Secure Boot:** the boot chain is signed and verified via [lanzaboote]. Keys
+  are generated and enrolled on first boot.
+- **Disposable rootfs:** nothing here needs backing up; the system is rebuilt
+  from this Nix configuration.
+
+> [!NOTE]
+> By default the TPM seal uses an **empty policy** (no PCR binding). This
+> protects data on disks removed from the machine and survives kernel/firmware
+> updates, but does **not** defend against theft of the whole powered-on machine
+> (it will unlock itself). That is an accepted trade-off for unattended boot.
+> Enabling Secure Boot does not change this on its own --- to additionally
+> resist boot-chain tampering, re-seal the key to PCR 7 (see
+> [Optional: bind the disk key to Secure Boot](#optional-bind-the-disk-key-to-secure-boot-pcr-7)).
+
+[clevis]: https://github.com/latchset/clevis
+[lanzaboote]: https://github.com/nix-community/lanzaboote
+
+## Initial install
+
+These steps run from a NixOS installer **on the target machine** (so clevis can
+talk to the real TPM).
+
+### 1. Identify the NVMe devices
+
+```console
+ls -l /dev/disk/by-id/ | grep nvme
+```
+
+Edit `disko-config.nix` and replace the placeholder NVMe devices with the
+`by-id` path of the second device.
+
+### 2. Seal the ZFS passphrase against the TPM
+
+> [!IMPORTANT]
+> Choose a strong passphrase and **record it in your password manager**. This is
+> the recovery key used to unlock the root filesystem if the TPM is ever
+> unavailable.
+
+The clevis JWE must exist before the configuration evaluates, so generate it
+first:
+
+```console
+nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
+  sh -c "printf '%s' 'YOUR-ZFS-PASSPHRASE' | clevis encrypt tpm2 '{}'" \
+  > hosts/tranquility/tranquility-rpool-crypt.jwe
+```
+
+The resulting `.jwe` is decryptable **only by this host's TPM**, so commit it to
+the repo (same trust model as the TPM-backed SSH host key and agenix secrets).
+
+### 3. Partition, format, and install
 
 ```console
 sudo nix \
   --extra-experimental-features 'nix-command flakes' \
   run 'github:nix-community/disko/latest#disko-install' -- \
-  --write-efi-boot-entries \
   --flake '.#tranquility' \
-  --disk nvme0n1 /dev/disk/by-id/nvme-CT1000P510SSD5_2525E9C382B2
+  --disk nvme0 /dev/disk/by-id/nvme-${NVME0} \
+  --disk nvme1 /dev/disk/by-id/nvme-${NVME1}
 ```
+
+When disko prompts to set the passphrase for the `crypt` dataset, enter the
+**same passphrase** you sealed in step 2.
+
+### 4. Verify unattended boot
+
+Reboot and confirm the pool unlocks with no prompt:
+
+```console
+sudo journalctl -b -u 'clevis-*' --no-pager
+zfs get keystatus,keylocation tranquility-rpool/crypt   # keystatus = available
+```
+
+### 5. Enroll Secure Boot keys
+
+lanzaboote signs the boot chain with keys generated *on the host*
+(`autoGenerateKeys`) and enrolls them via systemd-boot (`autoEnrollKeys`).
+Enrollment only succeeds when the firmware is in **Setup Mode**.
+
+1. In the UEFI firmware (via the BMC) put Secure Boot into **Setup Mode**, which
+   deletes any existing Platform Keys.
+
+   On the ASRockRack B650D4U BIOS, this setting is `Security > Secure Boot >
+   Clear Secure Boot Keys`.
+   
+   > [!IMPORTANT]
+   > Do this *before* the enrollment reboot. It's probably easiest to do this
+   > before the install.
+2. On the **first boot** after install, `generate-sb-keys` runs `sbctl
+   create-keys` (into `/var/lib/sbctl`), then `prepare-sb-auto-enroll` writes the
+   `PK`/`KEK`/`db` auth files to the ESP and re-signs all artifacts.
+3. **Reboot.** With the firmware in Setup Mode, systemd-boot enrolls the keys
+   and Secure Boot becomes active with *your* keys.
+4. Verify:
+
+```console
+bootctl status | grep -i 'secure boot'   # Secure Boot: enabled (user)
+sbctl status
+sbctl verify                             # all ESP artifacts should be signed
+```
+
+> [!WARNING]
+> This box has LSI SAS HBAs. Their option ROMs are typically Microsoft-signed,
+> so `autoEnrollKeys.includeMicrosoftKeys = true` (the default we set) keeps
+> them trusted. Because the system boots from NVMe rather than the HBAs, a
+> blocked option ROM would not stop boot, but leaving the Microsoft keys
+> enrolled avoids surprises. Do **not** set `allowBrickingMyMachine`.
+
+### 6. Provision the TPM-sealed agenix identity
+
+This host's SSH host key lives in the TPM (`services.ssh-tpm-hostkeys`) and
+**cannot** be used by age to decrypt secrets, so agenix uses its own TPM-sealed
+*age* identity (via `age-plugin-tpm`). This is independent of the clevis disk
+key.
+
+> [!IMPORTANT]
+> The host identity for `agenix` is permanently bound to the TPM. If the
+> TPM/motherboard is replaced, regenerate the `age` identity, update
+> `hostPubkey`, and `agenix rekey` again. Nothing is permanently lost because
+> secrets are always recoverable from the 1Password master identity.
+
+Generate the identity **on the host** (it is bound to this machine's TPM). Do
+not include a PIN, so decryption stays unattended:
+
+```console
+sudo install -d -m 0700 /etc/age
+sudo age-plugin-tpm --generate -o /etc/age/host-identity.txt
+sudo chmod 0600 /etc/age/host-identity.txt
+```
+
+Read back the recipient (the `age1tpm1…` string) and put it into
+`configuration.nix` as `age.rekey.hostPubkey`, replacing the
+`age1tpm1qREPLACE_ME` placeholder:
+
+```console
+age-plugin-tpm -y /etc/age/host-identity.txt     # prints: age1tpm1…
+# (also recorded in the `# Recipient:` comment of the identity file)
+```
+
+Then, from your admin machine, re-encrypt this host's secrets to the new
+recipient and rebuild:
+
+```console
+agenix rekey            # or your usual agenix-rekey invocation (e.g. `nix run .#rekey`)
+nixos-rebuild switch --flake '.#tranquility'
+```
+
+> [!NOTE]
+> Until the `age` identity exists and `hostPubkey` is set, secret-dependent 
+> services will fail to start, but the system still boots.
+
+## Verifying boot redundancy
+
+Confirm the system boots from either disk alone (do this once, while you can
+physically access the machine):
+
+1. Power off, physically remove (or disconnect) `nvme0`, power on.
+   - Firmware should fall back to `nvme1`'s `EFI/BOOT/BOOTX64.EFI` (the signed
+     systemd-boot lanzaboote installed there), the TPM unlocks the pool, and the
+     pool imports **degraded** but online.
+2. Power off, reconnect `nvme0`, repeat with `nvme1` removed.
+3. Reconnect both and resilver if needed:
+
+```console
+zpool status tranquility-rpool
+zpool clear tranquility-rpool
+zpool online tranquility-rpool <reconnected-partition>
+```
+
+## Replacing a failed drive
+
+```console
+# Partition the replacement to match (2G ESP + rest ZFS), then:
+zpool replace tranquility-rpool <old-part> /dev/disk/by-id/nvme-<NEW>-part2
+# Re-run the bootloader install so the new ESP gets a signed copy of the
+# bootloader (lanzaboote writes to every ESP in extraEfiSysMountPoints):
+sudo nixos-rebuild boot --flake '.#tranquility'
+```
+
+## Rotating the TPM-sealed key
+
+If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
+(step 2) with the new passphrase and `nixos-rebuild switch`. To change the
+passphrase itself:
+
+```console
+zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
+```
+
+## Optional: bind the disk key to Secure Boot (PCR 7)
+
+The clevis JWE (step 2) uses an empty TPM policy so it survives updates but only
+protects *removed* drives. Once Secure Boot is enrolled and verified, PCR 7 (the
+Secure Boot policy) is stable across kernel updates, so you can re-seal the disk
+key to it --- the TPM then releases the key **only** under your signed boot
+chain, defeating boot-chain tampering while staying unattended:
+
+```console
+printf '%s' 'YOUR-ZFS-PASSPHRASE' | clevis encrypt tpm2 '{"pcr_ids":"7"}' \
+  > hosts/tranquility/tranquility-rpool-crypt.jwe
+nixos-rebuild switch --flake '.#tranquility'
+```
+
+Only do this *after* `bootctl status` reports Secure Boot enabled, and keep the
+passphrase fallback (it still works on the BMC console if PCR 7 ever changes).

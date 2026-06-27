@@ -18,155 +18,162 @@
 
   ############################################################################
   #### INPUTS ################################################################
-  inputs = {
-    # nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
-    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    flake-parts.url = "github:hercules-ci/flake-parts";
+  inputs =
+    {
+      # nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
+      nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+      flake-utils.url = "github:numtide/flake-utils";
+      flake-parts.url = "github:hercules-ci/flake-parts";
 
-    # agenix and agenix-rekey
-    agenix = {
-      url = "github:ryantm/agenix";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        # don't download nix-darwin deps as this flake only contains Linux
-        # configurations.
-        ### NOTE: remove this line to enable nix-darwin support!!! ###
-        darwin.follows = "";
+      # agenix and agenix-rekey
+      agenix = {
+        url = "github:ryantm/agenix";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          # don't download nix-darwin deps as this flake only contains Linux
+          # configurations.
+          ### NOTE: remove this line to enable nix-darwin support!!! ###
+          darwin.follows = "";
+        };
       };
-    };
-    agenix-rekey = {
-      url = "github:oddlama/agenix-rekey";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-parts.follows = "flake-parts";
+      agenix-rekey = {
+        url = "github:oddlama/agenix-rekey";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-parts.follows = "flake-parts";
+        };
       };
-    };
 
-    # for building Rust packages
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
+      # for building Rust packages
+      rust-overlay = {
+        url = "github:oxalica/rust-overlay";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
       };
-    };
 
-    # deploy-rs: for remote deployments
-    deploy-rs = {
-      url = "github:serokell/deploy-rs";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
+      # deploy-rs: for remote deployments
+      deploy-rs = {
+        url = "github:serokell/deploy-rs";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
       };
-    };
 
-    # declarative disk partitioning
-    disko = {
-      url = "github:nix-community/disko/latest";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    home = {
-      url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nixos-hardware.url = "github:nixos/nixos-hardware/master";
-
-    nixos-raspberrypi = {
-      url = "github:hawkw/nixos-raspberrypi?ref=eliza/no-noXlibs";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        nixos-hardware.follows = "nixos-hardware";
+      # declarative disk partitioning
+      disko = {
+        url = "github:nix-community/disko/latest";
+        inputs.nixpkgs.follows = "nixpkgs";
       };
-    };
 
-    utils = {
-      url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
-      inputs.flake-utils.follows = "flake-utils";
-    };
-
-    vu-server = {
-      url = "github:hawkw/vu-server-flake";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
+      home = {
+        url = "github:nix-community/home-manager";
+        inputs.nixpkgs.follows = "nixpkgs";
       };
-    };
 
-    vupdaters = {
-      url = "https://flakehub.com/f/mycoliza/vupdaters/0.1.121.tar.gz";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        vu-server.follows = "vu-server";
-        rust-overlay.follows = "rust-overlay";
+      nixos-hardware.url = "github:nixos/nixos-hardware/master";
+
+      nixos-raspberrypi = {
+        url = "github:hawkw/nixos-raspberrypi?ref=eliza/no-noXlibs";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          nixos-hardware.follows = "nixos-hardware";
+        };
       };
-    };
 
-    # for secureboot support on theseus
-    lanzaboote = {
-      url = "github:nix-community/lanzaboote/v0.4.2";
-
-      # Optional but recommended to limit the size of your system closure.
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "rust-overlay";
-        flake-parts.follows = "flake-parts";
+      utils = {
+        url = "github:gytis-ivaskevicius/flake-utils-plus/v1.4.0";
+        inputs.flake-utils.follows = "flake-utils";
       };
-    };
 
-
-    # fw ectool as configured for FW13 7040 AMD (until patch is upstreamed)
-    fw-ectool = {
-      url = "github:tlvince/ectool.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # # depend on the latest `atuin` in order to enable daemon mode
-    # atuin = {
-    #   url = "github:atuin-sh/atuin/main";
-    #   inputs = {
-    #     nixpkgs.follows = "nixpkgs";
-    #     flake-utils.follows = "flake-utils";
-    #   };
-    # };
-
-    eclssd = {
-      # url = "github:hawkw/eclssd/6de42a256f547bba72bda5274b3d42dc574676e8";
-      url = "https://flakehub.com/f/mycoliza/eclssd/0.1.118.tar.gz";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "rust-overlay";
-        flake-utils.follows = "flake-utils";
+      vu-server = {
+        url = "github:hawkw/vu-server-flake";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
       };
-    };
 
-    ghostty = {
-      url = "github:ghostty-org/ghostty";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
+      vupdaters = {
+        url = "https://flakehub.com/f/mycoliza/vupdaters/0.1.121.tar.gz";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          vu-server.follows = "vu-server";
+          rust-overlay.follows = "rust-overlay";
+        };
       };
-    };
 
-    # Nix formatter in Rust
-    alejandra = {
-      url = "github:kamadorueda/alejandra/3.1.0";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
+      # UEFI Secure Boot support (theseus, tranquility)
+      lanzaboote = {
+        url = "github:nix-community/lanzaboote/v1.1.0";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          rust-overlay.follows = "rust-overlay";
+        };
       };
-    };
 
-    smfc = {
-      url = "github:hawkw/smfc-flake";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
 
-    claude-code = {
-      url = "github:sadjow/claude-code-nix";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
+      # fw ectool as configured for FW13 7040 AMD (until patch is upstreamed)
+      fw-ectool = {
+        url = "github:tlvince/ectool.nix";
+        inputs.nixpkgs.follows = "nixpkgs";
       };
+
+      # # depend on the latest `atuin` in order to enable daemon mode
+      # atuin = {
+      #   url = "github:atuin-sh/atuin/main";
+      #   inputs = {
+      #     nixpkgs.follows = "nixpkgs";
+      #     flake-utils.follows = "flake-utils";
+      #   };
+      # };
+
+      eclssd = {
+        # url = "github:hawkw/eclssd/6de42a256f547bba72bda5274b3d42dc574676e8";
+        url = "https://flakehub.com/f/mycoliza/eclssd/0.1.118.tar.gz";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          rust-overlay.follows = "rust-overlay";
+          flake-utils.follows = "flake-utils";
+        };
+      };
+
+      ghostty = {
+        url = "github:ghostty-org/ghostty";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
+      };
+
+      # Nix formatter in Rust
+      alejandra = {
+        url = "github:kamadorueda/alejandra/3.1.0";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
+      };
+
+      smfc = {
+        url = "github:hawkw/smfc-flake";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
+      claude-code = {
+        url = "github:sadjow/claude-code-nix";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-utils.follows = "flake-utils";
+        };
+      };
+
+      # TPM2.0-backed SSH host keys using ssh-tpm-agent.
+      ssh-tpm-hostkeys = {
+        url = "github:visualphoenix/ssh-tpm-hostkeys";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+        };
+      };
+
     };
-  };
 
   ############################################################################
   #### OUTPUTS ###############################################################
@@ -257,9 +264,11 @@
               inputs.eclssd.nixosModules.default
               inputs.disko.nixosModules.disko
               inputs.smfc.nixosModules.default
+              inputs.ssh-tpm-hostkeys.nixosModules.default
               # agenix
               inputs.agenix.nixosModules.default
               inputs.agenix-rekey.nixosModules.default
+
             ];
           };
 

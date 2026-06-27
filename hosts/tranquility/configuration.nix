@@ -4,7 +4,22 @@ with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
 
-  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC679UGFcXpYScZzpbeC1Zai7ck4tHpKxdp3T6Ri/mcC";
+  # agenix-rekey: this host decrypts its secrets with a TPM-sealed *age*
+  # identity (via age-plugin-tpm), NOT with its SSH host key. The SSH host key
+  # lives in the TPM (`services.ssh-tpm-hostkeys`) and cannot be used by age to
+  # decrypt --- TPMs issue ECDSA/RSA signing keys, which age either can't use as
+  # a recipient (ECDSA) or can't drive for decryption (the key never leaves the
+  # TPM). So secret decryption gets its own TPM-bound age identity, which keeps
+  # the secrets decryptable only on this host's TPM. See README for how to
+  # generate the identity + recipient and fill in the placeholders below.
+  age.rekey.hostPubkey = "age1tpm1qREPLACE_ME"; # TODO: the `age1tpm1…` recipient from `age-plugin-tpm`
+  age.rekey.agePlugins = [ pkgs.age-plugin-tpm ];
+  # The age-plugin-tpm identity stub. It only *references* the TPM-sealed key
+  # (the secret never leaves the TPM), and is created on the host during install
+  # (see README). Using a runtime string path, rather than the SSH host key
+  # default, both clears the `age.identityPaths must be set` assertion and
+  # points decryption at the TPM identity.
+  age.identityPaths = [ "/etc/age/host-identity.txt" ];
 
   profiles = {
     server.enable = true;
@@ -42,6 +57,9 @@ with pkgs; with lib; {
   };
 
   environment.systemPackages = with pkgs; [
+    # age plugin for the TPM-sealed agenix identity (also used at
+    # secret-decryption time during activation).
+    age-plugin-tpm
     fwupd
     # various LSI SAS card thingies
     storcli2
@@ -72,17 +90,60 @@ with pkgs; with lib; {
   #### Boot configuration ####
   boot = {
     loader = {
-      # Use the systemd-boot EFI boot loader.
-      systemd-boot = {
-        enable = true;
-        configurationLimit = 8;
+
+      # Lanzaboote currently replaces the systemd-boot module.
+      # This setting is usually set to true in configuration.nix
+      # generated at installation time. So we force it to false
+      # for now.
+      loader.systemd-boot.enable = mkForce false;
+      efi = {
+        canTouchEfiVariables = true;
+        # Primary ESP; the second disk's ESP is added via
+        # `boot.lanzaboote.extraEfiSysMountPoints` below.
+        efiSysMountPoint = "/boot/nvme0";
       };
-      efi.canTouchEfiVariables = true;
+    };
+
+    # Secure Boot via lanzaboote. lzbt signs the UKI and installs the
+    # bootloader to *every* ESP listed, so the system boots (and verifies)
+    # from either NVMe device. This requires the systemd-based initrd.
+    lanzaboote = {
+      enable = true;
+      pkiBundle = "/var/lib/sbctl";
+      configurationLimit = 8;
+      extraEfiSysMountPoints = [ "/boot/nvme1" ];
+      # Automatically provision the Secure Boot keys on first boot.
+      autoGenerateKeys.enable = true;
+      autoEnrollKeys = {
+        enable = true;
+        # Microsoft keys are included to ensure signed option ROMs (such as the
+        # LSI SAS HBAs in this box) are not locked out.
+        includeMicrosoftKeys = true;
+      };
     };
 
     initrd.supportedFilesystems = [ "zfs" ];
-    # Request ZFS encryption credentials at boot.
-    zfs.requestEncryptionCredentials = true;
+    # systemd-based initrd is required for clevis TPM unlocking and for
+    # lanzaboote's extraEfiSysMountPoints.
+    initrd.systemd.enable = true;
+    # Unattended unlock of the root pool's encryption root from the TPM via
+    # clevis. The JWE seals the ZFS passphrase against *this machine's* TPM
+    # (empty policy, no PCR binding), so it survives kernel/firmware updates and
+    # is only decryptable on this host, which makes it safe to commit. If the
+    # TPM ever refuses, ZFS falls back to prompting for the passphrase, so that
+    # the root FS can still be unlocked manually.
+    #
+    # The JWE is generated on the target machine during install (see README).
+    # Until it has been committed, clevis is disabled and the pool is unlocked
+    # by entering the passphrase at the prompt --- this keeps the configuration
+    # evaluable before the secret exists.
+    initrd.clevis = lib.mkIf (builtins.pathExists ./tranquility-rpool-crypt.jwe) {
+      enable = true;
+      devices."tranquility-rpool/crypt".secretFile = ./tranquility-rpool-crypt.jwe;
+    };
+    # Request ZFS encryption credentials for the root pool's encryption root at
+    # boot (satisfied unattended by clevis, above).
+    zfs.requestEncryptionCredentials = [ "tranquility-rpool/crypt" ];
     # Apparently leaving this on can result in data corruption?
     zfs.forceImportRoot = false;
 
@@ -135,9 +196,12 @@ with pkgs; with lib; {
   };
   # enable ssh early
   systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
-  # start ttyS0 early so that IPMI SoL works
-  systemd.services."serial-getty@ttyS0".wantedBy = [ "multi-user.target" ];
+  # # start ttyS0 early so that IPMI SoL works
+  # systemd.services."serial-getty@ttyS0".wantedBy = [ "multi-user.target" ];
 
+  # TPM 2.0-backed SSH hostkeys using ssh-tpm-agent.
+  services.ssh-tpm-hostkeys.enable = true;
+  services.openssh.enable = true;
 
   users.motd = ''
     ┌┬────────────────┐
