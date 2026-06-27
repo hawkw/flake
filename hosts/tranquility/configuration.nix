@@ -12,7 +12,7 @@ with pkgs; with lib; {
   # TPM). So secret decryption gets its own TPM-bound age identity, which keeps
   # the secrets decryptable only on this host's TPM. See README for how to
   # generate the identity + recipient and fill in the placeholders below.
-  age.rekey.hostPubkey = "age1tpm1qREPLACE_ME"; # TODO: the `age1tpm1…` recipient from `age-plugin-tpm`
+  age.rekey.hostPubkey = "age1tpm1qd2z32tv4z7nz47hjnalx2e5z3yu7rgc8ltqjusnlaka4hcz0jaqcr9hqvy";
   age.rekey.agePlugins = [ pkgs.age-plugin-tpm ];
   # The age-plugin-tpm identity stub. It only *references* the TPM-sealed key
   # (the secret never leaves the TPM), and is created on the host during install
@@ -34,26 +34,26 @@ with pkgs; with lib; {
     zfs.enable = true;
   };
 
-  # age.secrets.hakofoundry-secret = {
-  #   generator.script = "base64";
-  # };
-  # # Generate a file in the .env format
-  # age.secrets.hakofoundry-env = {
-  #   generator = {
-  #     dependencies = {
-  #       inherit (config.age.secrets) hakofoundry-secret;
-  #     };
-  #     script = { pkgs, lib, decrypt, deps, ... }: ''
-  #       printf 'SECRET="%s"\n' $(${decrypt} ${lib.escapeShellArg deps.hakofoundry-secret.file})
-  #     '';
-  #   };
-  # };
-  #
-  # services.hakoFoundry = {
-  #   enable = true;
-  #   secretFilePath = config.age.secrets.hakofoundry-env.path;
-  #   openFirewall = true;
-  # };
+  age.secrets.hakofoundry-secret = {
+    generator.script = "base64";
+  };
+  # Generate a file in the .env format
+  age.secrets.hakofoundry-env = {
+    generator = {
+      dependencies = {
+        inherit (config.age.secrets) hakofoundry-secret;
+      };
+      script = { pkgs, lib, decrypt, deps, ... }: ''
+        printf 'SECRET="%s"\n' $(${decrypt} ${lib.escapeShellArg deps.hakofoundry-secret.file})
+      '';
+    };
+  };
+
+  services.hakoFoundry = {
+    enable = true;
+    secretFilePath = config.age.secrets.hakofoundry-env.path;
+    openFirewall = true;
+  };
 
   environment.systemPackages = with pkgs; [
     # age plugin for the TPM-sealed agenix identity (also used at

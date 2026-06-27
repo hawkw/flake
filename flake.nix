@@ -309,17 +309,17 @@
               };
             in
             {
-              clavius = mkNode {
-                hostname = "clavius";
-                system = "aarch64-linux";
-                extraOpts = { sshOpts = [ "-t" ]; };
-              };
+              # clavius = mkNode {
+              #   hostname = "clavius";
+              #   system = "aarch64-linux";
+              #   extraOpts = { sshOpts = [ "-t" ]; };
+              # };
 
-              tycho = mkNode {
-                hostname = "tycho";
-                system = "aarch64-linux";
-                extraOpts = { sshOpts = [ "-t" ]; };
-              };
+              # tycho = mkNode {
+              #   hostname = "tycho";
+              #   system = "aarch64-linux";
+              #   extraOpts = { sshOpts = [ "-t" ]; };
+              # };
 
               noctis = mkNode { hostname = "noctis"; };
 

@@ -173,14 +173,21 @@ sudo age-plugin-tpm --generate -o /etc/age/host-identity.txt
 sudo chmod 0600 /etc/age/host-identity.txt
 ```
 
-Read back the recipient (the `age1tpm1…` string) and put it into
+Read back the recipient with `--tpm-recipient` and put it into
 `configuration.nix` as `age.rekey.hostPubkey`, replacing the
 `age1tpm1qREPLACE_ME` placeholder:
 
 ```console
-age-plugin-tpm -y /etc/age/host-identity.txt     # prints: age1tpm1…
-# (also recorded in the `# Recipient:` comment of the identity file)
+age-plugin-tpm -y /etc/age/host-identity.txt --tpm-recipient   # prints: age1tpm1…
 ```
+
+> [!IMPORTANT]
+> Using `--tpm-recipient` is necessary to ensure that `age-plugin-tpm` uses the
+> `age1tpm1` prefix rather than `age1tag1` (the prefix for its newer `p256tag`
+> recipient). If the recipient is `age1tag1`, then `agenix rekey` will get
+> confused because it expects the prefix to include the actual name of the age
+> plugin to use, which makes it sad when there is no `age-plugin-tag` on the
+> path.
 
 Then, from your admin machine, re-encrypt this host's secrets to the new
 recipient and rebuild:
