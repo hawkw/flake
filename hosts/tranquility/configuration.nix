@@ -48,7 +48,7 @@ with pkgs; with lib; {
   #     '';
   #   };
   # };
-
+  #
   # services.hakoFoundry = {
   #   enable = true;
   #   secretFilePath = config.age.secrets.hakofoundry-env.path;
@@ -124,7 +124,15 @@ with pkgs; with lib; {
     initrd.supportedFilesystems = [ "zfs" ];
     # systemd-based initrd is required for clevis TPM unlocking and for
     # lanzaboote's extraEfiSysMountPoints.
-    initrd.systemd.enable = true;
+    initrd.systemd = {
+      enable = true;
+      # Allow a root rescue shell in the initrd emergency target. Without this,
+      # a failed pool import (or any stage-1 failure) drops to emergency mode
+      # with root locked, which strands a headless box. This is reachable only
+      # *before* the pool is unlocked, so it exposes no decrypted data. It's
+      # just for debugging, and manually unlocking the pool if necessary.
+      systemd.emergencyAccess = true;
+    };
     # Unattended unlock of the root pool's encryption root from the TPM via
     # clevis. The JWE seals the ZFS passphrase against *this machine's* TPM
     # (empty policy, no PCR binding), so it survives kernel/firmware updates and
@@ -135,8 +143,8 @@ with pkgs; with lib; {
     # The JWE is generated on the running system after first boot (see README);
     # it only needs root TPM access, not Secure Boot enrollment. Until it has
     # been committed, clevis is disabled and the pool is unlocked by entering
-    # the passphrase at the prompt --- this keeps the configuration evaluable
-    # before the secret exists.
+    # the passphrase at the prompt. This keeps the configuration evaluable
+    # before the secret exists, which is necessary for installation.
     initrd.clevis = lib.mkIf (builtins.pathExists ./tranquility-rpool-crypt.jwe) {
       enable = true;
       devices."tranquility-rpool/crypt".secretFile = ./tranquility-rpool-crypt.jwe;
@@ -144,8 +152,9 @@ with pkgs; with lib; {
     # Request ZFS encryption credentials for the root pool's encryption root at
     # boot (satisfied unattended by clevis, above).
     zfs.requestEncryptionCredentials = [ "tranquility-rpool/crypt" ];
-    # Apparently leaving this on can result in data corruption?
-    zfs.forceImportRoot = false;
+    # Force-import the root pool at boot (`zpool import -f`). This is fine to do
+    # for the root zpool, as it is not shared over the network.
+    zfs.forceImportRoot = true;
 
     kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
     kernelParams = [
