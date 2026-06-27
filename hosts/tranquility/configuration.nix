@@ -13,7 +13,6 @@ with pkgs; with lib; {
   # the secrets decryptable only on this host's TPM. See README for how to
   # generate the identity + recipient and fill in the placeholders below.
   age.rekey.hostPubkey = "age1tpm1qd2z32tv4z7nz47hjnalx2e5z3yu7rgc8ltqjusnlaka4hcz0jaqcr9hqvy";
-  age.rekey.agePlugins = [ pkgs.age-plugin-tpm ];
   # The age-plugin-tpm identity stub. It only *references* the TPM-sealed key
   # (the secret never leaves the TPM), and is created on the host during install
   # (see README). Using a runtime string path, rather than the SSH host key

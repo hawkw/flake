@@ -34,11 +34,23 @@ with lib;
           agePlugins = with pkgs; [
             age-plugin-tpm
             age-plugin-1p
-            _1password-cli
-
-            age-plugin-tpm
           ];
         };
+
+        # The agenix activation script decrypts secrets with a minimal PATH that
+        # excludes `environment.systemPackages`, so upstream `age` cannot find
+        # plugin binaries when a host decrypts with a plugin-based identity,
+        # such as `age-plugin-tpm``. Using `age.rekey.agePlugins` only puts
+        # plugins on PATH for the rekeying step, not for host-side activation
+        # (see oddlama/agenix-rekey#154 and #155). Wrap `age` so the configured
+        # plugins are on its PATH at runtime too.
+        age.ageBin = getExe (pkgs.writeShellApplication {
+          name = "age-wrapped";
+          runtimeInputs = with pkgs; [ age ] ++ config.age.rekey.agePlugins;
+          text = ''
+            exec age "$@"
+          '';
+        });
       }
       # If 1Password is enabled, add the 1password age plugin.
       (mkIf config.programs._1password.enable {
