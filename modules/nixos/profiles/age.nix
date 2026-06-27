@@ -11,7 +11,7 @@ with lib;
   config = mkIf cfg.enable (
     mkMerge [
       {
-        environment.systemPackages = [ pkgs.rage ];
+        environment.systemPackages = with pkgs; [ rage age-plugin-tpm ];
         age.rekey = {
           # The path to the master identity used for decryption. See the
           # option's description for more information.
@@ -26,9 +26,18 @@ with lib;
           # ./secrets
           localStorageDir = ../../.. + "/secrets/rekeyed/${config.networking.hostName}";
 
-          # The path where all generated secrets should be stored by default. If set, this automatically sets age.secrets.<name>.rekeyFile to a default value in this directory, for any secret that defines a generator.
+          # The path where all generated secrets should be stored by default. If
+          # set, this automatically sets age.secrets.<name>.rekeyFile to a
+          # default value in this directory, for any secret that defines a
+          # generator.
           generatedSecretsDir = ../../.. + "/secrets/generated";
-          agePlugins = [ pkgs.age-plugin-1p pkgs._1password-cli ];
+          agePlugins = with pkgs; [
+            age-plugin-tpm
+            age-plugin-1p
+            _1password-cli
+
+            age-plugin-tpm
+          ];
         };
       }
       # If 1Password is enabled, add the 1password age plugin.
