@@ -15,5 +15,11 @@ in
     };
 
     boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+    # Use a statically-linked qemu so the binfmt registration carries the `F`
+    # (fix-binary) flag. Without this, the interpreter is registered as a path
+    # (`/run/binfmt/aarch64-linux`, flag `P`) that the kernel resolves at exec
+    # time. That fails inside Nix's build sandbox, since it doesn't bind-mount
+    # `/run/binfmt`.
+    boot.binfmt.preferStaticEmulators = true;
   };
 }
