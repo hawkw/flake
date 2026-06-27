@@ -95,7 +95,7 @@ with pkgs; with lib; {
       # This setting is usually set to true in configuration.nix
       # generated at installation time. So we force it to false
       # for now.
-      loader.systemd-boot.enable = mkForce false;
+      systemd-boot.enable = mkForce false;
       efi = {
         canTouchEfiVariables = true;
         # Primary ESP; the second disk's ESP is added via
