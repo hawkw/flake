@@ -59,6 +59,7 @@ with pkgs; with lib; {
     # age plugin for the TPM-sealed agenix identity (also used at
     # secret-decryption time during activation).
     age-plugin-tpm
+    sbctl
     fwupd
     # various LSI SAS card thingies
     storcli2

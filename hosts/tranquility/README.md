@@ -75,11 +75,12 @@ expected until step 3.
 ### 3. Seal the passphrase against the TPM
 
 Run this **after the first boot, on the installed system** (not the installer).
-The seal only needs root access to the TPM (`/dev/tpmrm0` is `root:tss`).
+This must be run as root, as the seal requires root access to the TPM
+(`/dev/tpmrm0` is `root:tss`).
+
 ```console
-read -rs RPOOL_PASSPHRASE      # type the passphrase from step 2 (input hidden)
 sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
-  sh -c "printf '%s' '$RPOOL_PASSPHRASE' | clevis encrypt tpm2 '{}'" \
+  sh -c "printf '%s' $RPOOL_PASSPHRASE | clevis encrypt tpm2 '{}'" \
   > hosts/tranquility/tranquility-rpool-crypt.jwe
 ```
 
