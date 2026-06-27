@@ -178,7 +178,7 @@ nixos-rebuild switch --flake '.#tranquility'
 > Until the `age` identity exists and `hostPubkey` is set, secret-dependent 
 > services will fail to start, but the system still boots.
 
-## Verifying boot redundancy
+### Optional: verifying boot redundancy
 
 Confirm the system boots from either disk alone (do this once, while you can
 physically access the machine):
@@ -196,32 +196,12 @@ zpool clear tranquility-rpool
 zpool online tranquility-rpool <reconnected-partition>
 ```
 
-## Replacing a failed drive
-
-```console
-# Partition the replacement to match (2G ESP + rest ZFS), then:
-zpool replace tranquility-rpool <old-part> /dev/disk/by-id/nvme-<NEW>-part2
-# Re-run the bootloader install so the new ESP gets a signed copy of the
-# bootloader (lanzaboote writes to every ESP in extraEfiSysMountPoints):
-sudo nixos-rebuild boot --flake '.#tranquility'
-```
-
-## Rotating the TPM-sealed key
-
-If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
-(step 2) with the new passphrase and `nixos-rebuild switch`. To change the
-passphrase itself:
-
-```console
-zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
-```
-
-## Optional: bind the disk key to Secure Boot (PCR 7)
+### Optional: bind the disk key to Secure Boot (PCR 7)
 
 The clevis JWE (step 2) uses an empty TPM policy so it survives updates but only
 protects *removed* drives. Once Secure Boot is enrolled and verified, PCR 7 (the
 Secure Boot policy) is stable across kernel updates, so you can re-seal the disk
-key to it --- the TPM then releases the key **only** under your signed boot
+key to it. The TPM then releases the key **only** under your signed boot
 chain, defeating boot-chain tampering while staying unattended:
 
 ```console
@@ -232,3 +212,25 @@ nixos-rebuild switch --flake '.#tranquility'
 
 Only do this *after* `bootctl status` reports Secure Boot enabled, and keep the
 passphrase fallback (it still works on the BMC console if PCR 7 ever changes).
+
+## Operations
+
+### Replacing a failed drive
+
+```console
+# Partition the replacement to match (4G ESP + rest ZFS), then:
+zpool replace tranquility-rpool <old-part> /dev/disk/by-id/nvme-<NEW>-part2
+# Re-run the bootloader install so the new ESP gets a signed copy of the
+# bootloader (lanzaboote writes to every ESP in extraEfiSysMountPoints):
+sudo nixos-rebuild boot --flake '.#tranquility'
+```
+
+### Rotating the TPM-sealed key
+
+If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
+(step 2) with the new passphrase and `nixos-rebuild switch`. To change the
+passphrase itself:
+
+```console
+zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
+```

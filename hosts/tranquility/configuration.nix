@@ -131,7 +131,7 @@ with pkgs; with lib; {
       # with root locked, which strands a headless box. This is reachable only
       # *before* the pool is unlocked, so it exposes no decrypted data. It's
       # just for debugging, and manually unlocking the pool if necessary.
-      systemd.emergencyAccess = true;
+      emergencyAccess = true;
     };
     # Unattended unlock of the root pool's encryption root from the TPM via
     # clevis. The JWE seals the ZFS passphrase against *this machine's* TPM
