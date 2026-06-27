@@ -34,27 +34,26 @@ with pkgs; with lib; {
     zfs.enable = true;
   };
 
+  # age.secrets.hakofoundry-secret = {
+  #   generator.script = "base64";
+  # };
+  # # Generate a file in the .env format
+  # age.secrets.hakofoundry-env = {
+  #   generator = {
+  #     dependencies = {
+  #       inherit (config.age.secrets) hakofoundry-secret;
+  #     };
+  #     script = { pkgs, lib, decrypt, deps, ... }: ''
+  #       printf 'SECRET="%s"\n' $(${decrypt} ${lib.escapeShellArg deps.hakofoundry-secret.file})
+  #     '';
+  #   };
+  # };
 
-  age.secrets.hakofoundry-secret = {
-    generator.script = "base64";
-  };
-  # Generate a file in the .env format
-  age.secrets.hakofoundry-env = {
-    generator = {
-      dependencies = {
-        inherit (config.age.secrets) hakofoundry-secret;
-      };
-      script = { pkgs, lib, decrypt, deps, ... }: ''
-        printf 'SECRET="%s"\n' $(${decrypt} ${lib.escapeShellArg deps.hakofoundry-secret.file})
-      '';
-    };
-  };
-
-  services.hakoFoundry = {
-    enable = true;
-    secretFilePath = config.age.secrets.hakofoundry-env.path;
-    openFirewall = true;
-  };
+  # services.hakoFoundry = {
+  #   enable = true;
+  #   secretFilePath = config.age.secrets.hakofoundry-env.path;
+  #   openFirewall = true;
+  # };
 
   environment.systemPackages = with pkgs; [
     # age plugin for the TPM-sealed agenix identity (also used at
