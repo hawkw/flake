@@ -33,8 +33,12 @@ fallback (entered on the BMC console) if the TPM ever refuses.
 
 ## Initial install
 
-These steps run from a NixOS installer **on the target machine** (so clevis can
-talk to the real TPM).
+uns from a NixOS installer on the target machine. The
+TPM-sealing step (step 3) runs **after first boot, on the installed system** ---
+there is no need to seal against the TPM from the installer, because the
+configuration evaluates fine without the JWE (clevis is gated on
+`builtins.pathExists` and the pool simply prompts for the passphrase until the
+JWE exists).
 
 ### 1. Identify the NVMe devices
 
@@ -43,28 +47,15 @@ ls -l /dev/disk/by-id/ | grep nvme
 ```
 
 Edit `disko-config.nix` and replace the placeholder NVMe devices with the
-`by-id` path of the second device.
+`by-id` paths of the two devices.
 
-### 2. Seal the ZFS passphrase against the TPM
+### 2. Partition, format, and install
 
 > [!IMPORTANT]
-> Choose a strong passphrase and **record it in your password manager**. This is
-> the recovery key used to unlock the root filesystem if the TPM is ever
-> unavailable.
-
-The clevis JWE must exist before the configuration evaluates, so generate it
-first:
-
-```console
-nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
-  sh -c "printf '%s' 'YOUR-ZFS-PASSPHRASE' | clevis encrypt tpm2 '{}'" \
-  > hosts/tranquility/tranquility-rpool-crypt.jwe
-```
-
-The resulting `.jwe` is decryptable **only by this host's TPM**, so commit it to
-the repo (same trust model as the TPM-backed SSH host key and agenix secrets).
-
-### 3. Partition, format, and install
+> Choose a strong passphrase for the `crypt` dataset and **record it in your
+> password manager**. It is both the value sealed into the TPM (step 3) and the
+> recovery key used to unlock the root filesystem on the BMC console if the TPM
+> is ever unavailable.
 
 ```console
 sudo nix \
@@ -75,8 +66,30 @@ sudo nix \
   --disk nvme1 /dev/disk/by-id/nvme-${NVME1}
 ```
 
-When disko prompts to set the passphrase for the `crypt` dataset, enter the
-**same passphrase** you sealed in step 2.
+Enter the passphrase when disko prompts for the `crypt` dataset. No JWE exists
+yet, so the first boot will prompt for this passphrase on the console**. This is
+expected until step 3.
+
+## Subsequent Setup
+
+### 3. Seal the passphrase against the TPM
+
+Run this **after the first boot, on the installed system** (not the installer).
+The seal only needs root access to the TPM (`/dev/tpmrm0` is `root:tss`).
+```console
+read -rs RPOOL_PASSPHRASE      # type the passphrase from step 2 (input hidden)
+sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
+  sh -c "printf '%s' '$RPOOL_PASSPHRASE' | clevis encrypt tpm2 '{}'" \
+  > hosts/tranquility/tranquility-rpool-crypt.jwe
+```
+
+The resulting `.jwe` is decryptable **only by this host's TPM**, so commit it to
+the repo (same trust model as the TPM-backed SSH host key and agenix secrets),
+then rebuild to activate unattended unlock:
+
+```console
+nixos-rebuild switch --flake '.#tranquility'
+```
 
 ### 4. Verify unattended boot
 

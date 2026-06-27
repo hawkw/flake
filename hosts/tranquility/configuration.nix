@@ -133,10 +133,11 @@ with pkgs; with lib; {
     # TPM ever refuses, ZFS falls back to prompting for the passphrase, so that
     # the root FS can still be unlocked manually.
     #
-    # The JWE is generated on the target machine during install (see README).
-    # Until it has been committed, clevis is disabled and the pool is unlocked
-    # by entering the passphrase at the prompt --- this keeps the configuration
-    # evaluable before the secret exists.
+    # The JWE is generated on the running system after first boot (see README);
+    # it only needs root TPM access, not Secure Boot enrollment. Until it has
+    # been committed, clevis is disabled and the pool is unlocked by entering
+    # the passphrase at the prompt --- this keeps the configuration evaluable
+    # before the secret exists.
     initrd.clevis = lib.mkIf (builtins.pathExists ./tranquility-rpool-crypt.jwe) {
       enable = true;
       devices."tranquility-rpool/crypt".secretFile = ./tranquility-rpool-crypt.jwe;
