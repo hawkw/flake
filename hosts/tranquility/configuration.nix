@@ -98,9 +98,11 @@ with pkgs; with lib; {
       systemd-boot.enable = mkForce false;
       efi = {
         canTouchEfiVariables = true;
-        # Primary ESP; the second disk's ESP is added via
+        # Primary ESP at the standard `/boot` mountpoint so `sbctl`/`bootctl`
+        # can find it (they only probe `/efi`, `/boot`, `/boot/efi` by default).
+        # The second disk's ESP is added via
         # `boot.lanzaboote.extraEfiSysMountPoints` below.
-        efiSysMountPoint = "/boot/nvme0";
+        efiSysMountPoint = "/boot";
       };
     };
 
@@ -111,7 +113,7 @@ with pkgs; with lib; {
       enable = true;
       pkiBundle = "/var/lib/sbctl";
       configurationLimit = 8;
-      extraEfiSysMountPoints = [ "/boot/nvme1" ];
+      extraEfiSysMountPoints = [ "/boot2" ];
       # Automatically provision the Secure Boot keys on first boot.
       autoGenerateKeys.enable = true;
       autoEnrollKeys = {
@@ -158,16 +160,6 @@ with pkgs; with lib; {
     zfs.forceImportRoot = true;
 
     kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
-    kernelParams = [
-      # console on ttyS0 to try and make IPMI SOL work...
-      # UPDATE: IT TURNS OUT THAT IPMI SOL DOES NOT WORK
-      # "console=tty0"
-      # "console=ttyS0,115200n8"
-
-      # TODO(eliza): this could be a static IP so that we don't depend on DHCP
-      # working to boot...
-      "ip=dhcp"
-    ];
 
     # additional kernel modules
     initrd.availableKernelModules = [

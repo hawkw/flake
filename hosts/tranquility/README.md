@@ -118,7 +118,7 @@ Enrollment only succeeds when the firmware is in **Setup Mode**.
    > before the install.
 2. On the **first boot** after install, `generate-sb-keys` runs `sbctl
    create-keys` (into `/var/lib/sbctl`), then `prepare-sb-auto-enroll` writes the
-   `PK`/`KEK`/`db` auth files to the ESP and re-signs all artifacts.
+   `PK`/`KEK`/`db` auth files to the primary ESP and re-signs all artifacts.
 3. **Reboot.** With the firmware in Setup Mode, systemd-boot enrolls the keys
    and Secure Boot becomes active with *your* keys.
 4. Verify:
@@ -128,6 +128,21 @@ bootctl status | grep -i 'secure boot'   # Secure Boot: enabled (user)
 sbctl status
 sbctl verify                             # all ESP artifacts should be signed
 ```
+
+> [!NOTE]
+> The auto-enroll path stages the keys only on the primary ESP (`/boot`),
+> and only takes effect if the firmware boots from that ESP while in Setup Mode.
+> If you're still in Setup Mode after the reboot, enroll directly instead.
+>  `sbctl enroll-keys`  writes the keys to the firmware regardless of which ESP
+> booted, and only needs the ESP at the standard `/boot` (which is why it is mounted there):
+>
+> ```console
+> sudo sbctl enroll-keys --microsoft # --microsoft keeps option-ROM keys trusted
+> sudo bootctl status | grep -i 'secure boot'
+> ```
+>
+> Then reboot, and if the firmware shows Secure Boot as `disabled (setup)` even
+> after keys are present, toggle Secure Boot **on** in the BIOS.
 
 > [!WARNING]
 > This box has LSI SAS HBAs. Their option ROMs are typically Microsoft-signed,

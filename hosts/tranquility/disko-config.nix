@@ -7,14 +7,13 @@ let
   zfs_fs = "zfs_fs";
   optAutosnapshot = "com.sun:autosnapshot";
 
-  # Each NVMe device gets its own 4G ESP plus a ZFS partition. The ESPs are
-  # mounted at distinct mountpoints (`/boot/nvme0`, `/boot/nvme1`). lanzaboote
-  # signs and installs the bootloader to *both* of them on every
-  # `nixos-rebuild` (its primary `boot.loader.efi.efiSysMountPoint` plus
+  # Each NVMe device gets its own 4G ESP plus a ZFS partition. lanzaboote signs
+  # and installs the bootloader to *both* ESPs on every `nixos-rebuild` (its
+  # primary `boot.loader.efi.efiSysMountPoint` plus
   # `boot.lanzaboote.extraEfiSysMountPoints`), so the system can boot from
   # either device if the other fails. The ZFS partitions are combined into a
   # single mirror vdev (`mode = "mirror"`).
-  mkDisk = { name, id }: {
+  mkDisk = { name, id, esp }: {
     inherit name;
     value = {
       type = "disk";
@@ -32,7 +31,7 @@ let
             content = {
               type = "filesystem";
               format = "vfat";
-              mountpoint = "/boot/${name}";
+              mountpoint = esp;
               mountOptions = [ "umask=0077" "nofail" ];
             };
           };
@@ -55,10 +54,12 @@ in
         (mkDisk {
           name = "nvme0";
           id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y706128";
+          esp = "/boot";
         })
         (mkDisk {
           name = "nvme1";
           id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y713948";
+          esp = "/boot2";
         })
       ];
       zpool =
