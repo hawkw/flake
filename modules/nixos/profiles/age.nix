@@ -80,10 +80,7 @@ with lib;
         assertions = [
           {
             assertion = config.security.tpm2.enable;
-            message = ''
-              TPM 2.0 support must be enabled in order to use TPM-sealed
-              age host identities.
-            '';
+            message = "`security.tpm2.enable` must be `true` in order to use TPM-sealed age host identities.";
           }
         ];
         # Point decryption at the TPM identity stub. The stub only *references*
