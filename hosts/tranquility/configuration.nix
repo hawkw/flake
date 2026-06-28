@@ -145,41 +145,6 @@ with pkgs; with lib; {
     zfs.forceImportRoot = true;
 
     kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
-
-    # additional kernel modules
-    initrd.availableKernelModules = [
-      "usb_storage"
-      "sd_mod"
-      # enable initrd kernel modules for network adapters.
-      #
-      # these can be found using `sudo lspci -v -nn -d '::0200'` to find Ethernet
-      # controllers and `sudo lscpi -v -nn -d '::0280'` to find wireless
-      # controllers, and then looking for the "Kernel driver in use" line.
-      "igb" # Intel GigaBit Ethernet
-      "iwlwifi" # Intel WiFi
-      "bnxt_en" # Broadcom NetExtreme
-      # other network adapters. these aren't currently present on my system, but
-      # let's enable them anyway in case it grows additional hardware
-      # later.abort
-      "thunderbolt"
-      "usbnet"
-      "r8152"
-      "igc"
-      "cdc_ether"
-    ];
-    initrd.network = {
-      enable = true;
-      # ssh = {
-      #   enable = true;
-      #   port = 22;
-      #   authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
-      #   # # WARNING: these must actually exist :)
-      #   # hostKeys = [
-      #   #   "/etc/ssh/ssh_host_rsa_key"
-      #   #   "/etc/ssh/ssh_host_ed25519_key"
-      #   # ];
-      # };
-    };
   };
   # enable ssh early
   systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
