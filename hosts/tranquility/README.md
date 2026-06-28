@@ -156,7 +156,8 @@ sbctl verify                             # all ESP artifacts should be signed
 This host's SSH host key lives in the TPM (`services.ssh-tpm-hostkeys`) and
 **cannot** be used by age to decrypt secrets, so agenix uses its own TPM-sealed
 *age* identity (via `age-plugin-tpm`). This is independent of the clevis disk
-key.
+key, and is enabled by `profiles.age.tpmHostIdentity.enable = true` in
+`configuration.nix`.
 
 > [!IMPORTANT]
 > The host identity for `agenix` is permanently bound to the TPM. If the
@@ -164,8 +165,14 @@ key.
 > `hostPubkey`, and `agenix rekey` again. Nothing is permanently lost because
 > secrets are always recoverable from the 1Password master identity.
 
-Generate the identity **on the host** (it is bound to this machine's TPM). Do
-not include a PIN, so decryption stays unattended:
+With `profiles.age.tpmHostIdentity` enabled, the `age-host-identity.service`
+systemd unit generates `/etc/age/host-identity.txt` automatically on first boot
+if the host does not already have one (it is sealed to this machine's TPM, with
+no PIN, so decryption stays unattended). You only need to read back its
+recipient.
+
+If you want to generate it by hand instead (e.g. before the first rebuild has
+brought the service in), the equivalent is:
 
 ```console
 sudo install -d -m 0700 /etc/age
@@ -175,7 +182,7 @@ sudo chmod 0600 /etc/age/host-identity.txt
 
 Read back the recipient with `--tpm-recipient` and put it into
 `configuration.nix` as `age.rekey.hostPubkey`, replacing the
-`age1tpm1qREPLACE_ME` placeholder:
+`age1tpm1qREPLACE_ME` placeholder (the service also prints it to its journal):
 
 ```console
 age-plugin-tpm -y /etc/age/host-identity.txt --tpm-recipient   # prints: age1tpm1…
