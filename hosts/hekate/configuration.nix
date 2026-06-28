@@ -7,25 +7,28 @@
 
   age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMu+TAtHZlbC9+dXzt57UwlTz2ghsXfSac4qdiRDy5tr";
 
-  profiles =
-    {
-      docs.enable = true;
-      server.enable = true;
-      desktop = {
-        gnome3.enable = true;
-      };
-      observability = {
-        enable = true;
-        snmp.enable = true;
-      };
-      # enable the correct perf tools for this kernel version
-      perftools.enable = true;
-      vu-dials.enable = false;
-      zfs.enable = true;
-
-      arm-cross-dev.enable = true;
-      nix-ld.enable = true;
+  profiles = {
+    age = {
+      enable = true;
+      tpmHostIdentity.enable = true;
     };
+    docs.enable = true;
+    server.enable = true;
+    desktop = {
+      gnome3.enable = true;
+    };
+    observability = {
+      enable = true;
+      snmp.enable = true;
+    };
+    # enable the correct perf tools for this kernel version
+    perftools.enable = true;
+    vu-dials.enable = false;
+    zfs.enable = true;
+
+    arm-cross-dev.enable = true;
+    nix-ld.enable = true;
+  };
 
   hardware = {
     probes = {
@@ -61,8 +64,10 @@
     };
 
     initrd.supportedFilesystems = [ "zfs" ];
+    # Root zpool is not encrypted.
     zfs.requestEncryptionCredentials = false;
-    # Apparently leaving this on can result in data corruption?
+    # Force-import the root pool at boot (`zpool import -f`). This is fine to do
+    # for the root zpool, as it is not shared over the network.
     zfs.forceImportRoot = false;
 
     kernelModules = [ "bnxt_en" "e1000e" "alx" "r8169" "igb" "cdc_ether" "r8152" ];
@@ -71,40 +76,14 @@
     kernelParams = [
       "ip=dhcp"
     ];
-
-    # additional kernel modules
-    initrd.availableKernelModules = [
-      "usb_storage"
-      "sd_mod"
-      # enable initrd kernel modules for network adapters.
-      #
-      # these can be found using `sudo lspci -v -nn -d '::0200'` to find Ethernet
-      # controllers and `sudo lscpi -v -nn -d '::0280'` to find wireless
-      # controllers, and then looking for the "Kernel driver in use" line.
-      "igb" # Intel GigaBit Ethernet
-      "iwlwifi" # Intel WiFi
-      "bnxt_en" # Broadcom NetExtreme
-      # other network adapters. these aren't currently present on my system, but
-      # let's enable them anyway in case it grows additional hardware
-      # later.abort
-      "thunderbolt"
-      "usbnet"
-      "r8152"
-      "igc"
-      "cdc_ether"
-    ];
-    initrd.network = {
+    initrd.systemd = {
       enable = true;
-      # ssh = {
-      #   enable = true;
-      #   port = 22;
-      #   authorizedKeys = config.users.users.eliza.openssh.authorizedKeys.keys;
-      #   # WARNING: these must actually exist :)
-      #   hostKeys = [
-      #     "/etc/ssh/ssh_host_rsa_key"
-      #     "/etc/ssh/ssh_host_ed25519_key"
-      #   ];
-      # };
+      # Allow a root rescue shell in the initrd emergency target. Without this,
+      # a failed pool import (or any stage-1 failure) drops to emergency mode
+      # with root locked, which strands a headless box. This is reachable only
+      # *before* the pool is unlocked, so it exposes no decrypted data. It's
+      # just for debugging, and manually unlocking the pool if necessary.
+      emergencyAccess = true;
     };
   };
 
