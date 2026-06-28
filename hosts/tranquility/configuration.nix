@@ -70,52 +70,6 @@ with pkgs; with lib; {
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
     useDHCP = false;
-
-    # LACP on 10GbE interfaces
-    # See: https://wiki.nixos.org/wiki/Networking#Link_aggregation
-    networkmanager.ensureProfiles.profiles =
-      let
-        bondName = "bond0";
-        mkPort =
-          let
-            controller = bondName;
-            type = "ethernet";
-            port-type = "bond";
-          in
-          { id, interface-name }: {
-            "${id}" = {
-              connection = {
-                inherit id port-type type interface-name controller;
-              };
-            };
-          };
-      in
-      {
-        "Bond connection 1" = {
-          bond = {
-            # IEEE 802.3ad Dynamic link aggregation. Requires
-            mode = "802.3ad";
-            miimon = "100"; # Monitor MII link every 100ms
-            xmit_hash_policy = "layer3+4"; # IP and TCP/UDP hash
-          };
-          connection = {
-            id = "Bond connection 1";
-            # this has to match the 'controller' value for the individual
-            # connections, below.
-            interface-name = bondName;
-            type = "bond";
-          };
-          ipv4 = {
-            method = "auto";
-          };
-          ipv6 = {
-            addr-gen-mode = "stable-privacy";
-            method = "auto";
-          };
-          proxy = { };
-        };
-      } // mkPort { id = "${bondName} port 1"; interface-name = "enp11s0f0np0"; }
-      // mkPort { id = "${bondName} port 2"; interface-name = "enp11s0f1np1"; };
   };
 
   #### Boot configuration ####
