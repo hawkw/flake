@@ -31,13 +31,13 @@
   };
 
   hardware = {
+    tpm.enable = true;
     probes = {
       cmsis-dap.enable = true;
       espressif.enable = true;
       st-link.enable = true;
     };
   };
-
 
   #### System configuration ####
   networking = {
