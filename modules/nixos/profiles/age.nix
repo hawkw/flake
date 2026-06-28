@@ -75,8 +75,17 @@ with lib;
           '';
         });
       }
-      # TPM-sealed *age* host identity. Opt-in per host via `profiles.age.tpm`.
+      # TPM-sealed *age* host identity.
       (mkIf cfg.tpmHostIdentity.enable {
+        assertions = [
+          {
+            assertion = config.security.tpm2.enable;
+            message = ''
+              TPM 2.0 support must be enabled in order to use TPM-sealed
+              age host identities.
+            '';
+          }
+        ];
         # Point decryption at the TPM identity stub. The stub only *references*
         # the TPM-sealed key (the secret never leaves the TPM); setting this,
         # rather than relying on the SSH-host-key default, also clears the
