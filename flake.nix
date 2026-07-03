@@ -66,6 +66,16 @@
         inputs.nixpkgs.follows = "nixpkgs";
       };
 
+      # declarative, non-destructive ZFS dataset management for Disko.
+      disko-zfs = {
+        url = "github:numtide/disko-zfs";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-parts.follows = "flake-parts";
+          disko.follows = "disko";
+        };
+      };
+
       home = {
         url = "github:nix-community/home-manager";
         inputs.nixpkgs.follows = "nixpkgs";
@@ -263,6 +273,7 @@
               inputs.vupdaters.nixosModules.default
               inputs.eclssd.nixosModules.default
               inputs.disko.nixosModules.disko
+              inputs.disko-zfs.nixosModules.default
               inputs.smfc.nixosModules.default
               inputs.ssh-tpm-hostkeys.nixosModules.default
               # agenix
