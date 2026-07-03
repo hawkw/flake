@@ -13,7 +13,7 @@ let
   # `boot.lanzaboote.extraEfiSysMountPoints`), so the system can boot from
   # either device if the other fails. The ZFS partitions are combined into a
   # single mirror vdev (`mode = "mirror"`).
-  mkDisk = { name, id, esp }: {
+  mkBootDisk = { name, id, esp }: {
     inherit name;
     value = {
       type = "disk";
@@ -55,12 +55,12 @@ in
   disko.devices =
     {
       disk = builtins.listToAttrs [
-        (mkDisk {
+        (mkBootDisk {
           name = "nvme0";
           id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y706128";
           esp = "/boot";
         })
-        (mkDisk {
+        (mkBootDisk {
           name = "nvme1";
           id = "nvme-SAMSUNG_MZVL2512HCJQ-00BH7_S640NX0Y713948";
           esp = "/boot2";

@@ -264,3 +264,82 @@ passphrase itself:
 ```console
 zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
 ```
+
+## Storage pool setup
+
+list SAS drives:
+
+```console
+$ lsblk -o NAME,VENDOR,MODEL,SERIAL,WWN -S
+NAME VENDOR   MODEL            SERIAL               WWN
+sda  SEAGATE  ST16000NM004J    ZR5DWPQ40000W3257HRN 0x5000c500da9d0c27
+sdb  SEAGATE  ST16000NM004J    ZR5CGT060000C2127EAG 0x5000c500da3bc09f
+sdc  SEAGATE  XS960LE70124     HSF030NS0000822150Z3 0x5000c500a18fae2b
+sdd  SEAGATE  ST16000NM004J    ZR5CMG610000C3039SWZ 0x5000c500da3be65b
+sde  NTAPCSSD X382_S1643960ATE S57SNA0R205377       0x5002538b012dda50
+sdf  SEAGATE  ST960FM0003      Z87130ES0000822150Z3 0x5000c50030186723
+sdg  WDC      WUH721816AL5204  2CHMU7PP             0x5000cca2a15c6554
+sdh  WDC      WUH721816AL5204  2CHNGUYP             0x5000cca2a15d9a7c
+sdi  WDC      WUH721816AL5204  2CHLHS6N             0x5000cca2a15a0534
+sdj  NTAPCSSD X382_S1643960ATE S57SNA0R205376       0x5002538b012dda40
+sdk  SEAGATE  ST960FM0003      Z87130AR0000822150Z3 0x5000c50030186713
+```
+
+Creating the zpool:
+
+```console
+sudo zpool create \
+  -o ashift=12 \
+  -o autoreplace=on \
+  -O compression=lz4 \
+  -O atime=off \
+  -O xattr=sa \
+  -O acltype=posixacl \
+  moonpool \
+  raidz2 \
+    /dev/disk/by-id/wwn-0x5000c500da9d0c27 \
+    /dev/disk/by-id/wwn-0x5000c500da3bc09f \
+    /dev/disk/by-id/wwn-0x5000c500da3be65b \
+    /dev/disk/by-id/wwn-0x5000cca2a15c6554 \
+    /dev/disk/by-id/wwn-0x5000cca2a15d9a7c \
+    /dev/disk/by-id/wwn-0x5000cca2a15a0534 \
+  special raidz2 \
+    /dev/disk/by-id/wwn-0x5000c50030186723 \
+    /dev/disk/by-id/wwn-0x5000c50030186713 \
+    /dev/disk/by-id/wwn-0x5002538b012dda50 \
+    /dev/disk/by-id/wwn-0x5002538b012dda40 \
+  spare \
+    /dev/disk/by-id/wwn-0x5000c500a18fae2b
+```
+
+ok it works 
+
+```console
+eliza@tranquility ~/flake $ zpool list && zpool status moonpool
+NAME                SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+moonpool           90.8T  1.37M  90.8T        -         -     0%     0%  1.00x    ONLINE  -
+tranquility-rpool   472G  13.7G   458G        -         -     0%     2%  1.00x    ONLINE  -
+  pool: moonpool
+ state: ONLINE
+config:
+
+        NAME                        STATE     READ WRITE CKSUM
+        moonpool                    ONLINE       0     0     0
+          raidz2-0                  ONLINE       0     0     0
+            wwn-0x5000c500da9d0c27  ONLINE       0     0     0
+            wwn-0x5000c500da3bc09f  ONLINE       0     0     0
+            wwn-0x5000c500da3be65b  ONLINE       0     0     0
+            wwn-0x5000cca2a15c6554  ONLINE       0     0     0
+            wwn-0x5000cca2a15d9a7c  ONLINE       0     0     0
+            wwn-0x5000cca2a15a0534  ONLINE       0     0     0
+        special
+          raidz2-1                  ONLINE       0     0     0
+            wwn-0x5000c50030186723  ONLINE       0     0     0
+            wwn-0x5000c50030186713  ONLINE       0     0     0
+            wwn-0x5002538b012dda50  ONLINE       0     0     0
+            wwn-0x5002538b012dda40  ONLINE       0     0     0
+        spares
+          wwn-0x5000c500a18fae2b    AVAIL
+
+errors: No known data errors
+````s
