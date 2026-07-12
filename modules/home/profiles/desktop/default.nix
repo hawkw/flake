@@ -57,7 +57,6 @@ in {
     ## Programs                                                                 #
     #############################################################################
     programs = {
-      firefox.enable = true;
       ghostty.enable = true;
       _1password-gui.enableSshAgent = true;
       keychain = {
@@ -65,6 +64,12 @@ in {
         enableXsessionIntegration = true;
         keys = [ "id_ed25519" ];
       };
+    };
+
+    programs.firefox = {
+      enable = true;
+      # this is the default location with home-manager sate versions >= 26.05
+      configPath = "${config.xdg.configHome}/mozilla/firefox/";
     };
 
     #############################################################################
