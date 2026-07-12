@@ -8,8 +8,10 @@ else
     esac
 fi
 
- # Import colorscheme from 'wal' asynchronously, if the terminal is
- # alacritty, and the current session is not a SSH session.
- if [[ -z "${SESSION_TYPE+x}" ]]; then
-     (cat "${HOME}/.cache/wal/sequences" &)
- fi
+# Import colorscheme from 'wal' asynchronously, if it exists and is readable and
+# the current session is not a SSH session. Honor XDG_CACHE_HOME, falling back
+# to $HOME/.cache only when it is unset.
+SEQUENCES="${XDG_CACHE_HOME:-$HOME/.cache}/wal/sequences"
+if [[ -z "${SESSION_TYPE+x}" ]] && [[ -r "$SEQUENCES" ]]; then
+    (cat "$SEQUENCES" &)
+fi
