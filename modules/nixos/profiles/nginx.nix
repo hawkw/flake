@@ -30,21 +30,21 @@ in
       {
 
         services.avahi.extraServiceFiles = {
-          nginx =
-            ''<?xml version = "1.0" standalone='no'?><!--*-nxml-*-->
-<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-
-<service-group>
-  <name replace-wildcards="yes">nginx on %h</name>
-  <service>
-    <type>_http._tcp</type>
-    <port>80</port>
-  </service>
-    <service>
-      <type>_https._tcp</type>
-      <port>443</port>
-  </service>
-</service-group>'';
+          nginx = ''
+            <?xml version = "1.0" standalone='no'?><!--*-nxml-*-->
+            <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+            <service-group>
+              <name replace-wildcards="yes">nginx on %h</name>
+              <service>
+                <type>_http._tcp</type>
+                <port>80</port>
+              </service>
+              <service>
+                <type>_https._tcp</type>
+                <port>443</port>
+              </service>
+            </service-group>
+          '';
         };
 
         # open firewall ports
