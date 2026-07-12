@@ -1,6 +1,5 @@
 { config, pkgs, lib, ... }:
 
-let moonpool = "moonpool"; ds1 = "ds1"; in
 with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
@@ -163,6 +162,100 @@ with pkgs; with lib; {
     ${config.networking.hostName}: storage
   '';
 
+  # Per-encryption-root passphrases for the `moonpool` data pool. These are
+  # generated (six random words) and stored, agenix-rekeyed to this host's
+  # TPM-sealed identity, in `secrets/generated/`. They are delivered to
+  # `/run/agenix/...` at boot and read by the `zfs-datasets-moonpool` oneshot to
+  # unlock the datasets unattended.
+  #
+  # `keyformat=passphrase` also means any of these can be unlocked by hand on
+  # any machine with `zfs load-key -L prompt <dataset>`. For that offline /
+  # foreign-machine recovery path to need nothing but a password manager, copy
+  # each generated passphrase into 1Password once (decrypt it with
+  # `agenix -d`/the master identity); otherwise recovery also needs this flake +
+  # the master identity.
+  age.secrets.moonpool-system-pass.generator.script = "passphrase";
+  age.secrets.moonpool-user-eliza-pass.generator.script = "passphrase";
+
+  # moonpool dataset layout (see hosts/tranquility/README.md). The `zfsDatasets`
+  # wrapper routes unencrypted datasets through the early disko-zfs service and
+  # the encrypted subtrees through a late per-pool oneshot (their passphrases are
+  # agenix secrets, unavailable when the early service runs). The pool itself is
+  # created and grown statefully (drives fail and get replaced); only the dataset
+  # layout is declarative.
+  zfsDatasets.pools.moonpool = {
+    # Pool-root properties. All creation-time local properties are declared so
+    # disko-zfs does not inherit (unset) them during reconciliation. Children
+    # inherit `acltype`/`xattr`/`dnodesize` from here (posixacl + sa are needed
+    # for NFS/Samba).
+    properties = {
+      mountpoint = "none";
+      compression = "lz4";
+      atime = "off";
+      xattr = "sa";
+      acltype = "posixacl";
+      dnodesize = "auto";
+      recordsize = "128K";
+      "com.sun:auto-snapshot" = "false";
+    };
+
+    datasets = {
+      # Container for this generation of the dataset layout.
+      "ds1".properties = {
+        mountpoint = "none";
+        "com.sun:auto-snapshot" = "false";
+      };
+
+      # Bulk media: unencrypted (re-downloadable, non-sensitive) and not
+      # auto-snapshotted.
+      "ds1/media".properties = {
+        mountpoint = "/srv/media";
+        "com.sun:auto-snapshot" = "false";
+      };
+
+      # Encrypted state for data-serving services. Child datasets (added later,
+      # per service, mounted into /var/lib/<service>) inherit this key.
+      "ds1/system" = {
+        encryption = {
+          keyFile = config.age.secrets.moonpool-system-pass.path;
+          keyFormat = "passphrase";
+        };
+        properties = {
+          mountpoint = "none";
+          "com.sun:auto-snapshot" = "true";
+        };
+      };
+
+      # Unencrypted container under which each user gets their own encryption
+      # root (own key). Add more users by adding another encrypted child here.
+      "ds1/users".properties = {
+        mountpoint = "none";
+        "com.sun:auto-snapshot" = "false";
+      };
+
+      "ds1/users/eliza" = {
+        encryption = {
+          keyFile = config.age.secrets.moonpool-user-eliza-pass.path;
+          keyFormat = "passphrase";
+        };
+        properties = {
+          mountpoint = "none";
+          "com.sun:auto-snapshot" = "true";
+          # TODO: set a `quota` here to cap this user's total usage.
+        };
+      };
+
+      "ds1/users/eliza/shares".properties = {
+        mountpoint = "/srv/users/eliza/shares";
+        "com.sun:auto-snapshot" = "true";
+      };
+
+      "ds1/users/eliza/backups".properties = {
+        mountpoint = "/srv/users/eliza/backups";
+        "com.sun:auto-snapshot" = "true";
+      };
+    };
+  };
 
   # This option defines the first version of NixOS you have installed on this
   # particular machine, and is used to maintain compatibility with application
@@ -185,6 +278,4 @@ with pkgs; with lib; {
   # For more information, see `man configuration.nix` or
   # https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
   system.stateVersion = "25.05"; # Did you read the comment?
-
-
 }

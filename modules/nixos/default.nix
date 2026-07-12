@@ -22,6 +22,7 @@
     ./profiles/server.nix
     ./profiles/vu-dials.nix
     ./profiles/zfs.nix
+    ./zfs-datasets.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix

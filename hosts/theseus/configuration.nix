@@ -89,6 +89,9 @@ with lib; {
     # };
   };
 
+  networking.hosts = {
+    # "172.20.36.4" = [ "recovery.sys.dublin.eng.oxide.computer" ];
+  };
 
   users.motd = ''
     ┌┬────────────────┐

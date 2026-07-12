@@ -5,7 +5,7 @@ let
   systemDataset = "${cryptDataset}/system";
   userDataset = "${cryptDataset}/user";
   zfs_fs = "zfs_fs";
-  optAutosnapshot = "com.sun:autosnapshot";
+  optAutosnapshot = "com.sun:auto-snapshot";
 
   # Each NVMe device gets its own 4G ESP plus a ZFS partition. lanzaboote signs
   # and installs the bootloader to *both* ESPs on every `nixos-rebuild` (its

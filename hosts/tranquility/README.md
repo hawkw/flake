@@ -342,4 +342,86 @@ config:
           wwn-0x5000c500a18fae2b    AVAIL
 
 errors: No known data errors
-````s
+```
+
+### Dataset layout and encryption
+
+The pool is created and grown **statefully** (drives fail and get replaced), but
+its **dataset layout is declarative**, defined once in `configuration.nix` under
+`zfsDatasets` (a thin wrapper over [`disko-zfs`], see
+`modules/nixos/zfs-datasets.nix`). The layout is:
+
+```
+moonpool
+└─ ds1
+   ├─ media                       unencrypted, no auto-snapshot   → /srv/media
+   ├─ system                      ENCRYPTED root, auto-snapshot   (service state)
+   └─ users
+      └─ eliza                    ENCRYPTED root, auto-snapshot
+         ├─ shares                → /srv/users/eliza/shares
+         └─ backups               → /srv/users/eliza/backups
+```
+
+- **`media`** is unencrypted (re-downloadable, non-sensitive) and not
+  snapshotted.
+- **`system`** holds state for data-serving services. Per-service child datasets
+  (added later, mounted into `/var/lib/<service>`) inherit its key.
+- Each **user** is their own encryption root with its own key, so their data is
+  cryptographically isolated. Add a user by adding another encrypted child under
+  `users`. `shares` and `backups` inherit the user's key.
+- Add a `quota` property to a user's encryption root to cap their usage.
+
+#### How it is applied
+
+`moonpool` contains encrypted datasets, so the whole pool is managed by a late
+systemd oneshot (`zfs-datasets-moonpool.service`) rather than the early
+`disko-zfs` service. The oneshot runs after the pool is imported
+(`boot.zfs.extraPools`) *and* after agenix has decrypted the encryption
+passphrases, then it creates any missing datasets (parent-first), loads keys,
+reconciles properties with `disko-zfs`, and mounts everything. Services that
+need the pool should order themselves after `zfs-datasets-moonpool.target`;
+failure to unlock the pool never blocks the rest of the system from booting.
+
+[`disko-zfs`]: https://github.com/numtide/disko-zfs
+
+### Provision the dataset encryption keys
+
+The `system` and per-user datasets are encrypted with `keyformat=passphrase`.
+The passphrases are agenix-rekey secrets with a `passphrase` generator (six
+random words), decrypted unattended at boot via this host's TPM-sealed identity.
+
+1. Generate and rekey the passphrases (on the admin machine), then commit them:
+
+   ```console
+   agenix generate   # creates secrets/generated/moonpool-*-pass.age
+   agenix rekey -a
+   ```
+
+2. **Recommended:** copy each passphrase into 1Password so the datasets can be
+   unlocked on *any* machine with nothing but the password manager (the whole
+   point of `keyformat=passphrase`). Read a generated value with:
+
+   ```console
+   agenix -d secrets/generated/moonpool-user-eliza-pass.age
+   ```
+
+   Without this, offline/foreign-machine recovery also needs this flake plus the
+   agenix master identity.
+
+3. Rebuild. On the next boot the oneshot creates, unlocks, and mounts the
+   datasets:
+
+   ```console
+   nixos-rebuild switch --flake '.#tranquility'
+   systemctl status zfs-datasets-moonpool.service
+   zfs get -r keystatus,mounted moonpool
+   ```
+
+#### Manual unlock
+
+If the TPM is ever unavailable, or when importing the pool on another machine,
+unlock a dataset by hand with its 1Password passphrase:
+
+```console
+zfs load-key -L prompt moonpool/ds1/users/eliza
+```
