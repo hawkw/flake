@@ -22,6 +22,10 @@ with lib; rec {
   # https://github.com/nix-community/home-manager/issues/3342
   manual.manpages.enable = false;
 
+  # enable home-manager management of XDG base directories. this will, among
+  # other things, ensure that XDG_$whatever_HOME env vars are set in shell configs.
+  xdg.enable = true;
+
   home = {
     sessionVariables = {
       EDITOR = lib.mkDefault "vim";

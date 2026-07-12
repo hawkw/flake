@@ -13,6 +13,9 @@ with lib; {
 
       # zsh config
       zsh = {
+        # default config directory moved into XDG_CONFIG_HOME in home-manager
+        # 26.05; adopt the new behavior everywhere.
+        dotDir = "${config.xdg.configHome}/zsh";
         syntaxHighlighting.enable = true;
         # Whether to enable integration with terminals using the VTE library.
         # This will let the terminal track the current working directory.
