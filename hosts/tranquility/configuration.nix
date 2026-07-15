@@ -163,54 +163,60 @@ with pkgs; with lib; {
   '';
 
   # Per-encryption-root passphrases for the `moonpool` data pool. These are
-  # generated (six random words) and stored, agenix-rekeyed to this host's
-  # TPM-sealed identity, in `secrets/generated/`. They are delivered to
-  # `/run/agenix/...` at boot and read by the `zfs-datasets-moonpool` oneshot to
-  # unlock the datasets unattended.
+  # generated (six random words), stored encrypted to the agenix master identity
+  # in `secrets/generated/`, and rekeyed for this host's TPM-sealed identity
+  # into `secrets/rekeyed/tranquility/`. They are delivered to `/run/agenix/...`
+  # at boot and read by the `zfs-datasets-moonpool` oneshot to unlock the
+  # datasets unattended.
   #
   # `keyformat=passphrase` also means any of these can be unlocked by hand on
   # any machine with `zfs load-key -L prompt <dataset>`. For that offline /
   # foreign-machine recovery path to need nothing but a password manager, copy
-  # each generated passphrase into 1Password once (decrypt it with
-  # `agenix -d`/the master identity); otherwise recovery also needs this flake +
-  # the master identity.
+  # each generated passphrase into 1Password once (read it with `agenix view`);
+  # otherwise recovery also needs this flake + the master identity.
   age.secrets.moonpool-system-pass.generator.script = "passphrase";
   age.secrets.moonpool-user-eliza-pass.generator.script = "passphrase";
 
-  # moonpool dataset layout (see hosts/tranquility/README.md). The `zfsDatasets`
-  # wrapper routes unencrypted datasets through the early disko-zfs service and
-  # the encrypted subtrees through a late per-pool oneshot (their passphrases are
+  # moonpool dataset layout (see hosts/tranquility/README.md). The
+  # `profiles.zfs.pools` wrapper (modules/nixos/profiles/zfs/datasets.nix)
+  # routes unencrypted datasets through the early disko-zfs service and the
+  # encrypted subtrees through a late per-pool oneshot (their passphrases are
   # agenix secrets, unavailable when the early service runs). The pool itself is
   # created and grown statefully (drives fail and get replaced); only the dataset
   # layout is declarative.
-  zfsDatasets.pools.moonpool = {
+  profiles.zfs.pools.moonpool = let propAutosnapshot = "com.sun:auto-snapshot"; in {
     # Pool-root properties. All creation-time local properties are declared so
-    # disko-zfs does not inherit (unset) them during reconciliation. Children
-    # inherit `acltype`/`xattr`/`dnodesize` from here (posixacl + sa are needed
-    # for NFS/Samba).
+    # disko-zfs does not inherit (unset) them during reconciliation.
     properties = {
       mountpoint = "none";
       compression = "lz4";
       atime = "off";
-      xattr = "sa";
+      # `acltype=posixacl` and `xattr=sa are needed for NFS/Samba
       acltype = "posixacl";
+      xattr = "sa";
       dnodesize = "auto";
       recordsize = "128K";
-      "com.sun:auto-snapshot" = "false";
+      "${propAutosnapshot}" = "false";
+      # Disable the `frequent` label pool-wide by default to disable 15-minute snapshot
+      # intervals.
+      "${propAutosnapshot}:frequent" = "false";
     };
 
     datasets = {
       # Container for this generation of the dataset layout.
       "ds1".properties = {
         mountpoint = "none";
-        "com.sun:auto-snapshot" = "false";
+        "${propAutosnapshot}" = "false";
       };
 
       # Bulk media: unencrypted (re-downloadable, non-sensitive) and not
-      # auto-snapshotted.
+      # auto-snapshotted. Large records: fewer indirect blocks (which also
+      # relieves the special vdev) and better sequential throughput; media
+      # files are never partially rewritten, so there is no RMW downside.
       "ds1/media".properties = {
         mountpoint = "/srv/media";
-        "com.sun:auto-snapshot" = "false";
+        recordsize = "1M";
+        "${propAutosnapshot}" = "false";
       };
 
       # Encrypted state for data-serving services. Child datasets (added later,
@@ -222,7 +228,7 @@ with pkgs; with lib; {
         };
         properties = {
           mountpoint = "none";
-          "com.sun:auto-snapshot" = "true";
+          "${propAutosnapshot}" = "true";
         };
       };
 
@@ -230,7 +236,7 @@ with pkgs; with lib; {
       # root (own key). Add more users by adding another encrypted child here.
       "ds1/users".properties = {
         mountpoint = "none";
-        "com.sun:auto-snapshot" = "false";
+        "${propAutosnapshot}" = "false";
       };
 
       "ds1/users/eliza" = {
@@ -240,19 +246,71 @@ with pkgs; with lib; {
         };
         properties = {
           mountpoint = "none";
-          "com.sun:auto-snapshot" = "true";
-          # TODO: set a `quota` here to cap this user's total usage.
+          "${propAutosnapshot}" = "true";
+          # TODO: set a `quota` here to cap this user's total usage. It must be
+          # declared *here*: a hand-run `zfs set quota=...` is local property
+          # drift, which reconciliation reverts on the next service run.
         };
       };
 
-      "ds1/users/eliza/shares".properties = {
-        mountpoint = "/srv/users/eliza/shares";
-        "com.sun:auto-snapshot" = "true";
+      # Fileshares hold a mixed corpus whose largest category is
+      # multi-megabyte PDFs (~1.2--35MB), plus assorted smaller files.
+      # `recordsize=1M` suits the big files (whole-file sequential I/O, 8x
+      # fewer indirect blocks than the 128K default); files smaller than the
+      # recordsize are stored as a single block of roughly the file's size,
+      # so the cap costs them nothing. `special_small_blocks=512K` routes
+      # those small blocks (files up to ~512K) to the special vdev's SSDs,
+      # where per-file seek latency hurts most; the 1M PDF chunks stay on the
+      # HDDs. Do NOT raise the threshold to the recordsize --- that routes
+      # *all* data to the special vdev. Metadata is protected from this data
+      # by the built-in class gate (`zfs_special_class_metadata_reserve_pct`,
+      # default 25%); watch the fill with `zpool list -v moonpool`.
+      "ds1/users/eliza/shares" = {
+        # Applied once, at dataset creation; never reconciled afterwards.
+        owner = "eliza";
+        group = "users";
+        mode = "0750";
+        properties = {
+          mountpoint = "/srv/users/eliza/shares";
+          recordsize = "1M";
+          special_small_blocks = "512K";
+          "${propAutosnapshot}" = "true";
+        };
       };
 
-      "ds1/users/eliza/backups".properties = {
-        mountpoint = "/srv/users/eliza/backups";
-        "com.sun:auto-snapshot" = "true";
+      # Backups are large sequential blobs; large records, same as media.
+      # Never set `special_small_blocks` here: chunk-based backup tools
+      # (borg/restic) write exactly midsize blocks and would soak terabytes
+      # of backup data into the special vdev.
+      "ds1/users/eliza/backups" = {
+        owner = "eliza";
+        group = "users";
+        mode = "0750";
+        properties = {
+          mountpoint = "/srv/users/eliza/backups";
+          recordsize = "1M";
+          "${propAutosnapshot}" = "true";
+        };
+      };
+
+      # Photo library (~1.2TB iPhoto import). The multi-MB originals and video
+      # chunk into 1M blocks and go to the HDDs regardless, but the library
+      # contains an unbounded population of sub-512K files (thumbnails,
+      # derivative previews, early-2000s originals) that must NOT compete for
+      # the special vdev's capacity. `special_small_blocks` is *explicitly*
+      # zero --- not merely unset --- so that no future inherited value (e.g.
+      # if the library moves under `shares`, which sets 512K) can silently
+      # route photo data to flash.
+      "ds1/users/eliza/photos" = {
+        owner = "eliza";
+        group = "users";
+        mode = "0750";
+        properties = {
+          mountpoint = "/srv/users/eliza/photos";
+          recordsize = "1M";
+          special_small_blocks = "0";
+          "${propAutosnapshot}" = "true";
+        };
       };
     };
   };

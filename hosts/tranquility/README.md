@@ -348,8 +348,8 @@ errors: No known data errors
 
 The pool is created and grown **statefully** (drives fail and get replaced), but
 its **dataset layout is declarative**, defined once in `configuration.nix` under
-`zfsDatasets` (a thin wrapper over [`disko-zfs`], see
-`modules/nixos/zfs-datasets.nix`). The layout is:
+`profiles.zfs.pools` (a thin wrapper over [`disko-zfs`], see
+`modules/nixos/profiles/zfs/datasets.nix`). The layout is:
 
 ```
 moonpool
@@ -359,17 +359,58 @@ moonpool
    └─ users
       └─ eliza                    ENCRYPTED root, auto-snapshot
          ├─ shares                → /srv/users/eliza/shares
-         └─ backups               → /srv/users/eliza/backups
+         ├─ backups               → /srv/users/eliza/backups
+         └─ photos                → /srv/users/eliza/photos
 ```
 
 - **`media`** is unencrypted (re-downloadable, non-sensitive) and not
-  snapshotted.
+  snapshotted. `recordsize=1M`: large sequential files, fewer indirect blocks
+  (which also relieves the special vdev).
 - **`system`** holds state for data-serving services. Per-service child datasets
   (added later, mounted into `/var/lib/<service>`) inherit its key.
 - Each **user** is their own encryption root with its own key, so their data is
   cryptographically isolated. Add a user by adding another encrypted child under
   `users`. `shares` and `backups` inherit the user's key.
-- Add a `quota` property to a user's encryption root to cap their usage.
+- **`shares`** holds a mixed corpus: the largest category is multi-megabyte
+  PDFs (~1.2--35MB), plus a tail of smaller files. `recordsize=1M` suits the
+  big files (whole-file sequential I/O, 8x fewer indirect blocks, so less
+  metadata on the special vdev); files smaller than the recordsize are stored
+  as a *single block of roughly the file's size* (recordsize is a cap, not an
+  allocation unit), so the cap costs the small files nothing.
+  `special_small_blocks=512K` routes those small blocks (files up to ~512K)
+  to the special vdev's SSDs --- the population where per-file HDD seek
+  latency hurts most --- while the 1M PDF chunks stay on the HDDs. **Never**
+  set the threshold at or above the recordsize: that routes *all* data to the
+  special vdev.
+
+  Metadata capacity is protected from this data by a built-in gate
+  (`zfs_special_class_metadata_reserve_pct`, module parameter, default 25):
+  metadata always bypasses it, while small-block *data* is refused once the
+  class passes `100 - pct` percent allocated --- a guaranteed metadata-only
+  floor of ~875GiB raw at the default. The small-file tail's aggregate is
+  bounded by its own smallness, so the default reserve is ample; if the
+  small-block population grows beyond expectations, raise the parameter (it
+  is runtime-tunable via `/sys/module/zfs/parameters/`). Watch the special
+  vdev's fill with `zpool list -v moonpool`.
+- **`backups`** sets `recordsize=1M` for the same reason. Never set
+  `special_small_blocks` here: chunk-based backup tools (borg/restic) write
+  exactly midsize blocks and would soak terabytes into the special vdev.
+- **`photos`** holds the (~1.2TB) photo library. Multi-MB originals and video
+  chunk into 1M blocks and land on the HDDs regardless (incompressible, so
+  the compressed size stays above any threshold), but photo libraries carry
+  an unbounded population of sub-512K files --- thumbnails, derivative
+  previews, early-digital originals --- so `special_small_blocks` is
+  **explicitly zero**, not merely unset: a local `0` cannot be overridden by
+  inheritance if the library ever moves under a dataset that sets a
+  threshold. The photo library must never compete with metadata (and the
+  shares' small files) for special vdev capacity.
+- Add a `quota` property to a user's encryption root to cap their usage. It
+  must be *declared* in the configuration --- see property ownership below.
+- 15-minute (`frequent`) auto-snapshots are disabled pool-wide via
+  `com.sun:auto-snapshot:frequent=false`; hourly and coarser labels still run
+  on the snapshotted subtrees. (SSD wear from snapshot churn is negligible ---
+  this is hygiene, not endurance management: 15-minute recovery points buy
+  nothing for this workload.)
 
 #### How it is applied
 
@@ -379,8 +420,31 @@ systemd oneshot (`zfs-datasets-moonpool.service`) rather than the early
 (`boot.zfs.extraPools`) *and* after agenix has decrypted the encryption
 passphrases, then it creates any missing datasets (parent-first), loads keys,
 reconciles properties with `disko-zfs`, and mounts everything. Services that
-need the pool should order themselves after `zfs-datasets-moonpool.target`;
-failure to unlock the pool never blocks the rest of the system from booting.
+need the pool must declare **both `requires` and `after`** on
+`zfs-datasets-moonpool.target`: `after` alone only orders, and a service without
+`requires` will still start when unlock fails and write into the empty
+mountpoint directory on the root filesystem. Failure to unlock the pool never
+blocks the rest of the system from booting.
+
+Two operational invariants:
+
+- **Layout changes are applied manually.** The oneshot is deliberately *not*
+  restarted by `nixos-rebuild switch` (switch-time stop/start would propagate
+  through the target's `Requires` and strand every consumer stopped). After
+  changing the layout, run:
+
+  ```console
+  sudo systemctl restart zfs-datasets-moonpool.service
+  ```
+
+  An explicit restart propagates to dependent services *as a restart*, in
+  dependency order. Or just reboot.
+
+- **The configuration owns every local property of a declared dataset.** A
+  hand-run `zfs set` (quota, sharenfs, sharesmb, ...) on a declared dataset is
+  drift, and is reverted (`zfs inherit`) the next time the oneshot runs.
+  Declare properties in `configuration.nix`, or add them to
+  `disko.zfs.settings.ignoredProperties`.
 
 [`disko-zfs`]: https://github.com/numtide/disko-zfs
 
@@ -399,10 +463,10 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
 
 2. **Recommended:** copy each passphrase into 1Password so the datasets can be
    unlocked on *any* machine with nothing but the password manager (the whole
-   point of `keyformat=passphrase`). Read a generated value with:
+   point of `keyformat=passphrase`). Read the generated values with:
 
    ```console
-   agenix -d secrets/generated/moonpool-user-eliza-pass.age
+   agenix view   # interactive; decrypts with the master identity
    ```
 
    Without this, offline/foreign-machine recovery also needs this flake plus the
@@ -416,6 +480,45 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    systemctl status zfs-datasets-moonpool.service
    zfs get -r keystatus,mounted moonpool
    ```
+
+4. **Test the recovery path once.** The disaster-recovery story rests on the
+   invariant *key-file contents ≡ what you type at the prompt* (libzfs strips
+   the file's trailing newline for `keyformat=passphrase`, so it should hold
+   --- verify it does). For each encryption root, with the 1Password copy of
+   the passphrase:
+
+   ```console
+   sudo zfs unload-key moonpool/ds1/system
+   sudo zfs load-key -L prompt moonpool/ds1/system   # type the 1Password passphrase
+   ```
+
+   `-L prompt` overrides the key *source* for this load only; the stored
+   `keylocation` is untouched, so no cleanup is needed afterwards. Note that
+   `unload-key` refuses while datasets using the key are mounted --- unmount
+   the subtree first, or do this before the datasets hold any data.
+
+#### Rotating a dataset passphrase
+
+`zfs change-key` re-wraps the dataset's master key; data is not re-encrypted,
+and child datasets are unaffected. Order matters --- `change-key` reads the
+*new* key from the stored `keylocation` (the agenix file), so deploy the new
+secret first:
+
+```console
+# On the admin machine: regenerate this secret, rekey, commit.
+agenix generate -f moonpool-user-eliza-pass
+agenix rekey -a
+
+# Deploy so /run/agenix/... contains the new passphrase (the key is still
+# loaded from boot, so nothing breaks in between):
+nixos-rebuild switch --flake '.#tranquility'
+
+# On tranquility: re-wrap with the new passphrase from the key file.
+sudo zfs change-key moonpool/ds1/users/eliza
+```
+
+Then update the copy in 1Password. The old passphrase no longer unlocks the
+dataset (but old raw `zfs send` streams remain wrapped with the old key).
 
 #### Manual unlock
 
