@@ -30,6 +30,7 @@
     qemu
     screen
     claude-code
+    ngrok
   ];
 
   # programs.lutris.enable = true;
