@@ -359,8 +359,7 @@ moonpool
    └─ users
       └─ eliza                    ENCRYPTED root, auto-snapshot
          ├─ shares                → /srv/users/eliza/shares
-         ├─ backups               → /srv/users/eliza/backups
-         └─ photos                → /srv/users/eliza/photos
+         └─ backups               → /srv/users/eliza/backups
 ```
 
 - **`media`** is unencrypted (re-downloadable, non-sensitive) and not
@@ -395,15 +394,6 @@ moonpool
 - **`backups`** sets `recordsize=1M` for the same reason. Never set
   `special_small_blocks` here: chunk-based backup tools (borg/restic) write
   exactly midsize blocks and would soak terabytes into the special vdev.
-- **`photos`** holds the (~1.2TB) photo library. Multi-MB originals and video
-  chunk into 1M blocks and land on the HDDs regardless (incompressible, so
-  the compressed size stays above any threshold), but photo libraries carry
-  an unbounded population of sub-512K files --- thumbnails, derivative
-  previews, early-digital originals --- so `special_small_blocks` is
-  **explicitly zero**, not merely unset: a local `0` cannot be overridden by
-  inheritance if the library ever moves under a dataset that sets a
-  threshold. The photo library must never compete with metadata (and the
-  shares' small files) for special vdev capacity.
 - Add a `quota` property to a user's encryption root to cap their usage. It
   must be *declared* in the configuration --- see property ownership below.
 - 15-minute (`frequent`) auto-snapshots are disabled pool-wide via
@@ -420,31 +410,48 @@ systemd oneshot (`zfs-datasets-moonpool.service`) rather than the early
 (`boot.zfs.extraPools`) *and* after agenix has decrypted the encryption
 passphrases, then it creates any missing datasets (parent-first), loads keys,
 reconciles properties with `disko-zfs`, and mounts everything. Services that
-need the pool must declare **both `requires` and `after`** on
-`zfs-datasets-moonpool.target`: `after` alone only orders, and a service without
-`requires` will still start when unlock fails and write into the empty
-mountpoint directory on the root filesystem. Failure to unlock the pool never
-blocks the rest of the system from booting.
+need the pool declare the paths they use:
+
+```nix
+systemd.services.jellyfin.requiresZfsMounts = [ "/srv/media" ];
+```
+
+Each path is resolved (at eval time --- unknown paths are an error) to the
+dataset whose mountpoint is its longest prefix, and the service gains
+**`requires` and `after`** on `zfs-datasets-moonpool.target`. `requires`
+matters: `after` alone only orders, and a service without `requires` will
+still start when unlock fails and write into the empty mountpoint directory
+on the root filesystem. Failure to unlock the pool never blocks the rest of
+the system from booting.
 
 Two operational invariants:
 
-- **Layout changes are applied manually.** The oneshot is deliberately *not*
-  restarted by `nixos-rebuild switch` (switch-time stop/start would propagate
-  through the target's `Requires` and strand every consumer stopped). After
-  changing the layout, run:
-
-  ```console
-  sudo systemctl restart zfs-datasets-moonpool.service
-  ```
-
-  An explicit restart propagates to dependent services *as a restart*, in
-  dependency order. Or just reboot.
+- **Layout changes are applied by `nixos-rebuild switch`, as a reload.** The
+  oneshot's runner is idempotent, so switch *reloads* the unit (re-runs the
+  runner) rather than restarting it --- a restart's stop would propagate
+  through the target's `Requires` and strand every consumer stopped. If the
+  reload fails (e.g. a new dataset's key is missing), the switch reports it,
+  but the target stays active and consumers of the previously-working layout
+  keep running; fix and re-switch. One race to know about: a *new* service
+  added in the same switch as the dataset it consumes may start before the
+  reload finishes creating that dataset, fail (loudly, against the immutable
+  or absent mountpoint), and need one `systemctl start` after --- or a
+  `Restart=on-failure` in the service itself.
 
 - **The configuration owns every local property of a declared dataset.** A
   hand-run `zfs set` (quota, sharenfs, sharesmb, ...) on a declared dataset is
   drift, and is reverted (`zfs inherit`) the next time the oneshot runs.
   Declare properties in `configuration.nix`, or add them to
   `disko.zfs.settings.ignoredProperties`.
+
+- **Mountpoint underlay directories are made immutable** (`chattr +i`) by the
+  oneshot before each mount, so that when a dataset is *not* mounted, writes
+  to its mountpoint path fail with `EPERM` (even as root) instead of silently
+  landing on the root pool and then blocking the mount. Two consequences:
+  the flag is invisible while the dataset is mounted (it lives on the
+  underlay inode), and an *abandoned* mountpoint directory cannot be removed
+  --- even by root --- until you clear the flag: `chattr -i <dir> && rmdir
+  <dir>`.
 
 [`disko-zfs`]: https://github.com/numtide/disko-zfs
 

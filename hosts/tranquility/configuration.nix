@@ -184,29 +184,29 @@ with pkgs; with lib; {
   # agenix secrets, unavailable when the early service runs). The pool itself is
   # created and grown statefully (drives fail and get replaced); only the dataset
   # layout is declarative.
-  profiles.zfs.pools.moonpool = let propAutosnapshot = "com.sun:auto-snapshot"; in {
+  profiles.zfs.pools.moonpool = {
     # Pool-root properties. All creation-time local properties are declared so
     # disko-zfs does not inherit (unset) them during reconciliation.
     properties = {
       mountpoint = "none";
       compression = "lz4";
-      atime = "off";
+      atime = false;
       # `acltype=posixacl` and `xattr=sa are needed for NFS/Samba
       acltype = "posixacl";
       xattr = "sa";
       dnodesize = "auto";
       recordsize = "128K";
-      "${propAutosnapshot}" = "false";
+      autoSnapshot = false;
       # Disable the `frequent` label pool-wide by default to disable 15-minute snapshot
       # intervals.
-      "${propAutosnapshot}:frequent" = "false";
+      autoSnapshotFrequent = false;
     };
 
     datasets = {
       # Container for this generation of the dataset layout.
       "ds1".properties = {
         mountpoint = "none";
-        "${propAutosnapshot}" = "false";
+        autoSnapshot = false;
       };
 
       # Bulk media: unencrypted (re-downloadable, non-sensitive) and not
@@ -216,7 +216,7 @@ with pkgs; with lib; {
       "ds1/media".properties = {
         mountpoint = "/srv/media";
         recordsize = "1M";
-        "${propAutosnapshot}" = "false";
+        autoSnapshot = false;
       };
 
       # Encrypted state for data-serving services. Child datasets (added later,
@@ -228,7 +228,7 @@ with pkgs; with lib; {
         };
         properties = {
           mountpoint = "none";
-          "${propAutosnapshot}" = "true";
+          autoSnapshot = true;
         };
       };
 
@@ -236,7 +236,7 @@ with pkgs; with lib; {
       # root (own key). Add more users by adding another encrypted child here.
       "ds1/users".properties = {
         mountpoint = "none";
-        "${propAutosnapshot}" = "false";
+        autoSnapshot = false;
       };
 
       "ds1/users/eliza" = {
@@ -246,8 +246,8 @@ with pkgs; with lib; {
         };
         properties = {
           mountpoint = "none";
-          "${propAutosnapshot}" = "true";
-          # TODO: set a `quota` here to cap this user's total usage. It must be
+          autoSnapshot = true;
+          # TODO: set `quota` here to cap this user's total usage. It must be
           # declared *here*: a hand-run `zfs set quota=...` is local property
           # drift, which reconciliation reverts on the next service run.
         };
@@ -269,12 +269,12 @@ with pkgs; with lib; {
         # Applied once, at dataset creation; never reconciled afterwards.
         owner = "eliza";
         group = "users";
-        mode = "0750";
+        mode = "0700";
         properties = {
           mountpoint = "/srv/users/eliza/shares";
           recordsize = "1M";
-          special_small_blocks = "512K";
-          "${propAutosnapshot}" = "true";
+          specialSmallBlocks = "512K";
+          autoSnapshot = true;
         };
       };
 
@@ -285,31 +285,11 @@ with pkgs; with lib; {
       "ds1/users/eliza/backups" = {
         owner = "eliza";
         group = "users";
-        mode = "0750";
+        mode = "0700";
         properties = {
           mountpoint = "/srv/users/eliza/backups";
           recordsize = "1M";
-          "${propAutosnapshot}" = "true";
-        };
-      };
-
-      # Photo library (~1.2TB iPhoto import). The multi-MB originals and video
-      # chunk into 1M blocks and go to the HDDs regardless, but the library
-      # contains an unbounded population of sub-512K files (thumbnails,
-      # derivative previews, early-2000s originals) that must NOT compete for
-      # the special vdev's capacity. `special_small_blocks` is *explicitly*
-      # zero --- not merely unset --- so that no future inherited value (e.g.
-      # if the library moves under `shares`, which sets 512K) can silently
-      # route photo data to flash.
-      "ds1/users/eliza/photos" = {
-        owner = "eliza";
-        group = "users";
-        mode = "0750";
-        properties = {
-          mountpoint = "/srv/users/eliza/photos";
-          recordsize = "1M";
-          special_small_blocks = "0";
-          "${propAutosnapshot}" = "true";
+          autoSnapshot = true;
         };
       };
     };
