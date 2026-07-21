@@ -33,8 +33,8 @@ fallback (entered on the BMC console) if the TPM ever refuses.
 
 ## Initial install
 
-uns from a NixOS installer on the target machine. The
-TPM-sealing step (step 3) runs **after first boot, on the installed system** ---
+Steps 1 and 2 run from a NixOS installer on the target machine. The
+TPM-sealing step (step 3) runs **after first boot, on the installed system**:
 there is no need to seal against the TPM from the installer, because the
 configuration evaluates fine without the JWE (clevis is gated on
 `builtins.pathExists` and the pool simply prompts for the passphrase until the
@@ -228,7 +228,7 @@ zpool online tranquility-rpool <reconnected-partition>
 
 ### Optional: bind the disk key to Secure Boot (PCR 7)
 
-The clevis JWE (step 2) uses an empty TPM policy so it survives updates but only
+The clevis JWE (step 3) uses an empty TPM policy so it survives updates but only
 protects *removed* drives. Once Secure Boot is enrolled and verified, PCR 7 (the
 Secure Boot policy) is stable across kernel updates, so you can re-seal the disk
 key to it. The TPM then releases the key **only** under your signed boot
@@ -258,7 +258,7 @@ sudo nixos-rebuild boot --flake '.#tranquility'
 ### Rotating the TPM-sealed key
 
 If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
-(step 2) with the new passphrase and `nixos-rebuild switch`. To change the
+(step 3) with the new passphrase and `nixos-rebuild switch`. To change the
 passphrase itself:
 
 ```console
@@ -370,88 +370,45 @@ moonpool
 - Each **user** is their own encryption root with its own key, so their data is
   cryptographically isolated. Add a user by adding another encrypted child under
   `users`. `shares` and `backups` inherit the user's key.
-- **`shares`** holds a mixed corpus: the largest category is multi-megabyte
-  PDFs (~1.2--35MB), plus a tail of smaller files. `recordsize=1M` suits the
-  big files (whole-file sequential I/O, 8x fewer indirect blocks, so less
-  metadata on the special vdev); files smaller than the recordsize are stored
-  as a *single block of roughly the file's size* (recordsize is a cap, not an
-  allocation unit), so the cap costs the small files nothing.
-  `special_small_blocks=512K` routes those small blocks (files up to ~512K)
-  to the special vdev's SSDs --- the population where per-file HDD seek
-  latency hurts most --- while the 1M PDF chunks stay on the HDDs. **Never**
-  set the threshold at or above the recordsize: that routes *all* data to the
-  special vdev.
-
-  Metadata capacity is protected from this data by a built-in gate
-  (`zfs_special_class_metadata_reserve_pct`, module parameter, default 25):
-  metadata always bypasses it, while small-block *data* is refused once the
-  class passes `100 - pct` percent allocated --- a guaranteed metadata-only
-  floor of ~875GiB raw at the default. The small-file tail's aggregate is
-  bounded by its own smallness, so the default reserve is ample; if the
-  small-block population grows beyond expectations, raise the parameter (it
-  is runtime-tunable via `/sys/module/zfs/parameters/`). Watch the special
-  vdev's fill with `zpool list -v moonpool`.
-- **`backups`** sets `recordsize=1M` for the same reason. Never set
-  `special_small_blocks` here: chunk-based backup tools (borg/restic) write
-  exactly midsize blocks and would soak terabytes into the special vdev.
-- Add a `quota` property to a user's encryption root to cap their usage. It
-  must be *declared* in the configuration --- see property ownership below.
+- **`shares`** holds a mixed corpus: mostly multi-megabyte PDFs (~1.2--35MB)
+  plus a tail of smaller files. `recordsize=1M` for the big files;
+  `specialSmallBlocks = "512K"` puts the small files --- the population where
+  per-file HDD seek latency hurts most --- on the special vdev's SSDs, while the
+  1M PDF chunks stay on the HDDs. Sizing: the kernel's metadata-only reserve
+  (`zfs_special_class_metadata_reserve_pct`, default 25%) is ~875GiB raw on this
+  special vdev, so the default is ample. Watch the consumption of space with
+  `zpool list -v moonpool`.
+- **`backups`** sets `recordsize=1M` for the same reason, and must never set
+  `specialSmallBlocks`: chunk-based backup tools (borg/restic) write exactly
+  midsize blocks and would soak terabytes into the special vdev.
+- Cap a user's usage by declaring `quota` on their encryption root (declared,
+  not `zfs set` by hand --- the module reconciles declared datasets' local
+  properties).
 - 15-minute (`frequent`) auto-snapshots are disabled pool-wide via
-  `com.sun:auto-snapshot:frequent=false`; hourly and coarser labels still run
-  on the snapshotted subtrees. (SSD wear from snapshot churn is negligible ---
-  this is hygiene, not endurance management: 15-minute recovery points buy
-  nothing for this workload.)
+  `autoSnapshotFrequent = false`: 15-minute recovery points buy nothing for
+  this workload. (SSD wear from snapshot churn is negligible; this is mostly to 
+  ensure that we aren't spending a bunch of time on snapshotst.)
 
 #### How it is applied
 
-`moonpool` contains encrypted datasets, so the whole pool is managed by a late
-systemd oneshot (`zfs-datasets-moonpool.service`) rather than the early
-`disko-zfs` service. The oneshot runs after the pool is imported
-(`boot.zfs.extraPools`) *and* after agenix has decrypted the encryption
-passphrases, then it creates any missing datasets (parent-first), loads keys,
-reconciles properties with `disko-zfs`, and mounts everything. Services that
-need the pool declare the paths they use:
+`moonpool` contains encrypted datasets, so the whole pool is managed by the
+module's late per-pool oneshot (`zfs-datasets-moonpool.service`). Systemd units
+which require `moonpool` datasets be mounted can depend on
+`zfs-datasets-moonpool.target`. The implementation of declarative pool
+management and its operational characteristics are documented in 
+`modules/nixos/profiles/zfs/datasets.nix`.
 
-```nix
-systemd.services.jellyfin.requiresZfsMounts = [ "/srv/media" ];
-```
+Host specifics:
 
-Each path is resolved (at eval time --- unknown paths are an error) to the
-dataset whose mountpoint is its longest prefix, and the service gains
-**`requires` and `after`** on `zfs-datasets-moonpool.target`. `requires`
-matters: `after` alone only orders, and a service without `requires` will
-still start when unlock fails and write into the empty mountpoint directory
-on the root filesystem. Failure to unlock the pool never blocks the rest of
-the system from booting.
+- the pool is imported at boot via `boot.zfs.extraPools` and unlocked with
+  the agenix passphrases below; a failed unlock never blocks boot, and
+  services gated on the target stay stopped instead of writing to the root
+  pool.
+- services that use the pool declare their paths, e.g.:
 
-Two operational invariants:
-
-- **Layout changes are applied by `nixos-rebuild switch`, as a reload.** The
-  oneshot's runner is idempotent, so switch *reloads* the unit (re-runs the
-  runner) rather than restarting it --- a restart's stop would propagate
-  through the target's `Requires` and strand every consumer stopped. If the
-  reload fails (e.g. a new dataset's key is missing), the switch reports it,
-  but the target stays active and consumers of the previously-working layout
-  keep running; fix and re-switch. One race to know about: a *new* service
-  added in the same switch as the dataset it consumes may start before the
-  reload finishes creating that dataset, fail (loudly, against the immutable
-  or absent mountpoint), and need one `systemctl start` after --- or a
-  `Restart=on-failure` in the service itself.
-
-- **The configuration owns every local property of a declared dataset.** A
-  hand-run `zfs set` (quota, sharenfs, sharesmb, ...) on a declared dataset is
-  drift, and is reverted (`zfs inherit`) the next time the oneshot runs.
-  Declare properties in `configuration.nix`, or add them to
-  `disko.zfs.settings.ignoredProperties`.
-
-- **Mountpoint underlay directories are made immutable** (`chattr +i`) by the
-  oneshot before each mount, so that when a dataset is *not* mounted, writes
-  to its mountpoint path fail with `EPERM` (even as root) instead of silently
-  landing on the root pool and then blocking the mount. Two consequences:
-  the flag is invisible while the dataset is mounted (it lives on the
-  underlay inode), and an *abandoned* mountpoint directory cannot be removed
-  --- even by root --- until you clear the flag: `chattr -i <dir> && rmdir
-  <dir>`.
+  ```nix
+  systemd.services.jellyfin.requiresZfsMounts = [ "/srv/media" ];
+  ```
 
 [`disko-zfs`]: https://github.com/numtide/disko-zfs
 
@@ -479,14 +436,22 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    Without this, offline/foreign-machine recovery also needs this flake plus the
    agenix master identity.
 
-3. Rebuild. On the next boot the oneshot creates, unlocks, and mounts the
-   datasets:
+3. Rebuild. The oneshot creates, unlocks, and mounts the datasets during
+   the switch itself (and again at every boot). Verify, including that
+   declared ownership landed (the one step that can fail silently if the run
+   aborts partway --- fix by hand with `chown`/`chmod` if so):
 
    ```console
+   nix build '.#nixosConfigurations.tranquility.config.system.build.toplevel'  # cheap pre-flight
    nixos-rebuild switch --flake '.#tranquility'
    systemctl status zfs-datasets-moonpool.service
    zfs get -r keystatus,mounted moonpool
+   ls -la /srv/users/eliza/   # shares & backups: eliza:users, 0700
    ```
+
+   Then reboot once and re-check: the boot path (pool import -> TPM decrypt
+   -> oneshot) is different from the switch path, and this box is headless
+   --- see it work before calling it done.
 
 4. **Test the recovery path once.** The disaster-recovery story rests on the
    invariant *key-file contents ≡ what you type at the prompt* (libzfs strips

@@ -191,7 +191,7 @@ with pkgs; with lib; {
       mountpoint = "none";
       compression = "lz4";
       atime = false;
-      # `acltype=posixacl` and `xattr=sa are needed for NFS/Samba
+      # `acltype=posixacl` and `xattr=sa` are needed for NFS/Samba
       acltype = "posixacl";
       xattr = "sa";
       dnodesize = "auto";
