@@ -28,7 +28,6 @@ with lib; rec {
 
   home = {
     sessionVariables = {
-      EDITOR = lib.mkDefault "vim";
       BROWSER = "firefox";
       TERMINAL = "wezterm";
       CARGO_TERM_COLOR = "auto";
