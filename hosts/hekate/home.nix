@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   profiles = {
@@ -19,6 +19,8 @@
       supermicro.enable = true;
     };
   };
+
+  home.sessionVariables.EDITOR = lib.mkForce "nano"; # headless...
 
   home.packages = with pkgs; [
     # not trying to build ESP32-C3 on this machine, so global clang is fine...
