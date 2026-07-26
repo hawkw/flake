@@ -74,18 +74,23 @@
 # mount. This ensures that while a dataset is unmounted, writes to its
 # mountpoint path fail with EPERM (even for root) instead of silently landing on
 # the parent filesystem and then blocking the next mount. The flag lives on the
-# underlay inode, so it is invisible while the dataset is mounted. The one
-# downside of this is that but it also means an abandoned mountpoint directory
-# cannot be removed, even by root, until the flag is cleared. If this occurs,
-# unset the immutable flag before removing the directory, using
-# `chattr -i <dir>`
-{ config, lib, pkgs, ... }:
+# underlay inode, so it is invisible while the dataset is mounted. The downside
+# is that an abandoned mountpoint directory cannot be removed, even by root,
+# until the flag is cleared. When a declared mountpoint changes, the runner
+# removes the old (empty) underlay directory itself after the dataset has been
+# remounted; a non-empty old directory is left in place with a warning, since
+# its contents were written while the dataset was unmounted and deleting them
+# silently would be data loss. To remove one by hand (that case, or an orphan
+# left by a run that failed between reconciliation and cleanup): `chattr -i
+# <dir>`, inspect the contents, then remove.
+{ config, lib, pkgs, utils, ... }:
 let
   inherit (lib)
-    mkOption mkIf types mapAttrs mapAttrsToList filter elem map head splitString
-    unique sort length concatMap concatLists concatMapStringsSep concatStringsSep
-    escapeShellArg listToAttrs nameValuePair getExe hasPrefix removeAttrs
-    removeSuffix stringLength optional optionalString filterAttrs attrNames;
+    mkOption mkIf mkMerge types mapAttrs mapAttrsToList filter elem map head
+    splitString unique sort length concatMap concatLists concatMapStringsSep
+    concatStringsSep escapeShellArg listToAttrs nameValuePair getExe hasPrefix
+    removeAttrs removeSuffix stringLength optional optionalString filterAttrs
+    attrNames attrValues;
 
   cfg = config.profiles.zfs;
 
@@ -343,15 +348,30 @@ let
       # The pool root (depth 1) is excluded: it always exists (the pool is
       # imported before this runs) and is reconciled by disko-zfs like any
       # other declared dataset.
+      # Externally-unlocked encryption roots (`encryption.external`) are
+      # verify-only: this module has no key material for them, so creating one
+      # would necessarily create it unencrypted, and touching `keylocation`
+      # would break whatever does unlock it (initrd clevis dispatches the
+      # prompt fallback on the stored keylocation). Existence and a loaded key
+      # are asserted instead, loudly.
       createDatasets = concatMapStringsSep "\n"
         (d:
           let
             name = escapeShellArg d.name;
-            # Lazy: only forced in the encrypted branch, where `d.encryption`
-            # is known non-null.
+            # Lazy: only forced in the internally-keyed encrypted branch, where
+            # `d.encryption` (and its `keyFile`) is known non-null.
             keyLoc = escapeShellArg "file://${d.encryption.keyFile}";
           in
-          if d.encryption != null then ''
+          if d.encryption != null && d.encryption.external then ''
+            if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
+              echo "<3>externally-unlocked encryption root ${d.name} does not exist; refusing to create it (this module has no key material for it)" >&2
+              exit 1
+            fi
+            if [ "$(zfs get -H -o value keystatus ${name})" != available ]; then
+              echo "<3>key for externally-unlocked encryption root ${d.name} is not loaded (its external unlock mechanism has not run?)" >&2
+              exit 1
+            fi
+          '' else if d.encryption != null then ''
             if [ ! -e ${escapeShellArg d.encryption.keyFile} ]; then
               echo "<3>key file ${d.encryption.keyFile} for ${d.name} is missing (is agenix ready?)" >&2
               exit 1
@@ -408,6 +428,66 @@ let
           '')
         (mountable inPool);
 
+      # Snapshot every declared dataset's effective mountpoint into
+      # old-mountpoints, after creation (so every declared dataset exists; a
+      # dataset created this run is born with its declared mountpoint and so
+      # never looks moved) but before disko-zfs reconciles properties.
+      # cleanupOldMountpoints (below) uses the snapshot to find underlay
+      # directories orphaned by a mountpoint change.
+      # Unrolled per dataset (not a shell loop over a generated list:
+      # shellcheck rejects a one-iteration `for` (SC2043) when a pool declares
+      # a single dataset), grouped into one redirect (SC2129), which also
+      # truncates the file per run.
+      captureMountpoints = ''
+        {
+      '' + concatMapStringsSep "\n"
+        (d: ''
+          printf '%s\t%s\n' ${escapeShellArg d.name} \
+            "$(zfs get -H -o value mountpoint ${escapeShellArg d.name})"
+        '')
+        inPool + ''
+        } > "$RUNTIME_DIRECTORY/old-mountpoints"
+      '';
+
+      # When a declared mountpoint changes, `zfs set mountpoint=` (run by
+      # disko-zfs during reconciliation) remounts the dataset at the new path
+      # and leaves the old underlay directory behind --- immutable, because the
+      # mount step chattr +i'd it, so a plain `rmdir` cannot remove it and
+      # orphans accumulate. Remove an old underlay only when all of these hold:
+      # the recorded pre-reconcile mountpoint is a real path (not
+      # none/legacy/-, and never `/` itself), it differs from the dataset's
+      # *current* mountpoint (which also makes re-runs no-ops), the directory
+      # still exists, and nothing is mounted there (a mountpoint swap can hand
+      # the old path to another dataset). Removal is `chattr -i` (best-effort,
+      # mirroring the +i in the mount step) plus `rmdir`, never `rm -rf`: a
+      # non-empty directory means something wrote there while the dataset was
+      # unmounted, and deleting it silently would be data loss, so it is logged
+      # and left for a human. If a run dies between reconciliation and this
+      # step the orphan is not retried (old == current on the next run); the
+      # header documents manual removal.
+      cleanupOldMountpoints = ''
+        while IFS=$'\t' read -r ds old_mp; do
+          case "$old_mp" in
+            /?*) ;;
+            *) continue ;;
+          esac
+          new_mp="$(zfs get -H -o value mountpoint "$ds")"
+          if [ "$new_mp" = "$old_mp" ] || [ ! -d "$old_mp" ]; then
+            continue
+          fi
+          if mountpoint -q "$old_mp"; then
+            echo "<6>not removing old mountpoint $old_mp of $ds: something is mounted there"
+            continue
+          fi
+          chattr -i "$old_mp" 2>/dev/null || true
+          if err="$(rmdir "$old_mp" 2>&1)"; then
+            echo "<5>removed orphaned mountpoint directory $old_mp ($ds moved to $new_mp)"
+          else
+            echo "<4>could not remove old mountpoint $old_mp of $ds: $err; inspect and remove by hand" >&2
+          fi
+        done < "$RUNTIME_DIRECTORY/old-mountpoints"
+      '';
+
       # Declared ownership is ordinary POSIX metadata on the dataset's root
       # directory, applied if this run created the dataset (tracked in
       # created-datasets). This is not reconciled after creating the dataset so
@@ -444,9 +524,10 @@ let
           coreutils
           e2fsprogs # chattr, for underlay hardening
           gnugrep
+          util-linux # mountpoint(1), for old-mountpoint cleanup
         ];
         text = ''
-          # This file records datasets created by this run, so that step 4 can
+          # This file records datasets created by this run, so that step 6 can
           # set their owners. This file must be truncated now, since it persists
           # across reloads of the same activation of this service, and we do not
           # want to re-apply ownership changes every time, so that ownership may
@@ -461,7 +542,12 @@ let
           #    encryption root is never accidentally created unencrypted.
           ${createDatasets}
 
-          # 2. Reconcile properties with disko-zfs. Every dataset already exists
+          # 2. Record every declared dataset's pre-reconcile mountpoint, so
+          #    step 5 can clean up underlay directories orphaned by a
+          #    mountpoint change.
+          ${captureMountpoints}
+
+          # 3. Reconcile properties with disko-zfs. Every dataset already exists
           #    after step 1, so disko-zfs only sets/inherits properties (drift
           #    from the declared spec). We feed it a snapshot of the pool via
           #    `--file` so it neither touches nor reports on other pools, and
@@ -471,10 +557,15 @@ let
           disko-zfs --file "$RUNTIME_DIRECTORY/actual.json" --log-level info \
             apply --spec ${spec}
 
-          # 3. Mount datasets that declare a path mountpoint.
+          # 4. Mount datasets that declare a path mountpoint.
           ${mountDatasets}
 
-          # 4. Apply declared ownership to datasets created by this run.
+          # 5. Remove old mountpoint underlay directories orphaned by a
+          #    mountpoint change, now that every dataset is mounted at its
+          #    declared path.
+          ${cleanupOldMountpoints}
+
+          # 6. Apply declared ownership to datasets created by this run.
           ${applyOwnership}
         '';
       };
@@ -583,14 +674,33 @@ let
 
   encryptionSubmodule = types.submodule {
     options = {
+      external = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          This dataset is an encryption root unlocked by something *other*
+          than this module (initrd clevis/TPM, `zfs load-key` over initrd
+          SSH, ...). The module then never touches its keys: it does not set
+          `keylocation` (an external unlock mechanism may dispatch on the
+          stored value, e.g. `prompt`), does not load keys, and **refuses to
+          create the dataset if it is missing** --- with no key material,
+          creation could only produce an unencrypted dataset. The key must
+          already be loaded when the oneshot runs; PAM-at-login unlocking is
+          therefore not supported. Mutually exclusive with {option}`keyFile`
+          and {option}`keyFormat` (asserted).
+        '';
+      };
+
       keyFile = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
+        default = null;
         example = lib.literalExpression "config.age.secrets.moonpool-system-pass.path";
         description = ''
           Path to the file containing the encryption key (such as an agenix
-          secret's `.path`). The dataset is created with `keylocation =
-          file://<this path>` and unlocked from it at boot; if the path later
-          changes, the stored `keylocation` is reconciled to follow it.
+          secret's `.path`). Required unless {option}`external` is set. The
+          dataset is created with `keylocation = file://<this path>` and
+          unlocked from it at boot; if the path later changes, the stored
+          `keylocation` is reconciled to follow it.
 
           To rotate the key itself, deploy the new file contents first, then
           run `zfs change-key <dataset>` on the host: it reads the *new* key
@@ -600,12 +710,12 @@ let
       };
 
       keyFormat = mkOption {
-        type = types.enum [ "passphrase" "hex" "raw" ];
+        type = types.nullOr (types.enum [ "passphrase" "hex" "raw" ]);
+        default = null;
         description = ''
-          The `keyformat` for the encryption root.
-
-          This must be specified, and has no default: it must match the actual
-          contents of {option}`keyFile`.
+          The `keyformat` for the encryption root. Required unless
+          {option}`external` is set, and deliberately without a default: it
+          must match the actual contents of {option}`keyFile`.
 
           `passphrase` (with an actual passphrase in the file) is recommended:
           the same passphrase can unlock the dataset on any machine (using `zfs
@@ -826,7 +936,7 @@ in
         }
         ++ optional (d.owner != null || d.group != null || d.mode != null) {
           assertion = hasPrefix "/" (d.properties.mountpoint or "none")
-          && (d.properties.canmount or "on") != "off";
+            && (d.properties.canmount or "on") != "off";
           message = ''
             profiles.zfs.pools: dataset "${d.name}" declares owner/group/mode,
             but is never mounted (no path mountpoint, or canmount=off) ---
@@ -846,8 +956,47 @@ in
             profiles.zfs.pools: dataset "${d.name}" defines properties both
             via a typed option and as a freeform ZFS property name: ${concatStringsSep ", " d.conflicts}.
             Use one or the other.'';
+        }
+        ++ optional (d.encryption != null) {
+          assertion =
+            if d.encryption.external
+            then d.encryption.keyFile == null && d.encryption.keyFormat == null
+            else d.encryption.keyFile != null && d.encryption.keyFormat != null;
+          message =
+            if d.encryption.external then ''
+              profiles.zfs.pools: dataset "${d.name}" sets `encryption.external`
+              together with `keyFile`/`keyFormat`; an externally-unlocked root
+              has no module-managed key material. Set one or the other.''
+            else ''
+              profiles.zfs.pools: dataset "${d.name}" declares `encryption` but
+              is missing `keyFile` and/or `keyFormat` (required unless
+              `encryption.external` is set).'';
         })
-      datasetList;
+      datasetList
+    # Pools backing boot-critical filesystems are imported by the initrd;
+    # adding them to `boot.zfs.extraPools` (what `importAtBoot` does) makes the
+    # extra import unit try to `zfs load-key` every locked dataset in the pool
+    # at boot --- interactive prompts and a failed unit on hosts with
+    # login-unlocked datasets.
+    ++ mapAttrsToList
+      (poolName: pcfg:
+        let
+          bootFs = filter
+            (fs:
+              fs.fsType == "zfs" && fs.device != null
+                && poolOf fs.device == poolName
+                && utils.fsNeededForBoot fs)
+            (attrValues config.fileSystems);
+        in
+        {
+          assertion = pcfg.importAtBoot -> bootFs == [ ];
+          message = ''
+            profiles.zfs.pools: pool "${poolName}" backs filesystems needed for
+            boot (${concatStringsSep ", " (map (fs: fs.mountPoint) bootFs)}) and
+            is therefore imported from the initrd; set `importAtBoot = false`
+            for it.'';
+        })
+      cfg.pools;
 
     boot.zfs.extraPools = attrNames (filterAttrs (_: p: p.importAtBoot) cfg.pools);
 
@@ -869,7 +1018,29 @@ in
       ignoredProperties =
         [ "nixos:shutdown-time" ":generation" ] ++ cryptoProperties;
       # Unencrypted pools go through the stock (early) disko-zfs service.
-      datasets = listToAttrs (map datasetSpec earlyDatasets);
+      #
+      # The second merge entry compensates for a gap in upstream disko-zfs's
+      # auto-import of `disko.devices.zpool`: it copies each dataset's
+      # `options` attrset but drops the top-level disko `mountpoint`
+      # attribute --- which disko sets as a LOCAL property at creation. An
+      # auto-imported spec without it makes reconciliation `zfs inherit
+      # mountpoint` on every such dataset (today that mostly fails-silently
+      # because the datasets are busy, but that is luck, not design). Inject
+      # the missing mountpoints so the spec matches what disko actually
+      # created. TODO: upstream this into disko-zfs's auto-import.
+      datasets = mkMerge [
+        (listToAttrs (map datasetSpec earlyDatasets))
+        (mkIf (config.disko or { } ? devices)
+          (listToAttrs (concatLists (mapAttrsToList
+            (poolName: zpool: concatLists (mapAttrsToList
+              (dsName: ds:
+                optional ((ds.type or "") == "zfs_fs" && (ds.mountpoint or null) != null)
+                  (nameValuePair "${poolName}/${dsName}" {
+                    properties.mountpoint = ds.mountpoint;
+                  }))
+              (removeAttrs zpool.datasets [ "__root" ])))
+            (config.disko.devices.zpool or { })))))
+      ];
       # Keep the early stock `disko-zfs` service away from pools this module is
       # managing via its late oneshot service, as well as from any unmanaged
       # (undeclared) pool root. It will not try to create their datasets nor

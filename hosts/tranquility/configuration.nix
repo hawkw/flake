@@ -155,6 +155,18 @@ with pkgs; with lib; {
   services.ssh-tpm-hostkeys.enable = true;
   services.openssh.enable = true;
 
+  # Convenience symlink so SFTP-relative paths resolve from $HOME:
+  # `scp f tranquility:shares/`, `sftp`'s `cd shares`, and
+  # `sshfs eliza@tranquility:shares mnt/` (the last needs
+  # `-o follow_symlinks`, or spell the absolute /srv path). SFTP resolves
+  # paths server-side, so the symlink is traversed like any directory; it
+  # also keeps GNOME/tracker and $HOME-scoped tools off the share (they do
+  # not follow symlinks), unlike a real mountpoint in the homedir would.
+  # `L` (not `L+`): never clobbers an existing ~/shares.
+  systemd.tmpfiles.rules = [
+    "L /home/eliza/shares - - - - /srv/users/eliza/shares"
+  ];
+
   users.motd = ''
     ┌┬────────────────┐
     ││ ELIZA NETWORKS │
