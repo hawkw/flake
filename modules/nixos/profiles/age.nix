@@ -135,6 +135,16 @@ with lib;
         environment.systemPackages = [ pkgs.age-plugin-1p ];
         age.rekey.agePlugins = with pkgs; [ age-plugin-1p _1password-cli ];
       })
+      # If the YubiKey profile is enabled, add the YubiKey age plugin, so
+      # identities minted by `ykprovision` (see profiles/yubikey.nix) are
+      # usable for decryption and as agenix-rekey master identities. Scoped
+      # like the 1Password plugins above: only hosts that use YubiKeys need
+      # it, and `agenix rekey`'s aggregate ageWrapper picks it up from any
+      # YubiKey-enabled host.
+      (mkIf config.profiles.yubikey.enable {
+        environment.systemPackages = [ pkgs.age-plugin-yubikey ];
+        age.rekey.agePlugins = with pkgs; [ age-plugin-yubikey ];
+      })
     ]
   );
 }
