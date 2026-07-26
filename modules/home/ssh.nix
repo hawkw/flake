@@ -4,6 +4,22 @@ let
     enable = config.programs._1password-gui.enableSshAgent;
     path = "${config.home.homeDirectory}/.1password/agent.sock";
   };
+
+  # SSH identities for provisioned YubiKeys (see lib/yubikeys.nix). The key
+  # handles live in ~/.ssh on machines they've been copied to. Because ssh
+  # silently skips IdentityFiles that don't exist, it's fine to just include
+  # each YubiKey's key in IdentityFiles all the time, and SSH will select
+  # whichever one is physically present.
+  #
+  # These are only wired up when the 1Password SSH agent is disabled, because the 1P
+  # agent can neither hold nor add sk keys, so with `IdentityAgent` pointing
+  # at it the handles would degrade to passphrase-per-connection file reads.
+  # The `enableSshAgent` option is the per-host transition knob --- flip it
+  # off to switch a host to YubiKey-backed SSH auth (via the gnome-keyring
+  # agent). Once I've validated the YubiKey scheme end-to-end, the 1Password
+  # agent wiring can be deleted entirely.
+  yubikeys = import ../../lib/yubikeys.nix { inherit lib; };
+  yubikeyIdentityFiles = map (f: "~/.ssh/" + f) yubikeys.ssh.privkeyFilenames;
 in
 with lib;
 {
@@ -55,7 +71,10 @@ with lib;
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
                 ForwardAgent = false;
-                AddKeysToAgent = "no";
+                # With the 1P agent, adds are refused, so "yes" is inert at
+                # best. With the keyring agent, "yes" is what loads a YubiKey
+                # key handle (and its gcr-remembered passphrase) on first use.
+                AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
                 ServerAliveInterval = 0;
                 ServerAliveCountMax = 3;
@@ -64,6 +83,10 @@ with lib;
                 ControlMaster = "no";
                 ControlPath = "~/.ssh/master-%r@%n:%p";
                 ControlPersist = "no";
+                # Generating the SSH config will omit values that are empty
+                # lists, so this disappears entirely while no YubiKeys are
+                # enrolled.
+                IdentityFile = yubikeyIdentityFiles;
               };
             };
         }

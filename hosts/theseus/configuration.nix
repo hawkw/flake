@@ -22,6 +22,10 @@ with lib; {
     arm-cross-dev.enable = true;
     nix-ld.enable = true;
     games.enable = true;
+    yubikey = {
+      enable = true;
+      provisioning.enable = true;
+    };
   };
 
   hardware = {
