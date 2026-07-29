@@ -213,16 +213,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1721583749,
-        "narHash": "sha256-j/m8BGiNrhoPUg1u8+6RCx+52i6h6+zh8S71HfkXU04=",
-        "rev": "fc76618c3834f04ef54aea81fe2bf88f45ff4375",
-        "revCount": 123,
+        "lastModified": 1785341037,
+        "narHash": "sha256-XRQCprompORzD8zYOBNthocF9U30jiifQB7QNYBTqkM=",
+        "rev": "3b3f5a47742c288205c60a8af8b98fc2152ef872",
+        "revCount": 127,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/mycoliza/eclssd/0.1.123%2Brev-fc76618c3834f04ef54aea81fe2bf88f45ff4375/0190d664-7a1f-740c-8759-8bdda4ebe729/source.tar.gz?rev=fc76618c3834f04ef54aea81fe2bf88f45ff4375&revCount=123"
+        "url": "https://api.flakehub.com/f/pinned/mycoliza/eclssd/0.1.127%2Brev-3b3f5a47742c288205c60a8af8b98fc2152ef872/019fae9f-34a4-7790-bf67-2afe432935d4/source.tar.gz?rev=3b3f5a47742c288205c60a8af8b98fc2152ef872&revCount=127"
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/mycoliza/eclssd/0.1.118.tar.gz"
+        "url": "https://flakehub.com/f/mycoliza/eclssd/0.1.127.tar.gz"
       }
     },
     "fenix": {
