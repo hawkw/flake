@@ -25,6 +25,9 @@ with lib; {
     yubikey = {
       enable = true;
       provisioning.enable = true;
+      pam_u2f = {
+        enable = true;
+      };
     };
   };
 
