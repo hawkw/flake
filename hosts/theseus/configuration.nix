@@ -6,7 +6,7 @@ with lib; {
     ./hardware-configuration.nix
   ];
 
-  age.rekey.hostPubkey = "AAAAC3NzaC1lZDI1NTE5AAAAIEJLA1+OlP+jULnVvoP0wBZJIKeXadYQB4V90YAJnm3T";
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJLA1+OlP+jULnVvoP0wBZJIKeXadYQB4V90YAJnm3T";
 
   networking.hostName = "theseus"; # Define your hostname.
 
