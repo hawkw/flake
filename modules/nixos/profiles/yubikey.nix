@@ -1238,6 +1238,13 @@ in
             cue = true;
           };
         };
+
+        # sadly, GDM's `gdm-fingerprint` worker can race with `gdm-password`,
+        # which is what pam-u2f hangs off of, and can block session startup when
+        # logging in with the yubikey. so, turn off fprintd to make that work
+        # nicer.
+        services.fprintd.enable = false;
+
       }
     ))
   ]);
