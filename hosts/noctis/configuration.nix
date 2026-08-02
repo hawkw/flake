@@ -188,11 +188,6 @@
   #     ];
   #   };
 
-  # disable the Gnome keyring, since we are using 1password to manage secrets
-  # instead.
-  services.gnome.gnome-keyring.enable = lib.mkForce false;
-  security.pam.services.login.enableGnomeKeyring = lib.mkForce false;
-
   users.motd = ''
     ┌┬────────────────┐
     ││ ELIZA NETWORKS │

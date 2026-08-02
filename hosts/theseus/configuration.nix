@@ -27,6 +27,7 @@ with lib; {
       provisioning.enable = true;
       pam_u2f = {
         enable = true;
+        lockOnUnplug = true;
       };
     };
   };
@@ -82,10 +83,6 @@ with lib; {
     xfel.enable = true;
   };
 
-  # disable the Gnome keyring, since we are using 1password to manage secrets
-  # instead.
-  services.gnome.gnome-keyring.enable = mkForce false;
-  security.pam.services.login.enableGnomeKeyring = mkForce false;
   # COSMIC
   services = {
     desktopManager.cosmic.enable = true;
