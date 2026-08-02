@@ -99,7 +99,7 @@
 # authfile) and prints a checklist of the steps it can't do from here (GitHub
 # key removal, 1Password cleanup, rebuilds and reboots).
 #
-# The module also installs a udev rule that symlinks /dev/yubikeys/<serial> for
+# The module also installs a udev rule that symlinks /dev/yubikey/<serial> for
 # each attached YubiKey, as a zero-I/O way for scripts (e.g. the git signing-key
 # selector in the home-manager config) to discover which keys are physically
 # present. This depends on the serial being visible in the USB descriptor, which
@@ -397,7 +397,7 @@ let
         #     to stop it from doing that. Luckily, we're not using OTP for
         #     anything.
         #  2. The serial must appear in the USB descriptor (iSerialNumber)
-        #     so this module's udev rule can produce /dev/yubikeys/ symlinks.
+        #     so this module's udev rule can produce /dev/yubikey/ symlinks.
         #     The SERIAL_USB_VISIBLE flag lives *in a slot configuration*
         #     and only takes effect while the OTP application is
         #     USB-enabled. Unfortunately, this means we cannot do the
@@ -1106,7 +1106,7 @@ in
         libnotify = mkDefault true;
       };
 
-      # /dev/yubikeys/<serial> symlinks used as presence markers for attached
+      # /dev/yubikey/<serial> symlinks used as presence markers for attached
       # YubiKeys. symlink per key, named by the canonical decimal serial (the
       # same spelling `ykman list --serials` prints and the SSH keyfile names
       # use). Consumers can glob the directory to learn which enrolled keys are
@@ -1116,22 +1116,33 @@ in
       # imagine wanting it for other things.
       #
       # Requires the serial to be visible in the USB descriptor
-      # (SERIAL_USB_VISIBLE), which ykprovision's OTP phase configures. The
-      # descriptor zero-pads to 10 digits; the IMPORT helper strips that so
-      # symlink names match ykman's spelling. IMPORT{program} is evaluated
-      # as a match, so a key with a hidden or malformed serial simply gets
-      # no symlink.
-      services.udev.extraRules =
+      # (SERIAL_USB_VISIBLE), which ykprovision's OTP phase configures.
+      services.udev.packages =
         let
+          # When ykman prints serials, they are displayed without leading
+          # zeroes, but udev's USB descriptor will include them. This IMPORT
+          # helper strips that so symlink names match ykman's spelling.
+          # IMPORT{program} is evaluated as a match, so a key with a hidden or
+          # malformed serial simply gets no symlink.
           normalizeSerial = pkgs.writeShellScript "yk-serial-normalize" ''
             ${yubikeysLib.usb.serialFunctions}
             s="$(normalize_yk_serial "''${1:-}")" || exit 1
             echo "YK_SERIAL=$s"
           '';
+          devYubikeysRules = pkgs.writeTextFile {
+            name = "yubikey-udev-rules";
+            text =
+              ''
+                SUBSYSTEM=="usb", \
+                  ATTR{idVendor}=="${yubicoVid}", \
+                  ATTR{serial}=="?*", \
+                  IMPORT{program}="${normalizeSerial} $attr{serial}", \
+                  SYMLINK+="yubikey/$env{YK_SERIAL}"
+              '';
+            destination = "/etc/udev/rules.d/50-yubikey.rules";
+          };
         in
-        ''
-          SUBSYSTEM=="usb", ATTR{idVendor}=="${yubicoVid}", ATTR{serial}=="?*", IMPORT{program}="${normalizeSerial} $attr{serial}", SYMLINK+="yubikeys/$env{YK_SERIAL}"
-        '';
+        [ devYubikeysRules ];
     }
     # If provisioning.enable = true, also include the `ykprovision` and
     # `ykrevoke` scripts.

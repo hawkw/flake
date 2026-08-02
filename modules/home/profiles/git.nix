@@ -212,7 +212,8 @@ with lib; {
             cases = mapAttrsToList mkCase yubikeys.ssh.bySerial;
           in
           concatStrings cases;
-        signingKeyCommand = pkgs.writeShellApplication {
+        devPath = "/dev/yubikey";
+        signingKeyCommand = lpkgs.writeShellApplication {
           name = "yk-git-signing-key";
           runtimeInputs = with pkgs; [ openssh coreutils gnugrep ];
           text = ''
@@ -222,9 +223,9 @@ with lib; {
             present_serials() {
               local d
               # first, try to detect which keys are present using the
-              # /dev/yubikeys/ symlinks
-              if [ -d /dev/yubikeys ]; then
-                for d in /dev/yubikeys/*; do
+              # /dev/yubikey/ symlinks
+              if [ -d ${devPath} ]; then
+                for d in ${devPath}*; do
                   [ -e "$d" ] || continue
                   basename "$d"
                 done
@@ -273,8 +274,8 @@ with lib; {
             done <<< "$AGENT_KEYS"
 
             echo "yk-git-signing-key: no YubiKey SSH key available for signing." >&2
-            echo "either plug in an enrolled YubiKey (with its key handle restored" >&2
-            echo "to ~/.ssh), or connect with a forwarded agent that holds one." >&2
+            echo "either plug in an enrolled YubiKey (with its key handle present" >&2
+            echo "in ~/.ssh), or connect with a forwarded agent that holds one." >&2
             exit 1
           '';
         };
