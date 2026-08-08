@@ -20,6 +20,7 @@
     ./profiles/perftools.nix
     ./profiles/raspberry-pi
     ./profiles/server.nix
+    ./profiles/storage.nix
     ./profiles/vu-dials.nix
     ./profiles/zfs
     ./profiles/yubikey.nix

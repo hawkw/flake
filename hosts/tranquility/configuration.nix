@@ -11,6 +11,7 @@ with pkgs; with lib; {
   profiles = {
     age.tpmHostIdentity.enable = true;
     server.enable = true;
+    storage.enable = true;
     desktop = {
       gnome3.enable = true;
     };
@@ -46,14 +47,6 @@ with pkgs; with lib; {
   environment.systemPackages = with pkgs; [
     sbctl
     fwupd
-    # various LSI SAS card thingies
-    storcli2
-    lsirec
-    lsiutil
-    lsscsi
-    # seagate drive firmware utility
-    openseachest
-    sg3_utils
   ];
 
   # fwupd: firmware update
