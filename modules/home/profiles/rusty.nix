@@ -30,7 +30,6 @@ in with lib; {
           fd
           # ytop
           bottom
-          glances
           # dust: like `du` but good
           dust
           # procs: list processes
