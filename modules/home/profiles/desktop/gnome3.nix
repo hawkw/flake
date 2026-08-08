@@ -52,10 +52,5 @@ with lib; {
         ocs-url
       ] ++ gnome_extensions ++ themes;
 
-    #### gnome-keyring ########################################################
-    services.gnome-keyring = {
-      enable = true;
-      components = [ "pkcs11" "secrets" "ssh" ];
-    };
   };
 }
