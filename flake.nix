@@ -181,6 +181,13 @@
         };
       };
 
+      zed-editor-flake = {
+        url = "github:HPsaucii/zed-editor-flake";
+        inputs = {
+          nixpkgs.follows = "nixpkgs";
+          flake-parts.follows = "flake-parts";
+        };
+      };
     };
 
   ############################################################################
@@ -230,7 +237,13 @@
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
+
         inputs.claude-code.overlays.default
+
+        (_: prev: {
+          zed-editor-preview-bin = inputs.zed-editor-flake.packages.${prev.system}.zed-editor-preview-bin;
+          zed-editor-bin = inputs.zed-editor-flake.packages.${prev.system}.zed-editor-bin;
+        })
       ];
 
       lib = import ./lib;
@@ -347,7 +360,6 @@
             inherit inputs config overlays;
 
             user = "eliza";
-
             baseModules = [ self.homeModules.default ];
           };
 

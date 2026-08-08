@@ -811,7 +811,8 @@
         "ssh-tpm-hostkeys": "ssh-tpm-hostkeys",
         "utils": "utils_2",
         "vu-server": "vu-server",
-        "vupdaters": "vupdaters"
+        "vupdaters": "vupdaters",
+        "zed-editor-flake": "zed-editor-flake"
       }
     },
     "rust-analyzer-src": {
@@ -1116,6 +1117,29 @@
       "original": {
         "type": "tarball",
         "url": "https://flakehub.com/f/mycoliza/vupdaters/0.1.121.tar.gz"
+      }
+    },
+    "zed-editor-flake": {
+      "inputs": {
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1756797624,
+        "narHash": "sha256-8EWKUNW90lu6B13B/97CROw4iji6v3CAm3avvioXho8=",
+        "owner": "HPsaucii",
+        "repo": "zed-editor-flake",
+        "rev": "2c2a2aaac1cd9dd95e92dc045ce51a6d8372b02e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "HPsaucii",
+        "repo": "zed-editor-flake",
+        "type": "github"
       }
     },
     "zig": {
