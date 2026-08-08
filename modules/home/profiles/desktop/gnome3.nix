@@ -18,20 +18,19 @@ let
     # dash-to-dock-for-cosmic
     # tailscale-status
   ];
-  # configure Gnome themes
-  themes = with pkgs; [
-    ant-theme
-    ant-nebula-theme
-    dracula-theme
-    arc-theme
-    arc-icon-theme
-    equilux-theme
-    pop-gtk-theme
-    pop-icon-theme
-    qogir-theme
-    yaru-theme
-    matcha-gtk-theme
-  ];
+  # # configure Gnome themes
+  # themes = with pkgs; [
+  #   ant-nebula-theme
+  #   dracula-theme
+  #   arc-theme
+  #   arc-icon-theme
+  #   equilux-theme
+  #   pop-gtk-theme
+  #   pop-icon-theme
+  #   qogir-theme
+  #   yaru-theme
+  #   matcha-gtk-theme
+  # ];
 in
 with lib; {
 
@@ -50,7 +49,9 @@ with lib; {
         # and disk space
         gnome-usage
         ocs-url
-      ] ++ gnome_extensions ++ themes;
+      ] ++ gnome_extensions
+      # ++ themes
+    ;
 
   };
 }
