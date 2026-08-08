@@ -54,20 +54,31 @@ in {
     # When the last session for a user ends, the per-user systemd manager
     # (user@.service) shuts down, stopping every unit it owns, including the
     # app-*.scope units that desktop environments launch applications into. One
-    # such application ignoring SIGTERM will keep the logout from succeeding for
+    # application ignoring SIGTERM will keep the logout from succeeding for
     # `TimeoutStopSec` seconds, which defaults to 90s. While that transaction is
     # queued, logind cannot start a new session for the same user, so login
     # attempts sit at the display manager with a spinner until the timeout
     # expires and the straggler is SIGKILLed. This is annoying.
     #
-    # This applies to all app-*.scope units via systemd's truncated unit-name
-    # matching (systemd.unit(5)), so only launched applications get the shorter
-    # timeout. Services are given the default timeout, because they might be
-    # doing something important.
-    environment.etc."systemd/user/app-.scope.d/10-bound-stop-timeout.conf".text = ''
-      [Scope]
-      TimeoutStopSec=15s
-    '';
+    # This dropin sets a 5-second timeout for all app-*.scope units via
+    # systemd's truncated unit-name matching (systemd.unit(5)), so only launched
+    # applications (not daemons) get the shorter timeout.
+    #
+    # GNOME and flatpak already ship `app-gnome-.scope.d` and
+    # `app-flatpak-.scope.d` drop-ins setting TimeoutStopSec=5s, so 5s seems
+    # like a reasonable default for interactive applications. And, because
+    # dropins are applied based on filename ordering, setting a larger timeout
+    # here would also increase the timeout for GNOME apps.
+    systemd.user.units."app-.scope" = {
+      text = ''
+        [Scope]
+        TimeoutStopSec=5s
+      '';
+      # `overrideStrategy = "asDropin"` makes the unit generator emit this as
+      # `app-.scope.d/overrides.conf` rather than as a unit file named
+      # `app-.scope`, which wouldn't work.
+      overrideStrategy = "asDropin";
+    };
 
     ### hardware ###
     hardware = {
