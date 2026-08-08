@@ -133,7 +133,6 @@ in with lib; {
       (mkIf cfg.enableAliases {
         home.shellAliases = {
           tree = "${pkgs.lsd}/bin/lsd --tree";
-          grep = "${pkgs.ripgrep}/bin/rg";
         };
       })
     ]);
