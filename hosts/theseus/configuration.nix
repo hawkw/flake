@@ -6,7 +6,7 @@ with lib; {
     ./hardware-configuration.nix
   ];
 
-  age.rekey.hostPubkey = "AAAAC3NzaC1lZDI1NTE5AAAAIEJLA1+OlP+jULnVvoP0wBZJIKeXadYQB4V90YAJnm3T";
+  age.rekey.hostPubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEJLA1+OlP+jULnVvoP0wBZJIKeXadYQB4V90YAJnm3T";
 
   networking.hostName = "theseus"; # Define your hostname.
 
@@ -22,6 +22,14 @@ with lib; {
     arm-cross-dev.enable = true;
     nix-ld.enable = true;
     games.enable = true;
+    yubikey = {
+      enable = true;
+      provisioning.enable = true;
+      pam_u2f = {
+        enable = true;
+        lockOnUnplug = true;
+      };
+    };
   };
 
   hardware = {
@@ -43,8 +51,52 @@ with lib; {
     # use the latest stable Linux kernel
     kernelPackages = pkgs.linuxPackages_latest;
 
-    initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
-      "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
+    ### FDE unlock via YubiKey (systemd-cryptenroll FIDO2) ###
+    #
+    # Both LUKS volumes (root, declared in hardware-configuration.nix, and
+    # swap, declared here) carry FIDO2 enrollments made with
+    # `systemd-cryptenroll --fido2-device=auto <blockdev>`, one per YubiKey
+    # (see modules/nixos/profiles/yubikey.nix for the overall scheme). Swap is
+    # enrolled too, and with the same PIN-required policy: it must unlock in
+    # the initrd on the hibernate-resume path, and a hibernation image
+    # contains the root volume master key, so a weaker policy on swap would
+    # undermine the one on root.
+    #
+    # The original memorized passphrase remains enrolled (keyslot 0) on both
+    # volumes as the disaster-recovery path; systemd-cryptsetup falls back to
+    # a passphrase prompt when no token responds within token-timeout.
+    #
+    # FIDO2 unlock requires the systemd-based stage 1; the scripted-initrd
+    # fido2 path (fido2luks) is deprecated and incompatible with it.
+    initrd.systemd = {
+      enable = true;
+      # Allow a root rescue shell in the initrd emergency target. Without
+      # this, any stage-1 failure drops to emergency mode with root locked,
+      # and un-stranding the machine requires a live USB. This is reachable
+      # only *before* the volumes are unlocked, so it exposes no decrypted
+      # data.
+      emergencyAccess = true;
+    };
+
+    initrd.luks.devices =
+      let
+        # Luks options to enable 
+        crypttabExtraOpts = [
+          "fido2-device=auto"
+          # How long to wait for a FIDO2 token before falling back to the
+          # passphrase prompt (i.e. when booting with no yubikey plugged in).
+          "token-timeout=10s"
+        ];
+      in
+      {
+        # root
+        "luks-d315acae-6096-482b-8dbd-ff53e0df180c".crypttabExtraOpts = crypttabExtraOpts;
+        # swap
+        "luks-c8e922ff-11e1-473c-a52e-c2b86a042e44" = {
+          device = "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
+          inherit crypttabExtraOpts;
+        };
+      };
 
     ### secureboot using Lanzaboote ###
     # TODO: move this to a module?
@@ -75,10 +127,6 @@ with lib; {
     xfel.enable = true;
   };
 
-  # disable the Gnome keyring, since we are using 1password to manage secrets
-  # instead.
-  services.gnome.gnome-keyring.enable = mkForce false;
-  security.pam.services.login.enableGnomeKeyring = mkForce false;
   # COSMIC
   services = {
     desktopManager.cosmic.enable = true;
@@ -90,7 +138,7 @@ with lib; {
   };
 
   networking.hosts = {
-    # "172.20.36.4" = [ "recovery.sys.dublin.eng.oxide.computer" ];
+    "172.20.36.4" = [ "recovery.sys.dublin.eng.oxide.computer" ];
   };
 
   users.motd = ''

@@ -138,8 +138,12 @@ with lib; {
 
         signing = {
           format = "ssh";
-          key =
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s";
+          # The 1Password SSH key. Only set this as the signing key if 1Password
+          # ssh agent is enabled, since otherwise, it won't exist. When this is
+          # not enabled, git falls back to gpg.ssh.defaultKeyCommand, which
+          # picks a YubiKey (below).
+          key = mkIf enable1PasswordSshAgent
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s";
         };
       };
     };
@@ -165,6 +169,120 @@ with lib; {
       {
         home.packages = [ signingScript ];
         programs.git.settings.gpg."ssh".program = "ssh-sign";
+      }
+    ))
+    # YubiKey commit signing.
+    #
+    # Any enrolled YubiKey may be plugged into any machine, so the signing key
+    # cannot be pinned statically. Instead, we use `gpg.ssh.defaultKeyCommand`
+    # to pick one at signing time. Git runs this command when user.signingKey is
+    # unset, and expects `ssh-add -L`-shaped output.
+    #
+    # This script selects keys in the following order of presence:
+    #
+    #   1. A key that is *physically present* and whose handle file is present
+    #      in ~/.ssh. If the handle isn't in the ssh agent yet, it is
+    #      `ssh-add`ed first, prompting for the keyfile passphrase exactly as
+    #      AddKeysToAgent does on first ssh. This is necessary because git
+    #      signing uses the ssh-agent.
+    #   2. Otherwise, any enrolled key already in the agent. This is the
+    #      case when the agent is forwarded to a remote host.
+    #   3. Otherwise, fail with instructions.
+    (mkIf (!enable1PasswordSshAgent) (
+      let
+        yubikeys = import ../../../lib/yubikeys.nix { inherit lib; };
+        # "<type> <blob>" per enrolled key, one per line, for matching
+        # against `ssh-add -L` output (comments differ between agent and
+        # repo, so match on the first two fields only).
+        registeredKeys =
+          let
+            typeAndBlob = k: concatStringsSep " " (take 2 (splitString " " k));
+            keyLines = map typeAndBlob yubikeys.ssh.pubkeys;
+          in
+          concatStringsSep "\n" keyLines;
+        # `serial) handle=...; pubkey=...;;` stanzas for the case statement.
+        serialCases =
+          let
+            mkCase = (serial: key: ''
+              ${serial})
+                handle=${escapeShellArg key.privkeyFilename}
+                pubkey=${escapeShellArg key.pubkey}
+                ;;
+            '');
+            cases = mapAttrsToList mkCase yubikeys.ssh.bySerial;
+          in
+          concatStrings cases;
+        devPath = "/dev/yubikey";
+        signingKeyCommand = lpkgs.writeShellApplication {
+          name = "yk-git-signing-key";
+          runtimeInputs = with pkgs; [ openssh coreutils gnugrep ];
+          text = ''
+            ${yubikeys.usb.serialFunctions}
+
+            # Which enrolled YubiKeys are physically present?
+            present_serials() {
+              local d
+              # first, try to detect which keys are present using the
+              # /dev/yubikey/ symlinks
+              if [ -d ${devPath} ]; then
+                for d in ${devPath}*; do
+                  [ -e "$d" ] || continue
+                  basename "$d"
+                done
+                return 0
+              fi
+              # if nothing's there, fall back to walking sysfs in case the udev
+              # rule is messed up.
+              sysfs_yk_serials
+            }
+
+            AGENT_KEYS="$(ssh-add -L 2>/dev/null | cut -d' ' -f1,2)" || AGENT_KEYS=""
+
+            in_agent() {
+              [ -n "$AGENT_KEYS" ] && grep -qxF "$1" <<< "$AGENT_KEYS"
+            }
+
+            # 1. A plugged-in enrolled key whose handle is present here.
+            for serial in $(present_serials); do
+              handle=""
+              pubkey=""
+              case "$serial" in
+                ${serialCases}
+                *) continue;;
+              esac
+              if [ ! -f "$HOME/.ssh/$handle" ]; then
+                echo "yk-git-signing-key: YubiKey $serial is plugged in, but ~/.ssh/$handle" >&2
+                echo "is not on this machine; restore it from 1Password to sign with it." >&2
+                continue
+              fi
+              if ! in_agent "$(cut -d' ' -f1,2 <<< "$pubkey")"; then
+                # Load the handle into the agent (prompts for the keyfile
+                # passphrase).
+                ssh-add "$HOME/.ssh/$handle" >&2 || continue
+              fi
+              printf '%s\n' "$pubkey"
+              exit 0
+            done
+
+            # 2. Any enrolled key already in the agent (ForwardAgent case).
+            while read -r keyline; do
+              [ -n "$keyline" ] || continue
+              if grep -qxF "$keyline" <<< ${escapeShellArg registeredKeys}; then
+                printf '%s\n' "$keyline"
+                exit 0
+              fi
+            done <<< "$AGENT_KEYS"
+
+            echo "yk-git-signing-key: no YubiKey SSH key available for signing." >&2
+            echo "either plug in an enrolled YubiKey (with its key handle present" >&2
+            echo "in ~/.ssh), or connect with a forwarded agent that holds one." >&2
+            exit 1
+          '';
+        };
+      in
+      {
+        home.packages = [ signingKeyCommand ];
+        programs.git.settings.gpg."ssh".defaultKeyCommand = getExe signingKeyCommand;
       }
     ))]);
 }

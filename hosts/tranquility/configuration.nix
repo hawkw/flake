@@ -151,6 +151,20 @@ with pkgs; with lib; {
   # # start ttyS0 early so that IPMI SoL works
   # systemd.services."serial-getty@ttyS0".wantedBy = [ "multi-user.target" ];
 
+  # `/etc` is its own ZFS dataset (see disko-config.nix), and
+  # `switch-to-configuration` restarts (unmounts + remounts) a changed
+  # `etc.mount` rather than reloading it in place as it does for `/` and `/nix`.
+  # This can blip the `/etc` filesystem in and out of existence for a moment,
+  # causing systemd services which read/write files that should exist in `/etc`
+  # to transiently fail when the configuration is reloaded. Therefore, bind them
+  # to requiring the mount for `/etc` so that they don't restart until it has
+  # been re-mounted.
+  #
+  # TODO(eliza): i should probably get around to opening an upstream issue for
+  # actually fixing this...
+  systemd.services.systemd-tpm2-setup.unitConfig.RequiresMountsFor = "/etc";
+  systemd.services.accounts-daemon.unitConfig.RequiresMountsFor = "/etc";
+
   # TPM 2.0-backed SSH hostkeys using ssh-tpm-agent.
   services.ssh-tpm-hostkeys.enable = true;
   services.openssh.enable = true;

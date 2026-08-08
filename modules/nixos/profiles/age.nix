@@ -76,56 +76,72 @@ with lib;
         });
       }
       # TPM-sealed *age* host identity.
-      (mkIf cfg.tpmHostIdentity.enable {
-        assertions = [
-          {
-            assertion = config.security.tpm2.enable;
-            message = "`security.tpm2.enable` must be `true` in order to use TPM-sealed age host identities.";
-          }
-        ];
-        # Point decryption at the TPM identity stub. The stub only *references*
-        # the TPM-sealed key (the secret never leaves the TPM); setting this,
-        # rather than relying on the SSH-host-key default, also clears the
-        # `age.identityPaths must be set` assertion.
-        age.identityPaths = [ "/etc/age/host-identity.txt" ];
+      (mkIf cfg.tpmHostIdentity.enable (
+        let hostidPath = "/etc/age/host-identity.txt"; in {
+          assertions = [
+            {
+              assertion = config.security.tpm2.enable;
+              message = "`security.tpm2.enable` must be `true` in order to use TPM-sealed age host identities.";
+            }
+          ];
+          # Point decryption at the TPM identity stub. The stub only *references*
+          # the TPM-sealed key (the secret never leaves the TPM); setting this,
+          # rather than relying on the SSH-host-key default, also clears the
+          # `age.identityPaths must be set` assertion.
+          age.identityPaths = [ hostidPath ];
 
-        # Generate the identity on first boot if the host does not already have
-        # one. The key is sealed to this machine's TPM, so it cannot be
-        # generated ahead of time on the build host; it must be created on the
-        # target. The `ConditionPathExists` guard makes this a one-shot
-        # bootstrap that never clobbers an existing identity.
-        #
-        # This only mints the identity. The admin still has to read back its
-        # recipient, set it as `age.rekey.hostPubkey`, `agenix rekey`, and
-        # rebuild --- the recipient is build-time input and cannot be known
-        # until the key exists. Until then, secret-dependent services fail to
-        # start, but the host still boots.
-        systemd.services.age-host-identity = {
-          description = "Generate the TPM-sealed age host identity";
-          wantedBy = [ "multi-user.target" ];
-          unitConfig.ConditionPathExists = "!/etc/age/host-identity.txt";
-          path = [ pkgs.age-plugin-tpm ];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            UMask = "0077";
+          # Generate the identity on first boot if the host does not already have
+          # one. The key is sealed to this machine's TPM, so it cannot be
+          # generated ahead of time on the build host; it must be created on the
+          # target. The `ConditionPathExists` guard makes this a one-shot
+          # bootstrap that never clobbers an existing identity.
+          #
+          # This only mints the identity. The admin still has to read back its
+          # recipient, set it as `age.rekey.hostPubkey`, `agenix rekey`, and
+          # rebuild. The recipient is build-time input and cannot be known
+          # until the key exists. Until then, secret-dependent services fail to
+          # start, but the host still boots.
+          systemd.services.age-host-identity = {
+            description = "Generate the TPM-sealed age host identity";
+            wantedBy = [ "multi-user.target" ];
+            unitConfig = {
+              ConditionPathExists = "!${hostidPath}";
+              # Bind this unit to the `/etc` mount. Where `/etc` is its own
+              # filesystem, the mount can be torn down and rebuilt out from under
+              # running services, such as by `switch-to-configuration` restarting
+              # `etc.mount`. If this happens, the `ConditionPathExists` would
+              # incorrectly re-run the service, since the host-identity file would
+              # blip out of existence...and then it would try to write to a
+              # filesystem that is unmounted and fail spuriously. This is not
+              # actually that bad, because the host identity will actually have
+              # existed all along and will come back when `/etc` is mounted, but
+              # it causes a spurious failure, which makes me feel sad.
+              RequiresMountsFor = "/etc";
+            };
+            path = [ pkgs.age-plugin-tpm ];
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+              UMask = "0077";
+            };
+            script = ''
+              HOST_ID_PATH=${lib.escapeShellArg hostidPath}
+              install -d -m 0700 /etc/age
+              age-plugin-tpm --generate -o "$HOST_ID_PATH"
+              chmod 0600 "$HOST_ID_PATH"
+              echo "generated a new TPM-sealed age identity at $HOST_ID_PATH"
+              echo "its recipient is:"
+              # Use --tpm-recipient so the recipient carries the age1tpm1 prefix
+              # rather than age1tag1; agenix-rekey resolves the plugin from the
+              # prefix and there is no age-plugin-tag binary.
+              age-plugin-tpm -y "$HOST_ID_PATH" --tpm-recipient
+            '';
           };
-          script = ''
-            install -d -m 0700 /etc/age
-            age-plugin-tpm --generate -o /etc/age/host-identity.txt
-            chmod 0600 /etc/age/host-identity.txt
-            echo "generated a new TPM-sealed age identity at /etc/age/host-identity.txt"
-            echo "its recipient is:"
-            # Use --tpm-recipient so the recipient carries the age1tpm1 prefix
-            # rather than age1tag1; agenix-rekey resolves the plugin from the
-            # prefix and there is no age-plugin-tag binary.
-            age-plugin-tpm -y /etc/age/host-identity.txt --tpm-recipient
-          '';
-        };
-      })
+        }
+      ))
       # If 1Password is enabled, add the 1Password age plugins. The master
       # identity lives in 1Password, so these are only needed where 1Password
-      # is enabled --- in particular the host you run `agenix rekey` from.
+      # is enabled (i.e. the host you run `agenix rekey` from).
       # Scoping them here keeps `_1password-cli` (and an aarch64 build of it)
       # out of the closures of hosts that never touch 1Password, e.g. the Pis.
       # `agenix rekey` still gets `_1password-cli` for decrypting the master
@@ -134,6 +150,16 @@ with lib;
       (mkIf config.programs._1password.enable {
         environment.systemPackages = [ pkgs.age-plugin-1p ];
         age.rekey.agePlugins = with pkgs; [ age-plugin-1p _1password-cli ];
+      })
+      # If the YubiKey profile is enabled, add the YubiKey age plugin, so
+      # identities minted by `ykprovision` (see profiles/yubikey.nix) are
+      # usable for decryption and as agenix-rekey master identities. Scoped
+      # like the 1Password plugins above: only hosts that use YubiKeys need
+      # it, and `agenix rekey`'s aggregate ageWrapper picks it up from any
+      # YubiKey-enabled host.
+      (mkIf config.profiles.yubikey.enable {
+        environment.systemPackages = [ pkgs.age-plugin-yubikey ];
+        age.rekey.agePlugins = with pkgs; [ age-plugin-yubikey ];
       })
     ]
   );

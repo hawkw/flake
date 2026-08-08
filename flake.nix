@@ -6,12 +6,10 @@
   nixConfig = {
     extra-substituters = [
       "https://nix-community.cachix.org"
-      "https://cache.garnix.io"
       "https://cosmic.cachix.org/"
     ];
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
       "cosmic.cachix.org-1:Dya9IyXD4xdBehWjrkPv6rtxpmMdRel02smYzA85dPE="
     ];
   };
@@ -139,7 +137,7 @@
 
       eclssd = {
         # url = "github:hawkw/eclssd/6de42a256f547bba72bda5274b3d42dc574676e8";
-        url = "https://flakehub.com/f/mycoliza/eclssd/0.1.118.tar.gz";
+        url = "https://flakehub.com/f/mycoliza/eclssd/0.1.127.tar.gz";
         inputs = {
           nixpkgs.follows = "nixpkgs";
           rust-overlay.follows = "rust-overlay";

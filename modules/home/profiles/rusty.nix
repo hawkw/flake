@@ -30,7 +30,6 @@ in with lib; {
           fd
           # ytop
           bottom
-          glances
           # dust: like `du` but good
           dust
           # procs: list processes
@@ -134,7 +133,6 @@ in with lib; {
       (mkIf cfg.enableAliases {
         home.shellAliases = {
           tree = "${pkgs.lsd}/bin/lsd --tree";
-          grep = "${pkgs.ripgrep}/bin/rg";
         };
       })
     ]);

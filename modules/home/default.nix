@@ -28,7 +28,6 @@ with lib; rec {
 
   home = {
     sessionVariables = {
-      EDITOR = lib.mkDefault "vim";
       BROWSER = "firefox";
       TERMINAL = "wezterm";
       CARGO_TERM_COLOR = "auto";
@@ -196,7 +195,7 @@ with lib; rec {
   # don't know why it doesn't work in `zsh.nix` off the top of my head, but I'm
   # too lazy to figure it out.
   xdg.configFile."zsh/vendor-completions".source = with pkgs;
-    runCommandNoCC "vendored-zsh-completions" { } ''
+    runCommand "vendored-zsh-completions" { } ''
       mkdir -p $out
       ${fd}/bin/fd -t f '^_[^.]+$' \
         ${lib.escapeShellArgs home.packages} \

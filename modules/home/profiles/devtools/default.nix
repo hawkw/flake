@@ -90,7 +90,7 @@ in
         zed = "${config.programs.zed-editor.package}/bin/zeditor";
       };
       # Make Zed the default editor.
-      home.sessionVariables.EDITOR = mkForce "${config.programs.zed-editor.package}/bin/zeditor --wait";
+      home.sessionVariables.EDITOR = mkDefault "${config.programs.zed-editor.package}/bin/zeditor --wait";
     })
   ];
 }
