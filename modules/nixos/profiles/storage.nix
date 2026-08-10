@@ -5,6 +5,7 @@
 with lib;
 let
   cfg = config.profiles.storage;
+
 in
 {
   options.profiles.storage = {
@@ -30,11 +31,10 @@ in
 
     # Continuous drive-health monitoring via smartd.
     #
-    # This is enabled even on ZFS-based storage systems, since smartd detects
-    # pre-failure physical hardware health indicators, rather than corrupted
-    # data detected by ZFS scrubs. It is also the only thing which will poll
-    # idle hot-spare drives, so we don't discover that they're totally dead only
-    # after they're swapped in.
+    # This is enabled even on ZFS-based storage systems: ZFS scrubs detect damage
+    # already done to data, while smartd detects pre-failure physical hardware
+    # health indicators. It is also the only thing which will poll idle hot-spare
+    # drives.
     services.smartd = {
       # If a system wants to spin down drives, such as in very infrequently
       # written offsite backups, consider disabling smartd.
