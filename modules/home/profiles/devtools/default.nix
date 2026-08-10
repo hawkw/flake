@@ -91,6 +91,8 @@ in
       };
       # Make Zed the default editor.
       home.sessionVariables.EDITOR = mkDefault "${config.programs.zed-editor.package}/bin/zeditor --wait";
+      # zed needs this for agent sandboxing
+      home.packages = [ pkgs.bubblewrap ];
     })
   ];
 }
