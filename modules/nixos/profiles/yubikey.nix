@@ -1141,11 +1141,58 @@ in
                   ATTR{serial}=="?*", \
                   IMPORT{program}="${normalizeSerial} $attr{serial}", \
                   SYMLINK+="yubikey/$env{YK_SERIAL}"
+
+                # Kick the yubikey-touch-detector service whenever a YubiKey
+                # HID interface appears
+                ACTION=="add", \
+                  SUBSYSTEM=="hidraw", \
+                  ATTRS{idVendor}=="${yubicoVid}", \
+                  # setting this creates a systemd device unit for the hidraw
+                  # node...
+                  TAG+="systemd", \
+                  # ...and setting *this* tells systemd to start the rescan
+                  # oneshot when the device unit becomes active.
+                  ENV{SYSTEMD_USER_WANTS}+="yubikey-touch-detector-rescan.service"
               '';
             destination = "/etc/udev/rules.d/50-yubikey.rules";
           };
         in
         [ devYubikeysRules ];
+
+      # This is an unfortunate workaround for a weird little bit of jank in
+      # `yubikey-touch-detector`. It will only start tracking each device in
+      # /dev/hidraw* either immediately after it starts up (if it is already
+      # present) or after the device node's inotify create event. Critically,
+      # this means that it will not *retry* to start tracking events from a
+      # yubikey that it has previously failed to adopt. It is possible for
+      # `yubikey-touch-detector`'s attempt to open(2) a hidraw node to fail
+      # (typically because logind hasn't applied the seat uaccess ACL yet), so
+      # it can totally miss notifications from that yubikey until it is
+      # disconnected.
+      #
+      # This little oneshot, therefore, exists just to give
+      # `yubikey-touch-detector` a whack after udev has actually created the
+      # hidraw node, which makes it rescan /dev/ after the uaccess ACL has
+      # been applied. Isn't it wonderful how systemd gives you so many useful
+      # tools for fixing problems that you only have because of systemd?
+      systemd.user.services.yubikey-touch-detector-rescan = {
+        description = "Rescan for YubiKeys waiting for touch detection";
+        serviceConfig = {
+          Type = "oneshot";
+          # wait a bit before restarting yubikey-touch-detector so that we
+          # don't end up racing against logind applying ACLs...which is the
+          # thing that makes the touch-detector service break in the first
+          # place. if we restart it too early, it will still not be able to
+          # open the device.
+          #
+          # this adds a bit of latency when a yubikey is plugged in *after*
+          # the session has already started, but...whatever.
+          ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
+          # try-restart, so that we only bounce the service if it's actually
+          # running. this should do nothing if there is no such service.
+          ExecStart = "${config.systemd.package}/bin/systemctl --user try-restart yubikey-touch-detector.service";
+        };
+      };
     }
     # If provisioning.enable = true, also include the `ykprovision` and
     # `ykrevoke` scripts.
