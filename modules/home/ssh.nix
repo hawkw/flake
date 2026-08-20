@@ -6,20 +6,26 @@ let
   };
 
   # SSH identities for provisioned YubiKeys (see lib/yubikeys.nix). The key
-  # handles live in ~/.ssh on machines they've been copied to. Because ssh
-  # silently skips IdentityFiles that don't exist, it's fine to just include
-  # each YubiKey's key in IdentityFiles all the time, and SSH will select
-  # whichever one is physically present.
-  #
-  # These are only wired up when the 1Password SSH agent is disabled, because the 1P
-  # agent can neither hold nor add sk keys, so with `IdentityAgent` pointing
-  # at it the handles would degrade to passphrase-per-connection file reads.
-  # The `enableSshAgent` option is the per-host transition knob --- flip it
-  # off to switch a host to YubiKey-backed SSH auth (via the gnome-keyring
-  # agent). Once I've validated the YubiKey scheme end-to-end, the 1Password
-  # agent wiring can be deleted entirely.
+  # handles live in ~/.ssh on machines they've been copied to.
   yubikeys = import ../../lib/yubikeys.nix { inherit lib; };
-  yubikeyIdentityFiles = map (f: "~/.ssh/" + f) yubikeys.ssh.privkeyFilenames;
+  # Generate SSH config blocks setting `IdentityFile` for yubikey-backed SSH
+  # keys.
+  #
+  # These have a `Match exec` clause that checks for the presence of the
+  # corresponding Yubikey (via the symlinks we set up in
+  # `nixos/profiles/yubikey.nix`). This way, we only offer the key from the
+  # Yubikey that's actually present, which stops ssh from printing a bunch of
+  # junk complaining that it tried to offer *all* the yubikey-backed SK keys and
+  # two of them didn't work. This is not strictly necessary (ssh still
+  # ultimately *works* if it offers the not-present keys) but i didn't love that
+  # it printed a bunch of complaints.
+  yubikeyIdentityBlocks = lib.mapAttrs'
+    (serial: key:
+      lib.nameValuePair "yubikey-present-${serial}" {
+        header = ''Match exec "test -e /dev/yubikey/${serial}"'';
+        IdentityFile = "~/.ssh/${key.privkeyFilename}";
+      })
+    yubikeys.ssh.bySerial;
 in
 with lib;
 {
@@ -83,10 +89,6 @@ with lib;
                 ControlMaster = "no";
                 ControlPath = "~/.ssh/master-%r@%n:%p";
                 ControlPersist = "no";
-                # Generating the SSH config will omit values that are empty
-                # lists, so this disappears entirely while no YubiKeys are
-                # enrolled.
-                IdentityFile = yubikeyIdentityFiles;
               };
             };
         }
@@ -94,6 +96,15 @@ with lib;
           settings."notSsh" = {
             header = ''Match host * exec "test -z $SSH_CONNECTION"'';
             IdentityAgent = _1passwordAgent.path;
+          };
+        })
+        (mkIf (!_1passwordAgent.enable) {
+          # Offer only the keys whose YubiKey is present (see
+          # `yubikeyIdentityBlocks` above). We must not add these if the
+          # 1Password ssh agent is in use, since setting `IdentitiesOnly` will
+          # break it.
+          settings = yubikeyIdentityBlocks // {
+            "*".IdentitiesOnly = "yes";
           };
         })
       ];
