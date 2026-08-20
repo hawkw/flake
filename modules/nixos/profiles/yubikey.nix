@@ -1100,297 +1100,299 @@ in
   config = mkIf cfg.enable (mkMerge [
     # Base config with nothing else enabled: just the necessary dependencies for
     # day-to-day YubiKey use.
-    {
-      # Provides `ykman`, pcscd, and the udev rules. These are required both
-      # for daily YubiKey use and for the provisioning script.
-      programs.yubikey-manager.enable = true;
-      # Generates notifications when the YubiKey is asking to be touched. By
-      # default, send these to libnotify for desktop use.
-      programs.yubikey-touch-detector = {
-        enable = mkDefault true;
-        libnotify = mkDefault true;
-      };
-
-      # /dev/yubikey/<serial> symlinks used as presence markers for attached
-      # YubiKeys. We create a symlink per key, named using the device's serial
-      # number. Consumers can glob the directory to learn which enrolled keys
-      # are physically present without any device I/O (which is slow and
-      # contends with pcscd/scdaemon). Presently, this is only used for
-      # selecting which SSH key to offer and to use for Git commitsigning.
-      #
-      # Requires the serial to be visible in the USB descriptor
-      # (SERIAL_USB_VISIBLE), which ykprovision's OTP phase configures.
-      services.udev.packages =
-        let
-          # When ykman prints serials, they are displayed without leading
-          # zeroes, but udev's USB descriptor will include them. This IMPORT
-          # helper strips that so symlink names match ykman's formatting for
-          # serials. IMPORT{program} is evaluated as a match, so a key with a
-          # hidden or malformed serial simply gets no symlink.
-          normalizeSerial = pkgs.writeShellScript "yk-serial-normalize" ''
-            ${yubikeysLib.usb.serialFunctions}
-            s="$(normalize_yk_serial "''${1:-}")" || exit 1
-            echo "YK_SERIAL=$s"
-          '';
-          devYubikeysRules = pkgs.writeTextFile {
-            name = "yubikey-udev-rules";
-            text =
-              ''
-                SUBSYSTEM=="usb", \
-                  ATTR{idVendor}=="${yubicoVid}", \
-                  ATTR{serial}=="?*", \
-                  IMPORT{program}="${normalizeSerial} $attr{serial}", \
-                  SYMLINK+="yubikey/$env{YK_SERIAL}"
-
-                # Kick the yubikey-touch-detector service whenever a YubiKey
-                # HID interface appears
-                ACTION=="add", \
-                  SUBSYSTEM=="hidraw", \
-                  ATTRS{idVendor}=="${yubicoVid}", \
-                  # setting this creates a systemd device unit for the hidraw
-                  # node...
-                  TAG+="systemd", \
-                  # ...and setting *this* tells systemd to start the rescan
-                  # oneshot when the device unit becomes active.
-                  ENV{SYSTEMD_USER_WANTS}+="yubikey-touch-detector-rescan.service"
-              '';
-            destination = "/etc/udev/rules.d/50-yubikey.rules";
-          };
-        in
-        [ devYubikeysRules ];
-
-      # This is an unfortunate workaround for a weird little bit of jank in
-      # `yubikey-touch-detector`. It will only start tracking each device in
-      # /dev/hidraw* either immediately after it starts up (if it is already
-      # present) or after the device node's inotify create event. Critically,
-      # this means that it will not *retry* to start tracking events from a
-      # yubikey that it has previously failed to adopt. It is possible for
-      # `yubikey-touch-detector`'s attempt to open(2) a hidraw node to fail
-      # (typically because logind hasn't applied the seat uaccess ACL yet), so
-      # it can totally miss notifications from that yubikey until it is
-      # disconnected.
-      #
-      # This little oneshot, therefore, exists just to give
-      # `yubikey-touch-detector` a whack after udev has actually created the
-      # hidraw node, which makes it rescan /dev/ after the uaccess ACL has
-      # been applied. Isn't it wonderful how systemd gives you so many useful
-      # tools for fixing problems that you only have because of systemd?
-      systemd.user.services.yubikey-touch-detector-rescan = {
-        description = "Rescan for YubiKeys waiting for touch detection";
-        serviceConfig = {
-          Type = "oneshot";
-          # wait a bit before restarting yubikey-touch-detector so that we
-          # don't end up racing against logind applying ACLs...which is the
-          # thing that makes the touch-detector service break in the first
-          # place. if we restart it too early, it will still not be able to
-          # open the device.
-          #
-          # this adds a bit of latency when a yubikey is plugged in *after*
-          # the session has already started, but...whatever.
-          ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
-          # try-restart, so that we only bounce the service if it's actually
-          # running. this should do nothing if there is no such service.
-          ExecStart = "${config.systemd.package}/bin/systemctl --user try-restart yubikey-touch-detector.service";
-        };
-      };
-    }
-    # If provisioning.enable = true, also include the `ykprovision` and
-    # `ykrevoke` scripts.
-    (mkIf cfg.provisioning.enable {
-      # ensure that the global 1password CLI is present. the provisioning script
-      # relies on this but cannot depend on it directly due to Some Kind of
-      # Reason.
-      programs._1password.enable = true;
-      environment.systemPackages = [ ykprovision ykrevoke ];
-    })
-    # PAM-U2F auth config.
-    (mkIf cfg.pam_u2f.enable (
-      let
-        # Per-key credentials discovered from the repo at eval time. The
-        # dependency list for the authfile generator is automatically determined
-        # based on which credential secrets are in the repo.
-        credsPath = ../../.. + "/${pam_u2fCredentialsDir}";
-        credFilenames = optionals (builtins.pathExists credsPath)
-          (filter (hasSuffix ".age") (attrNames (builtins.readDir credsPath)));
-        secretName = f: "pam-u2f-" + (removeSuffix ".age" f);
-        # Serials of the enrolled keys. This is determined from the list of
-        # actual PAM U2F credentials, rather than the list in
-        # `lib/yubikeys.nix`, so that we *only* care about the ones actually
-        # used for pam-u2f, and not keys that are only used for SSH. This does
-        # not actually matter, since all my keys are enrolled for both,
-        # but...let's do the more correct thing just in case.
-        serials = map
-          (f: removePrefix "yubikey-" (removeSuffix ".age" f))
-          credFilenames;
-      in
+    (
+      let rescanServiceName = "yubikey-touch-detector-rescan"; in
       {
-        age.secrets =
+        # Provides `ykman`, pcscd, and the udev rules. These are required both
+        # for daily YubiKey use and for the provisioning script.
+        programs.yubikey-manager.enable = true;
+        # Generates notifications when the YubiKey is asking to be touched. By
+        # default, send these to libnotify for desktop use.
+        programs.yubikey-touch-detector = {
+          enable = mkDefault true;
+          libnotify = mkDefault true;
+        };
+
+        # /dev/yubikey/<serial> symlinks used as presence markers for attached
+        # YubiKeys. We create a symlink per key, named using the device's serial
+        # number. Consumers can glob the directory to learn which enrolled keys
+        # are physically present without any device I/O (which is slow and
+        # contends with pcscd/scdaemon). Presently, this is only used for
+        # selecting which SSH key to offer and to use for Git commitsigning.
+        #
+        # Requires the serial to be visible in the USB descriptor
+        # (SERIAL_USB_VISIBLE), which ykprovision's OTP phase configures.
+        services.udev.packages =
           let
-            # generate agenix `intermediary` secrets for each U2F key
-            mkSecret = f:
+            # When ykman prints serials, they are displayed without leading
+            # zeroes, but udev's USB descriptor will include them. This IMPORT
+            # helper strips that so symlink names match ykman's formatting for
+            # serials. IMPORT{program} is evaluated as a match, so a key with a
+            # hidden or malformed serial simply gets no symlink.
+            normalizeSerial = pkgs.writeShellScript "yk-serial-normalize" ''
+              ${yubikeysLib.usb.serialFunctions}
+              s="$(normalize_yk_serial "''${1:-}")" || exit 1
+              echo "YK_SERIAL=$s"
+            '';
+            devYubikeysRules = pkgs.writeTextFile {
+              name = "yubikey-udev-rules";
+              text =
+                ''
+                  SUBSYSTEM=="usb", \
+                    ATTR{idVendor}=="${yubicoVid}", \
+                    ATTR{serial}=="?*", \
+                    IMPORT{program}="${normalizeSerial} $attr{serial}", \
+                    SYMLINK+="yubikey/$env{YK_SERIAL}"
+
+                  # Kick the yubikey-touch-detector service whenever a YubiKey
+                  # HID interface appears
+                  ACTION=="add", \
+                    SUBSYSTEM=="hidraw", \
+                    ATTRS{idVendor}=="${yubicoVid}", \
+                    # setting this creates a systemd device unit for the hidraw
+                    # node...
+                    TAG+="systemd", \
+                    # ...and setting *this* tells systemd to start the rescan
+                    # oneshot when the device unit becomes active.
+                    ENV{SYSTEMD_USER_WANTS}+="${rescanServiceName}.service"
+                '';
+              destination = "/etc/udev/rules.d/50-yubikey.rules";
+            };
+          in
+          [ devYubikeysRules ];
+
+        # This is an unfortunate workaround for a weird little bit of jank in
+        # `yubikey-touch-detector`. It will only start tracking each device in
+        # /dev/hidraw* either immediately after it starts up (if it is already
+        # present) or after the device node's inotify create event. Critically,
+        # this means that it will not *retry* to start tracking events from a
+        # yubikey that it has previously failed to adopt. It is possible for
+        # `yubikey-touch-detector`'s attempt to open(2) a hidraw node to fail
+        # (typically because logind hasn't applied the seat uaccess ACL yet), so
+        # it can totally miss notifications from that yubikey until it is
+        # disconnected.
+        #
+        # This little oneshot, therefore, exists just to give
+        # `yubikey-touch-detector` a whack after udev has actually created the
+        # hidraw node, which makes it rescan /dev/ after the uaccess ACL has
+        # been applied. Isn't it wonderful how systemd gives you so many useful
+        # tools for fixing problems that you only have because of systemd?
+        systemd.user.services.${rescanServiceName} = {
+          description = "Rescan for YubiKeys waiting for touch detection";
+          serviceConfig = {
+            Type = "oneshot";
+            # wait a bit before restarting yubikey-touch-detector so that we
+            # don't end up racing against logind applying ACLs...which is the
+            # thing that makes the touch-detector service break in the first
+            # place. if we restart it too early, it will still not be able to
+            # open the device.
+            #
+            # this adds a bit of latency when a yubikey is plugged in *after*
+            # the session has already started, but...whatever.
+            ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
+            # try-restart, so that we only bounce the service if it's actually
+            # running. this should do nothing if there is no such service.
+            ExecStart = "${config.systemd.package}/bin/systemctl --user try-restart yubikey-touch-detector.service";
+          };
+        };
+      }
+        # If provisioning.enable = true, also include the `ykprovision` and
+        # `ykrevoke` scripts.
+        (mkIf cfg.provisioning.enable {
+          # ensure that the global 1password CLI is present. the provisioning script
+          # relies on this but cannot depend on it directly due to Some Kind of
+          # Reason.
+          programs._1password.enable = true;
+          environment.systemPackages = [ ykprovision ykrevoke ];
+        })
+        # PAM-U2F auth config.
+        (mkIf cfg.pam_u2f.enable (
+          let
+            # Per-key credentials discovered from the repo at eval time. The
+            # dependency list for the authfile generator is automatically determined
+            # based on which credential secrets are in the repo.
+            credsPath = ../../.. + "/${pam_u2fCredentialsDir}";
+            credFilenames = optionals (builtins.pathExists credsPath)
+              (filter (hasSuffix ".age") (attrNames (builtins.readDir credsPath)));
+            secretName = f: "pam-u2f-" + (removeSuffix ".age" f);
+            # Serials of the enrolled keys. This is determined from the list of
+            # actual PAM U2F credentials, rather than the list in
+            # `lib/yubikeys.nix`, so that we *only* care about the ones actually
+            # used for pam-u2f, and not keys that are only used for SSH. This does
+            # not actually matter, since all my keys are enrolled for both,
+            # but...let's do the more correct thing just in case.
+            serials = map
+              (f: removePrefix "yubikey-" (removeSuffix ".age" f))
+              credFilenames;
+          in
+          {
+            age.secrets =
               let
-                name = secretName f;
-                secret = {
-                  rekeyFile = credsPath + "/${f}";
-                  intermediary = true;
+                # generate agenix `intermediary` secrets for each U2F key
+                mkSecret = f:
+                  let
+                    name = secretName f;
+                    secret = {
+                      rekeyFile = credsPath + "/${f}";
+                      intermediary = true;
+                    };
+                  in
+                  nameValuePair name secret;
+                credSecrets = map mkSecret credFilenames;
+                authfileSecret = {
+                  ${pam_u2fAuthfileSecret} = {
+                    generator = {
+                      dependencies = map
+                        (f: config.age.secrets.${secretName f})
+                        credFilenames;
+                      # Deps are decrypted with the master identity during
+                      # `agenix generate` and joined into pam_u2f's one-line format:
+                      # `user:cred1:cred2:...`. Credential order follows readDir
+                      # (lexicographic by serial), so output is deterministic.
+                      script = { lib, decrypt, deps, ... }:
+                        let
+                          decryptCred = dep: ''
+                            cred="$(${decrypt} ${lib.escapeShellArg dep.file} | tr -d '\n')" || exit 1
+                            if [ -z "$cred" ]; then
+                              echo "error: empty PAM credential decrypted from ${dep.file}" >&2
+                              exit 1
+                            fi
+                            printf ':%s' "$cred"
+                          '';
+                          decryptCreds = lib.concatMapStrings decryptCred deps;
+                        in
+                        ''
+                          printf '%s' ${lib.escapeShellArg user}
+                          ${decryptCreds}
+                          echo
+                        '';
+                    };
+                  };
                 };
               in
-              nameValuePair name secret;
-            credSecrets = map mkSecret credFilenames;
-            authfileSecret = {
-              ${pam_u2fAuthfileSecret} = {
-                generator = {
-                  dependencies = map
-                    (f: config.age.secrets.${secretName f})
-                    credFilenames;
-                  # Deps are decrypted with the master identity during
-                  # `agenix generate` and joined into pam_u2f's one-line format:
-                  # `user:cred1:cred2:...`. Credential order follows readDir
-                  # (lexicographic by serial), so output is deterministic.
-                  script = { lib, decrypt, deps, ... }:
-                    let
-                      decryptCred = dep: ''
-                        cred="$(${decrypt} ${lib.escapeShellArg dep.file} | tr -d '\n')" || exit 1
-                        if [ -z "$cred" ]; then
-                          echo "error: empty PAM credential decrypted from ${dep.file}" >&2
-                          exit 1
-                        fi
-                        printf ':%s' "$cred"
-                      '';
-                      decryptCreds = lib.concatMapStrings decryptCred deps;
-                    in
-                    ''
-                      printf '%s' ${lib.escapeShellArg user}
-                      ${decryptCreds}
-                      echo
-                    '';
-                };
+              listToAttrs credSecrets // authfileSecret;
+
+            assertions = [
+              {
+                assertion = credFilenames != [ ];
+                message = ''
+                  profiles.yubikey.pam_u2f is enabled, but no credential files
+                  exist in ${pam_u2fCredentialsDir}/. The generated authfile
+                  would contain no credentials, so pam_u2f could never succeed
+                  (and with control = "required", would lock out local auth).
+                  You must first enroll at least one yubikey with `ykprovision`!
+                '';
+              }
+            ];
+
+            # `security.pam.u2f.enable` adds pam_u2f to every PAM service's
+            # auth stack by default. For sshd this is, pretty obviously, never
+            # useful, since the YubiKey would have to be plugged into the server in
+            # order to be used to authenticate an SSH connection. And, if control =
+            # "required"  this is actively dangerous, since it makes it impossible
+            # to SSH into a server unless your yubikey is plugged in. Lol. Lmao.
+            security.pam.services.sshd.u2fAuth = false;
+
+            security.pam.u2f = {
+              enable = true;
+              control = cfg.pam_u2f.control;
+              settings = {
+                # Must match the origin baked into the credentials by ykprovision
+                # (same `pamOrigin` binding above). appid is set explicitly, because
+                # some pam_u2f versions have mishandled it when it differed from
+                # origin, and the default only covers credentials from old pamu2fcfg
+                # versions.
+                origin = pamOrigin;
+                appid = pamOrigin;
+                authfile = config.age.secrets.${pam_u2fAuthfileSecret}.path;
+                # The credentials are generated with `pamu2fcfg --pin-verification`,
+                # so enforce it module-side too.
+                pinverification = 1;
+                # Prompt a reminder when a touch is expected.
+                cue = true;
+                # debug = true;
+                # debug_file = "/var/log/pam_u2f_debug.log";
               };
             };
-          in
-          listToAttrs credSecrets // authfileSecret;
 
-        assertions = [
-          {
-            assertion = credFilenames != [ ];
-            message = ''
-              profiles.yubikey.pam_u2f is enabled, but no credential files
-              exist in ${pam_u2fCredentialsDir}/. The generated authfile
-              would contain no credentials, so pam_u2f could never succeed
-              (and with control = "required", would lock out local auth).
-              You must first enroll at least one yubikey with `ykprovision`!
-            '';
+            # sadly, GDM's `gdm-fingerprint` worker can race with `gdm-password`,
+            # which is what pam-u2f hangs off of, and can block session startup when
+            # logging in with the yubikey. so, turn off fprintd to make that work
+            # nicer.
+            services.fprintd.enable = false;
+
+            # Lock local graphical sessions when the last enrolled YubiKey is
+            # unplugged.
+            #
+            # This adds a udev rule that listens for removal events for USB devices
+            # that have Yubikey VID/PIDs, and runs a script which checks for the
+            # presence of any enrolled yubikey in sysfs and locks any graphical user
+            # sessions if no enrolled yubikeys are present. This way, if I'm
+            # provisioning a new yubikey and remove it, the system doesn't lock, and
+            # if multiple yubikeys are present, the system only locks when they're
+            # all removed.
+            services.udev.packages = mkIf cfg.pam_u2f.lockOnUnplug (
+              let
+                # A shell script run when a yubikey device is unplugged that checks
+                # if it's the last enrolled key, and then locks user sessions as
+                # appropriate.
+                lockScript = pkgs.writeShellApplication {
+                  name = "yubikey-lock-sessions";
+                  runtimeInputs = with pkgs; [ systemd coreutils ];
+                  text = ''
+                    ${yubikeysLib.usb.serialFunctions}
+
+                    # If any enrolled key is still plugged in, do nothing. sysfs
+                    # is authoritative here: the just-removed device is already
+                    # gone from it by the time this remove-triggered RUN fires.
+                    for present in $(sysfs_yk_serials); do
+                      for enrolled in ${escapeShellArgs serials}; do
+                        if [ "$present" = "$enrolled" ]; then
+                          exit 0
+                        fi
+                      done
+                    done
+
+                    # No enrolled key remains: lock local graphical sessions.
+                    loginctl list-sessions --no-legend --no-pager \
+                      | while read -r id _rest; do
+                      # Filter only sessions which are local, graphical user
+                      # sessions (Class=user, Type=wayland or Type=x11, Remote=no).
+                      # This way, we don't lock SSH sessions, which are not
+                      # authenticated by a locally connected yubikey, or remote
+                      # desktop sessions. I'm not actually using any kind of remote
+                      # desktop yet, but it's nice to not break that later.
+                      class="$(loginctl show-session "$id" --property Class --value)"
+                      type="$(loginctl show-session "$id" --property Type --value)"
+                      remote="$(loginctl show-session "$id" --property Remote --value)"
+                      if [ "$class" = user ] && [ "$remote" = no ] \
+                        && { [ "$type" = wayland ] || [ "$type" = x11 ]; }; then
+                        loginctl lock-session "$id"
+                      fi
+                    done
+                  '';
+                };
+
+                # The actual rules file. Matches the removal of any Yubico
+                # USB device. Sadly, udev remove events don't have serial numbers
+                # (including the one we set up via YK_SERIAL), so we instead rely
+                # on the locking script to sort out whether the unplugged device was
+                # actually the one that authed the session or not. Oh well.
+                lockRules = pkgs.writeTextFile {
+                  name = "yubikey-lock-udev-rules";
+                  destination = "/etc/udev/rules.d/70-yubikey-lock.rules";
+                  text = ''
+                    ACTION=="remove", \
+                      SUBSYSTEM=="usb", \
+                      ENV{DEVTYPE}=="usb_device", \
+                      ENV{PRODUCT}=="${yubicoVid}/*", \
+                      RUN+="${getExe lockScript}"
+                  '';
+                };
+              in
+              [ lockRules ]
+            );
           }
-        ];
-
-        # `security.pam.u2f.enable` adds pam_u2f to every PAM service's
-        # auth stack by default. For sshd this is, pretty obviously, never
-        # useful, since the YubiKey would have to be plugged into the server in
-        # order to be used to authenticate an SSH connection. And, if control =
-        # "required"  this is actively dangerous, since it makes it impossible
-        # to SSH into a server unless your yubikey is plugged in. Lol. Lmao.
-        security.pam.services.sshd.u2fAuth = false;
-
-        security.pam.u2f = {
-          enable = true;
-          control = cfg.pam_u2f.control;
-          settings = {
-            # Must match the origin baked into the credentials by ykprovision
-            # (same `pamOrigin` binding above). appid is set explicitly, because
-            # some pam_u2f versions have mishandled it when it differed from
-            # origin, and the default only covers credentials from old pamu2fcfg
-            # versions.
-            origin = pamOrigin;
-            appid = pamOrigin;
-            authfile = config.age.secrets.${pam_u2fAuthfileSecret}.path;
-            # The credentials are generated with `pamu2fcfg --pin-verification`,
-            # so enforce it module-side too.
-            pinverification = 1;
-            # Prompt a reminder when a touch is expected.
-            cue = true;
-            # debug = true;
-            # debug_file = "/var/log/pam_u2f_debug.log";
-          };
-        };
-
-        # sadly, GDM's `gdm-fingerprint` worker can race with `gdm-password`,
-        # which is what pam-u2f hangs off of, and can block session startup when
-        # logging in with the yubikey. so, turn off fprintd to make that work
-        # nicer.
-        services.fprintd.enable = false;
-
-        # Lock local graphical sessions when the last enrolled YubiKey is
-        # unplugged.
-        #
-        # This adds a udev rule that listens for removal events for USB devices
-        # that have Yubikey VID/PIDs, and runs a script which checks for the
-        # presence of any enrolled yubikey in sysfs and locks any graphical user
-        # sessions if no enrolled yubikeys are present. This way, if I'm
-        # provisioning a new yubikey and remove it, the system doesn't lock, and
-        # if multiple yubikeys are present, the system only locks when they're
-        # all removed.
-        services.udev.packages = mkIf cfg.pam_u2f.lockOnUnplug (
-          let
-            # A shell script run when a yubikey device is unplugged that checks
-            # if it's the last enrolled key, and then locks user sessions as
-            # appropriate.
-            lockScript = pkgs.writeShellApplication {
-              name = "yubikey-lock-sessions";
-              runtimeInputs = with pkgs; [ systemd coreutils ];
-              text = ''
-                ${yubikeysLib.usb.serialFunctions}
-
-                # If any enrolled key is still plugged in, do nothing. sysfs
-                # is authoritative here: the just-removed device is already
-                # gone from it by the time this remove-triggered RUN fires.
-                for present in $(sysfs_yk_serials); do
-                  for enrolled in ${escapeShellArgs serials}; do
-                    if [ "$present" = "$enrolled" ]; then
-                      exit 0
-                    fi
-                  done
-                done
-
-                # No enrolled key remains: lock local graphical sessions.
-                loginctl list-sessions --no-legend --no-pager \
-                  | while read -r id _rest; do
-                  # Filter only sessions which are local, graphical user
-                  # sessions (Class=user, Type=wayland or Type=x11, Remote=no).
-                  # This way, we don't lock SSH sessions, which are not
-                  # authenticated by a locally connected yubikey, or remote
-                  # desktop sessions. I'm not actually using any kind of remote
-                  # desktop yet, but it's nice to not break that later.
-                  class="$(loginctl show-session "$id" --property Class --value)"
-                  type="$(loginctl show-session "$id" --property Type --value)"
-                  remote="$(loginctl show-session "$id" --property Remote --value)"
-                  if [ "$class" = user ] && [ "$remote" = no ] \
-                    && { [ "$type" = wayland ] || [ "$type" = x11 ]; }; then
-                    loginctl lock-session "$id"
-                  fi
-                done
-              '';
-            };
-
-            # The actual rules file. Matches the removal of any Yubico
-            # USB device. Sadly, udev remove events don't have serial numbers
-            # (including the one we set up via YK_SERIAL), so we instead rely
-            # on the locking script to sort out whether the unplugged device was
-            # actually the one that authed the session or not. Oh well.
-            lockRules = pkgs.writeTextFile {
-              name = "yubikey-lock-udev-rules";
-              destination = "/etc/udev/rules.d/70-yubikey-lock.rules";
-              text = ''
-                ACTION=="remove", \
-                  SUBSYSTEM=="usb", \
-                  ENV{DEVTYPE}=="usb_device", \
-                  ENV{PRODUCT}=="${yubicoVid}/*", \
-                  RUN+="${getExe lockScript}"
-              '';
-            };
-          in
-          [ lockRules ]
-        );
-      }
-    ))
-  ]);
-}
+        ))
+      ]);
+    }
