@@ -171,23 +171,20 @@ with lib; {
         programs.git.settings.gpg."ssh".program = "ssh-sign";
       }
     ))
-    # YubiKey commit signing.
+    ### YubiKey git commit signing ###
     #
-    # Any enrolled YubiKey may be plugged into any machine, so the signing key
-    # cannot be pinned statically. Instead, we use `gpg.ssh.defaultKeyCommand`
-    # to pick one at signing time. Git runs this command when user.signingKey is
-    # unset, and expects `ssh-add -L`-shaped output.
+    # in order to be able to sign Git commits with *any* of my three yubikeys,
+    # it's necessary to dynamically detect which ones are present. This is
+    # accomplished using `gpg.ssh.defaultKeyCommand`, which tells Git to run a
+    # *command* to determine the signing key insetad of hardcoding a key. This
+    # is run if the `user.signingKey` option is unset.
     #
-    # This script selects keys in the following order of presence:
+    # This script selects keys in the following order:
     #
-    #   1. A key that is *physically present* and whose handle file is present
-    #      in ~/.ssh. If the handle isn't in the ssh agent yet, it is
-    #      `ssh-add`ed first, prompting for the keyfile passphrase exactly as
-    #      AddKeysToAgent does on first ssh. This is necessary because git
-    #      signing uses the ssh-agent.
-    #   2. Otherwise, any enrolled key already in the agent. This is the
-    #      case when the agent is forwarded to a remote host.
-    #   3. Otherwise, fail with instructions.
+    # 1. A plugged in, enrolled key whose handle file is present in ~/.ssh.
+    # 2. If we are on a remote host (i.e. SSH_CONNECTION is set),
+    #    any enrolled key forwarded over the SSH connection.
+    # 3. Otherwise, fail with instructions.
     (mkIf (!enable1PasswordSshAgent) (
       let
         yubikeys = import ../../../lib/yubikeys.nix { inherit lib; };
@@ -213,7 +210,7 @@ with lib; {
           in
           concatStrings cases;
         devPath = "/dev/yubikey";
-        signingKeyCommand = lpkgs.writeShellApplication {
+        signingKeyCommand = pkgs.writeShellApplication {
           name = "yk-git-signing-key";
           runtimeInputs = with pkgs; [ openssh coreutils gnugrep ];
           text = ''
@@ -222,10 +219,10 @@ with lib; {
             # Which enrolled YubiKeys are physically present?
             present_serials() {
               local d
-              # first, try to detect which keys are present using the
+              # first, try to detect which keys are present using their
               # /dev/yubikey/ symlinks
               if [ -d ${devPath} ]; then
-                for d in ${devPath}*; do
+                for d in ${devPath}/*; do
                   [ -e "$d" ] || continue
                   basename "$d"
                 done
@@ -260,19 +257,27 @@ with lib; {
                 # passphrase).
                 ssh-add "$HOME/.ssh/$handle" >&2 || continue
               fi
-              printf '%s\n' "$pubkey"
+              # the output that git expects here must be prefixed with 'key::',
+              # since otherwise, it expects a string beginning with 'ssh-',
+              # which will reject 'sk-ssh-ed25519@openssh.com' (which is what
+              # the yubikey SK keys are prefixed with). sigh.
+              printf 'key::%s\n' "$pubkey"
               exit 0
             done
 
-            # 2. Any enrolled key already in the agent (ForwardAgent case).
-            while read -r keyline; do
-              [ -n "$keyline" ] || continue
-              if grep -qxF "$keyline" <<< ${escapeShellArg registeredKeys}; then
-                printf '%s\n' "$keyline"
-                exit 0
-              fi
-            done <<< "$AGENT_KEYS"
+            # 2. If we are on a remote host (i.e. SSH_CONNECTION is set),
+            #    select any enrolled key forwarded over the SSH connection.
+            if [ -n "''${SSH_CONNECTION-}" ]; then
+              while read -r keyline; do
+                [ -n "$keyline" ] || continue
+                if grep -qxF "$keyline" <<< ${escapeShellArg registeredKeys}; then
+                  printf 'key::%s\n' "$keyline"
+                  exit 0
+                fi
+              done <<< "$AGENT_KEYS"
+            fi
 
+            # 3. Otherwise, fail with instructions.
             echo "yk-git-signing-key: no YubiKey SSH key available for signing." >&2
             echo "either plug in an enrolled YubiKey (with its key handle present" >&2
             echo "in ~/.ssh), or connect with a forwarded agent that holds one." >&2
