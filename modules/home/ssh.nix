@@ -24,6 +24,15 @@ let
       lib.nameValuePair "yubikey-present-${serial}" {
         header = ''Match exec "test -e /dev/yubikey/${serial}"'';
         IdentityFile = "~/.ssh/${key.privkeyFilename}";
+        # Restrict ssh to only offer the identity file for the present Yubikey.
+        # This prevents SSH from offering all SK keys (including those for the
+        # not-physically-connected Yubikeys), which results in printing errors
+        # that it can't use those keys.
+        #
+        # IdentitiesOnly is only set when we *did* find a physically present
+        # yubikey. Otherwise, it would also prevent offering forwarded keys when
+        # SSHed into a remote system, where /dev/yubikey/$SERIAL doesn't exist.
+        IdentitiesOnly = "yes";
       })
     yubikeys.ssh.bySerial;
 in
@@ -98,14 +107,12 @@ with lib;
             IdentityAgent = _1passwordAgent.path;
           };
         })
+
+        # If 1Password agent is not in use, add the Yubikey identity blocks
+        # generated above. Since these set `IdentitiesOnly`, they would break
+        # the 1Password agent and should only be added if it's not in use.
         (mkIf (!_1passwordAgent.enable) {
-          # Offer only the keys whose YubiKey is present (see
-          # `yubikeyIdentityBlocks` above). We must not add these if the
-          # 1Password ssh agent is in use, since setting `IdentitiesOnly` will
-          # break it.
-          settings = yubikeyIdentityBlocks // {
-            "*".IdentitiesOnly = "yes";
-          };
+          settings = yubikeyIdentityBlocks;
         })
       ];
   };
