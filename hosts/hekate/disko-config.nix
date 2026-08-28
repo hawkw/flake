@@ -26,6 +26,9 @@ let
   );
 in
 {
+  # Keep the declared datasets reconciled when applying this configuration.
+  disko.zfs.enable = true;
+
   disko.devices =
     {
       disk =
@@ -122,6 +125,13 @@ in
                   ${optAutosnapshot} = "false";
                 };
               };
+              "${localDataset}/tmp" = {
+                type = zfs_fs;
+                mountpoint = "/tmp";
+                options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
               "${localDataset}/reserved" = {
                 type = zfs_fs;
                 options = {
@@ -207,6 +217,17 @@ in
                   canmount = "on";
                 } // optsCrypt;
               };
+              "${homeDataset}/eliza/cache" = {
+                type = zfs_fs;
+                options = {
+                  # This child is mounted by PAM with its encrypted parent, so
+                  # do not generate a competing systemd mount unit.
+                  mountpoint = "/home/eliza/.cache";
+                  "${optSystemd}:ignore" = "on";
+                  canmount = "on";
+                  ${optAutosnapshot} = "false";
+                };
+              };
             };
           };
         };
@@ -218,6 +239,7 @@ in
     zfs = {
       enable = true;
       homes = "${rpool}/${homeDataset}";
+      mountRecursively = true;
     };
   };
 
