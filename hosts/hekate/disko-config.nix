@@ -132,6 +132,13 @@ in
                   ${optAutosnapshot} = "false";
                 };
               };
+              "${localDataset}/root-cache" = {
+                type = zfs_fs;
+                mountpoint = "/root/.cache";
+                options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
               "${localDataset}/reserved" = {
                 type = zfs_fs;
                 options = {
