@@ -139,6 +139,9 @@ in
               "${systemDataset}/root" = {
                 type = zfs_fs;
                 mountpoint = "/";
+                # Ensure that /tmp and /root/.cache are rw; for some reason,
+                # these sometimes get mounted ro by initrd?
+                mountOptions = [ "rw" ];
                 options = {
                   ${optAutosnapshot} = "true";
                   dnodesize = "auto";
