@@ -52,7 +52,7 @@ with lib;
           enableDefaultConfig = false;
           settings =
             let
-              hekate = "hekate";
+              homeHosts = [ "hekate" "noctis" "tranquility" "tereshkova" ];
               noctis = "noctis";
               noctis-tailscale = "${noctis}-tailscale";
               sysdomain = "sys.home.elizas.website";
@@ -66,38 +66,40 @@ with lib;
                 header = "Host ${noctis}";
                 HostName = noctis;
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
+                AddKeysToAgent = true;
               };
-              ${hekate} = hm.dag.entryBefore [ "sysdomain" ] {
-                # The attribute name already equals the `Host` pattern, so the
-                # `header` is derived as `Host hekate`.
-                HostName = "${hekate}.${sysdomain}";
+
+              # The attribute name already equals the `Host` pattern, so the
+              # `header` is derived as `Host hekate`.
+              homeAliases = hm.dag.entryBefore [ "sysdomain" ] {
+                header = "Host ${concatStringsSep " " homeHosts}";
+                HostName = "%h.${sysdomain}";
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
-                PubkeyAuthentication = "unbound";
+                AddKeysToAgent = true;
               };
+
               sysdomain = hm.dag.entryBefore [ "notSsh" ] {
                 header = "Host *.${sysdomain}";
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
-                PubkeyAuthentication = "unbound";
+                AddKeysToAgent = true;
               };
+
               "*" = {
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
                 ForwardAgent = false;
                 # With the 1P agent, adds are refused, so "yes" is inert at
-                # best. With the keyring agent, "yes" is what loads a YubiKey
-                # key handle (and its gcr-remembered passphrase) on first use.
+                # best. With the keyring agent, "yes" is necessary to load a
+                # YubiKey key handle on first use.
                 AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
                 ServerAliveInterval = 0;
                 ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";
-                ControlMaster = "no";
+                ControlMaster = false;
                 ControlPath = "~/.ssh/master-%r@%n:%p";
-                ControlPersist = "no";
+                ControlPersist = false;
               };
             };
         }
