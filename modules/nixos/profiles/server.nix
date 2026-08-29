@@ -33,8 +33,11 @@ in
     security.pam = {
       rssh = {
         enable = true;
-        settings.auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
-        settings.log_level = "debug";
+        settings = {
+          auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
+          log_level = "debug";
+          cue = true;
+        };
       };
       services.sudo.rssh = true;
     };
