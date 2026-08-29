@@ -31,8 +31,11 @@ in
     #
     # See https://discourse.nixos.org/t/nixos-rebuild-remote-deployments-non-root-pam/50477/19
     security.pam = {
-      rssh.enable = true;
-      rssh.settings.auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
+      rssh = {
+        enable = true;
+        settings.auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
+        settings.log_level = "debug";
+      };
       services.sudo.rssh = true;
     };
   };
