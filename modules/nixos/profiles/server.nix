@@ -13,15 +13,27 @@ in
     services.displayManager.gdm.autoSuspend = false;
     # Disable the GNOME3/GDM auto-suspend feature that cannot be disabled in GUI!
     # If no user is logged in, the machine will power down after 20 minutes.
-    systemd.targets.sleep.enable = false;
-    systemd.targets.suspend.enable = false;
-    systemd.targets.hibernate.enable = false;
-    systemd.targets.hybrid-sleep.enable = false;
+    systemd.targets = {
+      sleep.enable = false;
+      suspend.enable = false;
+      hibernate.enable = false;
+      hybrid-sleep.enable = false;
+    };
 
-    # allow using SSH keys to authenticate when on a remote connection.
+    # Allow passwordless sudo when connecting via ssh (we already auth'd via
+    # public key, that's enough).
+    #
+    # We use `pam_rssh` instead of `pam_ssh_agent_auth`, which apparently does
+    # not support ed25519 keys)
+    #
+    # When connecting via ssh, make sure to use `-A` or `-o ForwardAgent=yes`
+    # to ensure the SSH agent is forwarded to this box.
+    #
+    # See https://discourse.nixos.org/t/nixos-rebuild-remote-deployments-non-root-pam/50477/19
     security.pam = {
-      sshAgentAuth.enable = lib.mkDefault true;
-      services.sudo.sshAgentAuth = lib.mkDefault true;
+      rssh.enable = true;
+      rssh.settings.auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
+      services.sudo.rssh = true;
     };
   };
 }
