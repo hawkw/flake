@@ -305,38 +305,51 @@
           #####################
           ## deploy-rs nodes ##
           #####################
-          deploy.nodes =
-            let
-              mkNode = { hostname, domain ? ".sys.home.elizas.website", system ? "x86_64-linux", extraOpts ? { } }: {
-                hostname = "${hostname}${domain}";
-                profiles.system = ({
-                  sshUser = "eliza";
-                  path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.${hostname};
-                  user = "root";
-                } // extraOpts);
+          deploy = {
+            # enable SSH agent forwarding when deploying. this is needed to auth
+            # using a yubikey SSH key for sudo.
+            sshOpts = [ "-A" ];
+
+            nodes =
+              let
+                mkNode = { hostname, domain ? ".sys.home.elizas.website", system ? "x86_64-linux", extraOpts ? { } }: {
+                  hostname = "${hostname}${domain}";
+                  profiles.system = ({
+                    sshUser = "eliza";
+                    path = deploy-rs.lib.${system}.activate.nixos self.nixosConfigurations.${hostname};
+                    user = "root";
+                  } // extraOpts);
+                };
+              in
+              {
+                # clavius = mkNode {
+                #   hostname = "clavius";
+                #   system = "aarch64-linux";
+                #   extraOpts = { sshOpts = [ "-t" ]; };
+                # };
+
+                # tycho = mkNode {
+                #   hostname = "tycho";
+                #   system = "aarch64-linux";
+                #   extraOpts = { sshOpts = [ "-t" ]; };
+                # };
+
+                noctis = mkNode { hostname = "noctis"; };
+
+                tereshkova = mkNode { hostname = "tereshkova"; };
+
+                hekate = mkNode {
+                  hostname = "hekate";
+                  extraOpts = {
+                    # this system has more, faster cores than my laptop, so
+                    # always do the build on the deploy target.
+                    remoteBuild = true;
+                  };
+                };
+
+                tranquility = mkNode { hostname = "tranquility"; };
               };
-            in
-            {
-              # clavius = mkNode {
-              #   hostname = "clavius";
-              #   system = "aarch64-linux";
-              #   extraOpts = { sshOpts = [ "-t" ]; };
-              # };
-
-              # tycho = mkNode {
-              #   hostname = "tycho";
-              #   system = "aarch64-linux";
-              #   extraOpts = { sshOpts = [ "-t" ]; };
-              # };
-
-              noctis = mkNode { hostname = "noctis"; };
-
-              tereshkova = mkNode { hostname = "tereshkova"; };
-
-              hekate = mkNode { hostname = "hekate"; };
-
-              tranquility = mkNode { hostname = "tranquility"; };
-            };
+          };
 
 
           ##################

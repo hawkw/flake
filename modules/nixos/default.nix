@@ -161,12 +161,14 @@
     sudo-rs = {
       # Use sudo-rs rather than normal sudo.
       enable = lib.mkDefault true;
+      # Only make the sudo binary executable by members of the wheel group. This
+      # prevents users that are not members of wheel from exploiting
+      # vulnerabilities in sudo such as CVE-2021-3156.
+      execWheelOnly = lib.mkDefault true;
       # configFile = ''
       #   Defaults    env_reset,pwfeedback
       # '';
     };
-    # allow using SSH keys to authenticate when on a remote connection.
-    pam.sshAgentAuth.enable = lib.mkDefault true;
 
   };
 }

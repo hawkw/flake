@@ -17,5 +17,11 @@ in
     systemd.targets.suspend.enable = false;
     systemd.targets.hibernate.enable = false;
     systemd.targets.hybrid-sleep.enable = false;
+
+    # allow using SSH keys to authenticate when on a remote connection.
+    security.pam = {
+      sshAgentAuth.enable = lib.mkDefault true;
+      services.sudo.sshAgentAuth = lib.mkDefault true;
+    };
   };
 }
