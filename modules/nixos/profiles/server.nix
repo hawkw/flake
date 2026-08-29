@@ -35,7 +35,7 @@ in
         enable = true;
         settings = {
           auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
-          log_level = "debug";
+          loglevel = "debug";
           cue = true;
         };
       };
