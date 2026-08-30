@@ -11,6 +11,11 @@ with pkgs; with lib; {
 
   profiles = {
     age.tpmHostIdentity.enable = true;
+    hardened = {
+      enable = true;
+      kernel.enable = true;
+      systemd.enable = true;
+    };
     server.enable = true;
     desktop = {
       gnome3.enable = true;

@@ -13,6 +13,7 @@
     ./profiles/docs.nix
     ./profiles/eclss-node.nix
     ./profiles/games.nix
+    ./profiles/hardened.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
     ./profiles/nginx.nix
@@ -21,8 +22,8 @@
     ./profiles/raspberry-pi
     ./profiles/server.nix
     ./profiles/vu-dials.nix
-    ./profiles/zfs.nix
     ./profiles/yubikey.nix
+    ./profiles/zfs.nix
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix

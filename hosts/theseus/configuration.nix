@@ -11,6 +11,11 @@ with lib; {
   networking.hostName = "theseus"; # Define your hostname.
 
   profiles = {
+    hardened = {
+      enable = true;
+      kernel.enable = true;
+      systemd.enable = true;
+    };
     docs.enable = true;
     laptop.enable = true;
     desktop = {
