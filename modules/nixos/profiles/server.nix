@@ -36,7 +36,16 @@ in
         settings = {
           auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
           loglevel = "debug";
-          cue = true;
+
+          # cue = true makes rssh prompt when using a hardware security
+          # token-backed key such as a yubikey, which is nice...but this,
+          # unfortunately, breaks `deploy-rs`, since the activation command does
+          # not have a terminal and `ssh -t` apparently doesn't work. so,
+          # disable it; it's a bummer to have deploy-rs break just because we
+          # wanted to print "[sudo] Please touch the device" --- the remote
+          # system will have `yubikey-touch-detector` or similar anyway.
+
+          # cue = true;
         };
       };
       services.sudo.rssh = true;
