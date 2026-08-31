@@ -85,7 +85,8 @@ secrets/
 
 you need the following on your local machine:
 
-- the [1Password CLI](https://1password.com/downloads/command-line/) (`op`) on `$PATH`
+- the [1Password CLI](https://1password.com/downloads/command-line/) (`op`) on
+  `$PATH`
 - `age-plugin-1p` on `$PATH` (available in the flake's devshell)
 - an age identity file generated from your 1Password SSH key (see below)
 
