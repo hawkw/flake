@@ -283,6 +283,7 @@ sdh  WDC      WUH721816AL5204  2CHNGUYP             0x5000cca2a15d9a7c
 sdi  WDC      WUH721816AL5204  2CHLHS6N             0x5000cca2a15a0534
 sdj  NTAPCSSD X382_S1643960ATE S57SNA0R205376       0x5002538b012dda40
 sdk  SEAGATE  ST960FM0003      Z87130AR0000822150Z3 0x5000c50030186713
+sdl  NETAPP   X371_S164A960ATE S5JENA0RB07411       0x5002538b01bbde70
 ```
 
 Creating the zpool:
@@ -308,6 +309,7 @@ sudo zpool create \
     /dev/disk/by-id/wwn-0x5000c50030186713 \
     /dev/disk/by-id/wwn-0x5002538b012dda50 \
     /dev/disk/by-id/wwn-0x5002538b012dda40 \
+    /dev/disk/by-id/wwn-0x5002538b01bbde70 \
   spare \
     /dev/disk/by-id/wwn-0x5000c500a18fae2b
 ```

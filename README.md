@@ -2,28 +2,34 @@
 
 ## layout
 
-- [`hosts/`](./hosts) &mdash; per-machine configuration
-    + [`hosts/clavius/`](./hosts/clavius) &mdash; **clavius**: Raspberry Pi 4 (ECLSS node)
-    + [`hosts/hekate/`](./hosts/hekate) &mdash; **hekate**: engineering server (AMD, Supermicro X11/X12)
-    + [`hosts/noctis/`](./hosts/noctis) &mdash; **noctis**: desktop workstation (AMD Ryzen 3900X)
-    + [`hosts/tereshkova/`](./hosts/tereshkova) &mdash; **tereshkova**: infrastructure server
-    + [`hosts/theseus/`](./hosts/theseus) &mdash; **theseus**: Framework 13 (AMD Ryzen 7840U)
-    + [`hosts/tycho/`](./hosts/tycho) &mdash; **tycho**: Raspberry Pi 4 (ECLSS node)
-- [`lib/`](./lib)  &mdash; reusable nix utilities
-- [`modules/`](./modules) &mdash; modules used by system configurations
-    + [`modules/home/`](./modules/home) &mdash; home-manager modules
-        * [`modules/home/profiles/`](./modules/home/profiles) &mdash; home-manager
+- [`hosts/`](./hosts) --- per-machine configuration
+    + [`hosts/clavius/`](./hosts/clavius) --- **clavius**: Raspberry Pi 4 
+      (ECLSS node)
+    + [`hosts/hekate/`](./hosts/hekate) --- **hekate**: build serveri/workstation
+      (AMD  Threadripper 9960X/SuperMicro H13SRA-TF)
+    + [`hosts/noctis/`](./hosts/noctis) --- **noctis**: desktop (AMD Ryzen 
+      3900X)
+    + [`hosts/tereshkova/`](./hosts/tereshkova) --- **tereshkova**: server 
+      (SuperMicro Atom box)
+    + [`hosts/theseus/`](./hosts/theseus) --- **theseus**: Framework 13 (AMD
+      Ryzen 7840U)
+    + [`hosts/tranquility/`](./hosts/tranquility) --- **tranquility**: network
+      storage server (AMD Ryzen 9600X/AsrockRack B650D4U-2L2T/BCM)
+    + [`hosts/tycho/`](./hosts/tycho) --- **tycho**: Raspberry Pi 4 (ECLSS node)
+- [`lib/`](./lib) --- reusable nix utilities
+- [`modules/`](./modules) --- modules used by system configurations
+    + [`modules/home/`](./modules/home) --- home-manager modules
+        * [`modules/home/profiles/`](./modules/home/profiles) --- home-manager
           profiles (containing my personal preferences)
-    + [`modules/nixos/`](./modules/nixos) &mdash; NixOS modules
-        * [`modules/nixos/hardware/`](./modules/nixos/hardware) &mdash; NixOS modules
-          for hardware devices (generic and unopinionated)
-        * [`modules/nixos/profiles/`](./modules/nixos/profiles) &mdash; NixOS
+    + [`modules/nixos/`](./modules/nixos) --- NixOS modules
+        * [`modules/nixos/hardware/`](./modules/nixos/hardware) --- NixOS 
+          modules for hardware devices (generic and unopinionated)
+        * [`modules/nixos/profiles/`](./modules/nixos/profiles) --- NixOS
           profiles (containing my personal preferences)
-        * [`modules/nixos/programs/`](./modules/nixos/programs) &mdash; NixOS modules
-          for configuring specific programs (generic and unopinionated)
-- [`pkgs/`](./pkgs) &mdash; overlay with packages for stuff not currently in nixpkgs
-- [`secrets/`](./secrets) &mdash; encrypted secrets managed by
-  [agenix-rekey]
+        * [`modules/nixos/programs/`](./modules/nixos/programs) --- NixOS
+          modules for configuring specific programs (generic and unopinionated)
+- [`pkgs/`](./pkgs) --- overlay with packages for stuff not currently in nixpkgs
+- [`secrets/`](./secrets) --- encrypted secrets managed by [agenix-rekey]
 
 ## home-manager
 
@@ -54,7 +60,7 @@ whichever host SSH public keys need it. the rekeyed per-host copies live under
 time, the host decrypts its own copies using its SSH host key.
 
 this means:
-- adding or replacing a host is just `agenix rekey` &mdash; no per-secret
+- adding or replacing a host is just `agenix rekey` ---; no per-secret
   recipient lists to maintain
 - secrets in git history are only decryptable by the master identity, not by
   any individual host key
@@ -64,7 +70,7 @@ this means:
 ```
 secrets/
 ├── master-identities/
-│   └── 1password-ssh.pub  # age-plugin-1p identity (references 1Password, safe to commit)
+│   └── 1password-ssh.pub  # age-plugin-1p identity
 ├── host-keys/
 │   ├── hekate.pub         # ssh-ed25519 host public keys, one per host
 │   ├── noctis.pub
