@@ -58,7 +58,7 @@ in {
     #############################################################################
     programs = {
       ghostty.enable = true;
-      _1password-gui.enableSshAgent = true;
+      _1password-gui.enableSshAgent = false;
       keychain = {
         enable = false;
         enableXsessionIntegration = true;

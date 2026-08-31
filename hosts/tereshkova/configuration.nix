@@ -14,6 +14,11 @@ with pkgs; with lib; {
   };
 
   profiles = let rootDomain = "elizas.website"; in {
+    hardened = {
+      enable = true;
+      kernel.enable = true;
+      systemd.enable = true;
+    };
     docs.enable = true;
     desktop = {
       gnome3.enable = true;

@@ -30,6 +30,9 @@ with lib; rec {
     sessionVariables = {
       BROWSER = "firefox";
       TERMINAL = "wezterm";
+      # default to `nano` if no other profile overrides to a GUI editor, so that
+      # headless boxes have a useable editor.
+      EDITOR = mkOptionDefault "nano";
       CARGO_TERM_COLOR = "auto";
       RUST_BACKTRACE = "1";
     };

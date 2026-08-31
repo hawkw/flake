@@ -6,20 +6,35 @@ let
   };
 
   # SSH identities for provisioned YubiKeys (see lib/yubikeys.nix). The key
-  # handles live in ~/.ssh on machines they've been copied to. Because ssh
-  # silently skips IdentityFiles that don't exist, it's fine to just include
-  # each YubiKey's key in IdentityFiles all the time, and SSH will select
-  # whichever one is physically present.
-  #
-  # These are only wired up when the 1Password SSH agent is disabled, because the 1P
-  # agent can neither hold nor add sk keys, so with `IdentityAgent` pointing
-  # at it the handles would degrade to passphrase-per-connection file reads.
-  # The `enableSshAgent` option is the per-host transition knob --- flip it
-  # off to switch a host to YubiKey-backed SSH auth (via the gnome-keyring
-  # agent). Once I've validated the YubiKey scheme end-to-end, the 1Password
-  # agent wiring can be deleted entirely.
+  # handles live in ~/.ssh on machines they've been copied to.
   yubikeys = import ../../lib/yubikeys.nix { inherit lib; };
-  yubikeyIdentityFiles = map (f: "~/.ssh/" + f) yubikeys.ssh.privkeyFilenames;
+  # Generate SSH config blocks setting `IdentityFile` for yubikey-backed SSH
+  # keys.
+  #
+  # These have a `Match exec` clause that checks for the presence of the
+  # corresponding Yubikey (via the symlinks we set up in
+  # `nixos/profiles/yubikey.nix`). This way, we only offer the key from the
+  # Yubikey that's actually present, which stops ssh from printing a bunch of
+  # junk complaining that it tried to offer *all* the yubikey-backed SK keys and
+  # two of them didn't work. This is not strictly necessary (ssh still
+  # ultimately *works* if it offers the not-present keys) but i didn't love that
+  # it printed a bunch of complaints.
+  yubikeyIdentityBlocks = lib.mapAttrs'
+    (serial: key:
+      lib.nameValuePair "yubikey-present-${serial}" {
+        header = ''Match exec "test -e /dev/yubikey/${serial}"'';
+        IdentityFile = "~/.ssh/${key.privkeyFilename}";
+        # Restrict ssh to only offer the identity file for the present Yubikey.
+        # This prevents SSH from offering all SK keys (including those for the
+        # not-physically-connected Yubikeys), which results in printing errors
+        # that it can't use those keys.
+        #
+        # IdentitiesOnly is only set when we *did* find a physically present
+        # yubikey. Otherwise, it would also prevent offering forwarded keys when
+        # SSHed into a remote system, where /dev/yubikey/$SERIAL doesn't exist.
+        IdentitiesOnly = "yes";
+      })
+    yubikeys.ssh.bySerial;
 in
 with lib;
 {
@@ -37,7 +52,7 @@ with lib;
           enableDefaultConfig = false;
           settings =
             let
-              hekate = "hekate";
+              homeHosts = [ "hekate" "noctis" "tranquility" "tereshkova" ];
               noctis = "noctis";
               noctis-tailscale = "${noctis}-tailscale";
               sysdomain = "sys.home.elizas.website";
@@ -51,42 +66,40 @@ with lib;
                 header = "Host ${noctis}";
                 HostName = noctis;
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
+                AddKeysToAgent = true;
               };
-              ${hekate} = hm.dag.entryBefore [ "sysdomain" ] {
-                # The attribute name already equals the `Host` pattern, so the
-                # `header` is derived as `Host hekate`.
-                HostName = "${hekate}.${sysdomain}";
+
+              # The attribute name already equals the `Host` pattern, so the
+              # `header` is derived as `Host hekate`.
+              homeAliases = hm.dag.entryBefore [ "sysdomain" ] {
+                header = "Host ${concatStringsSep " " homeHosts}";
+                HostName = "%h.${sysdomain}";
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
-                PubkeyAuthentication = "unbound";
+                AddKeysToAgent = true;
               };
+
               sysdomain = hm.dag.entryBefore [ "notSsh" ] {
                 header = "Host *.${sysdomain}";
                 ForwardAgent = true;
-                AddKeysToAgent = "yes";
-                PubkeyAuthentication = "unbound";
+                AddKeysToAgent = true;
               };
+
               "*" = {
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
                 ForwardAgent = false;
                 # With the 1P agent, adds are refused, so "yes" is inert at
-                # best. With the keyring agent, "yes" is what loads a YubiKey
-                # key handle (and its gcr-remembered passphrase) on first use.
+                # best. With the keyring agent, "yes" is necessary to load a
+                # YubiKey key handle on first use.
                 AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
                 ServerAliveInterval = 0;
                 ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";
-                ControlMaster = "no";
+                ControlMaster = false;
                 ControlPath = "~/.ssh/master-%r@%n:%p";
-                ControlPersist = "no";
-                # Generating the SSH config will omit values that are empty
-                # lists, so this disappears entirely while no YubiKeys are
-                # enrolled.
-                IdentityFile = yubikeyIdentityFiles;
+                ControlPersist = false;
               };
             };
         }
@@ -95,6 +108,13 @@ with lib;
             header = ''Match host * exec "test -z $SSH_CONNECTION"'';
             IdentityAgent = _1passwordAgent.path;
           };
+        })
+
+        # If 1Password agent is not in use, add the Yubikey identity blocks
+        # generated above. Since these set `IdentitiesOnly`, they would break
+        # the 1Password agent and should only be added if it's not in use.
+        (mkIf (!_1passwordAgent.enable) {
+          settings = yubikeyIdentityBlocks;
         })
       ];
   };

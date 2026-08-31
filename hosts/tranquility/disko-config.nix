@@ -109,6 +109,27 @@ in
                   ${optAutosnapshot} = "false";
                 };
               };
+              "${localDataset}/tmp" = {
+                type = zfs_fs;
+                mountpoint = "/tmp";
+                options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
+              "${localDataset}/cache" = {
+                type = zfs_fs;
+                mountpoint = "/home/eliza/.cache";
+                options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
+              "${localDataset}/root-cache" = {
+                type = zfs_fs;
+                mountpoint = "/root/.cache";
+                options = {
+                  ${optAutosnapshot} = "false";
+                };
+              };
               "${localDataset}/reserved" = {
                 type = zfs_fs;
                 options = {
@@ -125,6 +146,9 @@ in
               "${systemDataset}/root" = {
                 type = zfs_fs;
                 mountpoint = "/";
+                # Ensure that /tmp and /root/.cache are rw; for some reason,
+                # these sometimes get mounted ro by initrd?
+                mountOptions = [ "rw" ];
                 options = {
                   ${optAutosnapshot} = "true";
                   dnodesize = "auto";
