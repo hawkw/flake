@@ -25,6 +25,19 @@
 - [`secrets/`](./secrets) &mdash; encrypted secrets managed by
   [agenix-rekey]
 
+## home-manager
+
+each host has a [home-manager] configuration for the `eliza` user. home-manager
+configurations are built alongside the host's NixOS configuration, so
+`nixos-rebuild switch --flake .` or `deploy-rs` will also activate the
+`home-manager` config.
+
+however, the standalone home-manager outputs use the same module lists, so one
+can also build and activate *just* the home-manager config by using
+`home-manager switch --flake .` this is useful when only the home-manager config
+has changed and it is not necessary to rebuild the whole system. a later NixOS
+switch will re-apply the same configuration.
+
 ## secrets
 
 secrets are managed with [agenix-rekey], which extends [agenix] with automatic
@@ -45,8 +58,6 @@ this means:
   recipient lists to maintain
 - secrets in git history are only decryptable by the master identity, not by
   any individual host key
-- 1Password biometric/password is the only authentication needed for secret
-  management
 
 ### directory layout
 
@@ -125,6 +136,7 @@ the `-a` flag automatically `git add`s the rekeyed output files.
 4. declare whichever `age.secrets.*` the host needs
 5. run `agenix rekey -a`
 
+[home-manager]: https://github.com/nix-community/home-manager
 [agenix]: https://github.com/ryantm/agenix
 [agenix-rekey]: https://github.com/oddlama/agenix-rekey
 [age-plugin-1p]: https://github.com/Enzime/age-plugin-1p
