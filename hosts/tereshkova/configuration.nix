@@ -41,6 +41,8 @@ with pkgs; with lib; {
       domain = rootDomain;
       acmeSubdomain = "home";
     };
+
+    yubikey.ssh.enable = true;
   };
 
   hardware = {

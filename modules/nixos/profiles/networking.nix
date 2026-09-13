@@ -55,19 +55,6 @@ in with lib; {
           X11Forwarding = true;
           # Necessary to use forwarded SSH keys for Git signing etc.
           AllowAgentForwarding = true;
-          # Needed to select the correct forwarded Yubikey SSH key for git
-          # signing on remote hosts.
-          #
-          # When forwarding Yubikey-backed ED25519-SK keys over SSH, any key
-          # that has been added to the SSH agent since boot will be forwarded.
-          # This includes keys which are not currently present. Setting
-          # `ExposeAuthInfo yes` causes sshd to additionally expose which key
-          # authenticated the *current* session. The `yk-git-signing-key` script
-          # in modules/home/profiles/git.nix will use this to pick which
-          # forwarded key is actually in use, so that it doesn't incorrectly
-          # select one that was previously present but isn't available in the
-          # current SSH session.
-          ExposeAuthInfo = true;
         };
       };
 

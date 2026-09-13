@@ -39,6 +39,8 @@
 
       arm-cross-dev.enable = true;
       nix-ld.enable = true;
+
+      yubikey.ssh.enable = true;
     };
 
   hardware = {

@@ -30,6 +30,7 @@ with lib; {
     yubikey = {
       enable = true;
       provisioning.enable = true;
+      ssh.enable = true;
       pam_u2f = {
         enable = true;
         lockOnUnplug = true;

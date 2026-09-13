@@ -19,36 +19,5 @@ in
       hibernate.enable = false;
       hybrid-sleep.enable = false;
     };
-
-    # Allow passwordless sudo when connecting via ssh (we already auth'd via
-    # public key, that's enough).
-    #
-    # We use `pam_rssh` instead of `pam_ssh_agent_auth`, which apparently does
-    # not support ed25519 keys)
-    #
-    # When connecting via ssh, make sure to use `-A` or `-o ForwardAgent=yes`
-    # to ensure the SSH agent is forwarded to this box.
-    #
-    # See https://discourse.nixos.org/t/nixos-rebuild-remote-deployments-non-root-pam/50477/19
-    security.pam = {
-      rssh = {
-        enable = true;
-        settings = {
-          auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
-          loglevel = "debug";
-
-          # cue = true makes rssh prompt when using a hardware security
-          # token-backed key such as a yubikey, which is nice...but this,
-          # unfortunately, breaks `deploy-rs`, since the activation command does
-          # not have a terminal and `ssh -t` apparently doesn't work. so,
-          # disable it; it's a bummer to have deploy-rs break just because we
-          # wanted to print "[sudo] Please touch the device" --- the remote
-          # system will have `yubikey-touch-detector` or similar anyway.
-
-          # cue = true;
-        };
-      };
-      services.sudo.rssh = true;
-    };
   };
 }

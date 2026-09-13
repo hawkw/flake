@@ -140,8 +140,8 @@ let
   # domain, preventing it from accidentally being used for WebAuthn.
   pamOrigin = "pam://${baseDomain}";
 
-  # The user the PAM U2F authfile authorizes, and for use in SSH key comment
-  # strings.
+  # The username the keys authorize. This username is used in the PAM-U2F
+  # authfile, in key comment strings, and when configuring SSH authorized_keys.
   user = "eliza";
 
   # Per-YubiKey PAM U2F credentials: one agenix `intermediary` secret per
@@ -1062,6 +1062,10 @@ in
   options.profiles.yubikey = {
     enable = mkEnableOption "yubikey config";
 
+    ssh.enable = mkEnableOption "YubiKey-based SSH auth for remote hosts" // {
+      default = true;
+    };
+
     # The provisioning scripts are enabled separately, since they pull in a
     # bunch of dependencies, and are not needed on every host that uses
     # yubikey auth.
@@ -1097,10 +1101,63 @@ in
     };
   };
 
-  config = mkIf cfg.enable (mkMerge [
+  config = mkMerge [
+    # SSH config for remote hosts. This is enabled separately from the base
+    # config for using YubiKeys attached locally to a system.
+    (mkIf cfg.ssh.enable {
+      # Use the authorized keys from the repo.
+      users.users.${user}.openssh.authorizedKeys.keys = yubikeysLib.ssh.pubkeys;
+
+      services.openssh.settings = {
+        # Needed to select the correct forwarded Yubikey SSH key for git
+        # signing on remote hosts.
+        #
+        # When forwarding Yubikey-backed ED25519-SK keys over SSH, any key
+        # that has been added to the SSH agent since boot will be forwarded.
+        # This includes keys which are not currently present. Setting
+        # `ExposeAuthInfo yes` causes sshd to additionally expose which key
+        # authenticated the *current* session. The `yk-git-signing-key` script
+        # in modules/home/profiles/git.nix will use this to pick which
+        # forwarded key is actually in use, so that it doesn't incorrectly
+        # select one that was previously present but isn't available in the
+        # current SSH session.
+        ExposeAuthInfo = true;
+      };
+
+      # Allow passwordless sudo when connecting via ssh (we already auth'd via
+      # public key, that's enough).
+      #
+      # We use `pam_rssh` instead of `pam_ssh_agent_auth`, which apparently does
+      # not support ed25519 keys)
+      #
+      # When connecting via ssh, make sure to use `-A` or `-o ForwardAgent=yes`
+      # to ensure the SSH agent is forwarded to this box.
+      #
+      # See https://discourse.nixos.org/t/nixos-rebuild-remote-deployments-non-root-pam/50477/19
+      security.pam = {
+        rssh = {
+          enable = lib.mkDefault true;
+          settings = {
+            auth_key_file = "/etc/ssh/authorized_keys.d/$ruser";
+            loglevel = "debug";
+
+            # cue = true makes rssh prompt when using an ED25519-SK key, which
+            # is nice...but this, unfortunately, breaks `deploy-rs`, since the
+            # activation command does not have a terminal and `ssh -t`
+            # apparently doesn't work. so, disable it; it's a bummer to have
+            # deploy-rs break just because we wanted to print "[sudo] Please
+            # touch the device" --- the remote system will have
+            # `yubikey-touch-detector` or similar anyway.
+
+            # cue = true;
+          };
+        };
+        services.sudo.rssh = lib.mkDefault true;
+      };
+    })
     # Base config with nothing else enabled: just the necessary dependencies for
     # day-to-day YubiKey use.
-    (
+    (mkIf cfg.enable (
       let rescanServiceName = "yubikey-touch-detector-rescan"; in
       {
         # Provides `ykman`, pcscd, and the udev rules. These are required both
@@ -1196,10 +1253,10 @@ in
           };
         };
       }
-    )
+    ))
     # If provisioning.enable = true, also include the `ykprovision` and
     # `ykrevoke` scripts.
-    (mkIf cfg.provisioning.enable {
+    (mkIf (cfg.provisioning.enable && cfg.enable) {
       # ensure that the global 1password CLI is present. the provisioning script
       # relies on this but cannot depend on it directly due to Some Kind of
       # Reason.
@@ -1207,7 +1264,7 @@ in
       environment.systemPackages = [ ykprovision ykrevoke ];
     })
     # PAM-U2F auth config.
-    (mkIf cfg.pam_u2f.enable (
+    (mkIf (cfg.pam_u2f.enable && cfg.enable) (
       let
         # Per-key credentials discovered from the repo at eval time. The
         # dependency list for the authfile generator is automatically determined
@@ -1395,5 +1452,5 @@ in
         );
       }
     ))
-  ]);
+  ];
 }
