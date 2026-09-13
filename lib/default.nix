@@ -31,35 +31,11 @@ in
     , builder ? nixpkgs.lib.nixosSystem
     , specialArgs ? { }
     , baseModules ? [ ]
-    , homeManager ? null
     , overlays ? [ ]
     , config ? { allowUnfree = true; }
     }:
     let
-      mkHost = conf@{ system, modules, hostname, ... }:
-        let
-          homeManagerModule =
-            if homeManager != null && hasAttr "home" conf then
-              [
-                ({ ... }: {
-                  # keep system and standalone home-manager activations on the
-                  # same module list and nixpkgs configuration. in particular,
-                  # do not share the NixOS package set, since it forces packages
-                  # the standalone home-manager build does not need on
-                  # unsupported platforms.
-                  home-manager = {
-                    useUserPackages = true;
-                    extraSpecialArgs = { inherit inputs self; };
-                    users.${homeManager.user} = {
-                      nixpkgs = { inherit overlays config; };
-                      imports = homeManager.baseModules ++ conf.home.modules;
-                    };
-                  };
-                })
-              ]
-            else
-              [ ];
-        in
+      mkHost = { system, modules, hostname, }:
         builder {
           inherit system;
 
@@ -71,13 +47,13 @@ in
 
               nixpkgs = { inherit overlays config; };
             })
-          ] ++ baseModules ++ modules ++ homeManagerModule;
+          ] ++ baseModules ++ modules;
         };
     in
     listToAttrs (map
       (conf: {
         name = conf.hostname;
-        value = mkHost conf;
+        value = mkHost (removeAttrs conf [ "home" ]);
       })
       (loadHosts directory inputs));
 

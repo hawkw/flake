@@ -262,11 +262,6 @@
           nixosConfigurations = lib.genNixOSHosts {
             inherit inputs config overlays self;
 
-            homeManager = {
-              user = "eliza";
-              baseModules = [ self.homeModules.default ];
-            };
-
             baseModules = [
               utils.nixosModules.autoGenFromInputs
               self.nixosModules.default
