@@ -33,16 +33,7 @@ with lib; {
       ssh.enable = true;
       pam_u2f = {
         enable = true;
-
-        # TODO: unfortunately, the auto-lock-on-yubikey-unplug stuff is a bit
-        # jankier than i'd like it to be: when the yubikey's usb connection is a
-        # bit flaky (i.e. if it has a heavy keychain on it and it wiggles a
-        # bit), the system will immediately lock while i'm still using it, which
-        # is very annoying. probably the right thing to do would be to make it
-        # spawn a timer or something which waits a bit and then locks if there
-        # are still no yubikeys visible a few seconds, or something...
-
-        # lockOnUnplug = true;
+        lockOnUnplug.enable = true;
       };
     };
   };
