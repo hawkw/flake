@@ -220,15 +220,15 @@
         })
         # inputs.atuin.overlays.default
         # add alejandra package
-        (_: prev: { alejandra = inputs.alejandra.defaultPackage.${prev.system}; })
+        (_: prev: { alejandra = inputs.alejandra.defaultPackage.${prev.stdenv.hostPlatform.system}; })
         # add ghostty package
-        (_: prev: { ghostty = inputs.ghostty.packages.${prev.system}.ghostty; })
+        (_: prev: { ghostty = inputs.ghostty.packages.${prev.stdenv.hostPlatform.system}.ghostty; })
         # add ECLSSD
-        (_: prev: { eclssd = inputs.eclssd.packages.${prev.system}.eclssd; })
+        (_: prev: { eclssd = inputs.eclssd.packages.${prev.stdenv.hostPlatform.system}.eclssd; })
         # add fw-ectool package
         # TODO(eliza): it would be nice if this was only added for the framework
         # system config...
-        (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.system}.ectool; })
+        (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.stdenv.hostPlatform.system}.ectool; })
         inputs.claude-code.overlays.default
       ];
 
