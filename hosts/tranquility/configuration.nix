@@ -25,6 +25,7 @@ with pkgs; with lib; {
       snmp.enable = true;
     };
 
+    yubikey.ssh.enable = true;
     zfs.enable = true;
   };
 

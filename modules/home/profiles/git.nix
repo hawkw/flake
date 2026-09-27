@@ -181,9 +181,14 @@ with lib; {
     #
     # This script selects keys in the following order:
     #
-    # 1. A plugged in, enrolled key whose handle file is present in ~/.ssh.
-    # 2. If we are on a remote host (i.e. SSH_CONNECTION is set),
-    #    any enrolled key forwarded over the SSH connection.
+    # 1. An ED25519-SK yubikey ssh key handle file from ~/.ssh, *if* and only
+    #    if the yubikey that key handle corresponds to is physically present (
+    #    determined using `/dev/yubikeys/$SERIAL`)
+    # 2. If we are on a remote host (i.e. `$SSH_CONNECTION` is set), use the key
+    #    that authenticated the current SSH session, determined by inspecting
+    #    the `$SSH_USER_AUTH` env var. This is necessary because, if multiple
+    #    Yubikeys have been used since boot, the SSH agent will forward *all*
+    #    identities. By inspecting SSH_USER_AUTH, we can ensure we select
     # 3. Otherwise, fail with instructions.
     (mkIf (!enable1PasswordSshAgent) (
       let
@@ -265,22 +270,36 @@ with lib; {
               exit 0
             done
 
-            # 2. If we are on a remote host (i.e. SSH_CONNECTION is set),
-            #    select any enrolled key forwarded over the SSH connection.
+            # 2. If we are on a remote host over SSH, select the forwarded key
+            #    that authenticated the current SSH session
             if [ -n "''${SSH_CONNECTION-}" ]; then
-              while read -r keyline; do
-                [ -n "$keyline" ] || continue
-                if grep -qxF "$keyline" <<< ${escapeShellArg registeredKeys}; then
-                  printf 'key::%s\n' "$keyline"
-                  exit 0
-                fi
-              done <<< "$AGENT_KEYS"
+              if [ -n "''${SSH_USER_AUTH-}" ] && [ -r "$SSH_USER_AUTH" ]; then
+                # $SSH_USER_AUTH lines begin with the authentication method,
+                # followed by the key type and publick key itself for SSH key
+                # auth.
+                while read -r authmethod keytype blob _; do
+                  # we are looking for 'publickey', but there may be additional
+                  # lines for password or keyboard interactive auth...
+                  [ "$authmethod" = "publickey" ] || continue
+                  keyline="$keytype $blob"
+                  if in_agent "$keyline" \
+                    && grep -qxF "$keyline" <<< ${escapeShellArg registeredKeys}; then
+                    printf 'key::%s\n' "$keyline"
+                    exit 0
+                  fi
+                done < "$SSH_USER_AUTH"
+              else
+                echo "yk-git-signing-key: SSH_USER_AUTH environment variable is" >&2
+                echo "unset. selecting the correct YubiKey for remote signing" >&2
+                echo "requires 'ExposeAuthInfo yes' in the sshd config on this host." >&2
+                exit 1
+              fi
             fi
 
             # 3. Otherwise, fail with instructions.
             echo "yk-git-signing-key: no YubiKey SSH key available for signing." >&2
-            echo "either plug in an enrolled YubiKey (with its key handle present" >&2
-            echo "in ~/.ssh), or connect with a forwarded agent that holds one." >&2
+            echo "either plug in a YubiKey corresponding to one of the key handles" >&2
+            echo "in ~/.ssh, or connect over SSH with a forwarded key." >&2
             exit 1
           '';
         };

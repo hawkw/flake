@@ -33,16 +33,27 @@
 
 ## home-manager
 
-each host has a [home-manager] configuration for the `eliza` user. home-manager
-configurations are built alongside the host's NixOS configuration, so
-`nixos-rebuild switch --flake .` or `deploy-rs` will also activate the
-`home-manager` config.
+each host has a [home-manager] configuration for the `eliza` user, built as part
+of the host's NixOS configuration using the home-manager NixOS module. the 
+HM config is activated by `nixos-rebuild switch --flake .` or `deploy-rs`.  
 
-however, the standalone home-manager outputs use the same module lists, so one
-can also build and activate *just* the home-manager config by using
-`home-manager switch --flake .` this is useful when only the home-manager config
-has changed and it is not necessary to rebuild the whole system. a later NixOS
-switch will re-apply the same configuration.
+the flake does not output any standalone `homeConfigurations`.
+
+> [!IMPORTANT]
+> because there are no standalone `homeConfigurations` in this flake, do **not**
+> use `home-manager switch`! 
+
+instead, home-manager packages are installed into the system closure (by
+`home-manager.useUserPackages`), at `/etc/profiles/per-user/eliza`. this means
+they switch and roll back together with the system configuration. a standalone
+home-manager configuration would install packages into
+`~/.local/state/nix/profile` instead, and if both were in use, each activation
+would remove the other's packages.
+
+> [!NOTE]
+> to iterate on home-manager config without adding a new system generation (and
+> boot entry), you can use use `sudo nixos-rebuild test --flake .`, and then run
+> `switch` after testing the new config..
 
 ## secrets
 

@@ -317,10 +317,10 @@ sudo zpool create \
 ok it works 
 
 ```console
-eliza@tranquility ~/flake $ zpool list && zpool status moonpool
+eliza@tranquility ~ $ zpool list && zpool status moonpool
 NAME                SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-moonpool           90.8T  1.37M  90.8T        -         -     0%     0%  1.00x    ONLINE  -
-tranquility-rpool   472G  13.7G   458G        -         -     0%     2%  1.00x    ONLINE  -
+moonpool           91.7T  1.41M  91.7T        -         -     0%     0%  1.00x    ONLINE  -
+tranquility-rpool   472G  29.0G   443G        -         -     6%     6%  1.00x    ONLINE  -
   pool: moonpool
  state: ONLINE
 config:
@@ -340,6 +340,7 @@ config:
             wwn-0x5000c50030186713  ONLINE       0     0     0
             wwn-0x5002538b012dda50  ONLINE       0     0     0
             wwn-0x5002538b012dda40  ONLINE       0     0     0
+            wwn-0x5002538b01bbde70  ONLINE       0     0     0
         spares
           wwn-0x5000c500a18fae2b    AVAIL
 

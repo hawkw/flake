@@ -149,13 +149,6 @@
       "dialout" # allows writing to serial ports
     ];
     shell = pkgs.zsh;
-    openssh.authorizedKeys.keys = [
-      # The 1Password-resident key.
-      # TODO(eliza): remove this when switching to the yubikey scheme
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNWunZTkQnvkKi6gbeRfOXaIg4NL0OiE0SIXosxRP6s"
-    ]
-    # YubiKey sk keys (see lib/yubikeys.nix).
-    ++ (import ../../lib/yubikeys.nix { inherit lib; }).ssh.pubkeys;
     initialPassword = "changethis";
   };
 
