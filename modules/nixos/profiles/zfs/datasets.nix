@@ -1,5 +1,5 @@
-# Declarative ZFS dataset management (`profiles.zfs.pools`), including datasets
-# encrypted with agenix-provided keys.
+# Declarative ZFS dataset management extending `disko-zfs` with typed dataset
+# properties and support for agenix-provided dataset encryption keys.
 #
 # == Theory of operation ==
 #
@@ -10,79 +10,128 @@
 #
 # * unencrypted pools are managed by the stock `disko-zfs` service, which runs
 #   early in boot (before `local-fs-pre.target`);
-# * pools containing any encrypted dataset are managed by a late, per-pool
+# * pools containing an encryption root are managed by a late, per-pool
 #   oneshot service (`zfs-datasets-<pool>.service`), which runs after the pool
-#   is imported. This service uses `disko-zfs` to create missing datasets and
+#   is imported. This service invokes `disko-zfs` to create missing datasets and
 #   reconcile properties, loads keys, and mounts the datasets.
 #
-# The separate oneshot service is necessary because the encryption keys are
+# The separate oneshot service is necessary when the encryption keys are
 # `agenix` secrets. `agenix` installs secrets in an activation script, so there
-# is no unit an early service could order itself after. Nothing that runs before
-# `local-fs-pre.target` is guaranteed to see the key files decrypted by agenix,
-# so the stock `disko-zfs` service would run before the pool can be unlocked.
-# The oneshot runs at multi-user instead, and fails loudly if a key file is
-# missing.
+# is no systemd unit an early service could depend on to ensure that the
+# reconcilation occurs after the pool is unlocked. The stock `disko-zfs` service
+# runs before `local-fs-pre.target`, at which time, the agenix keys are not
+# decrypted, and therefore, the encrypted datasets are not unlocked.
+# The oneshot service in this module runs at `multi-user.target`, instead.
 #
-# `disko-zfs`'s stock service also cannot create encryption roots safely. ZFS
-# encryption properties are read-only after creation, so reconciliation must
-# ignore them, but ignoring them also ignores them when `disko-zfs` runs `zfs
-# create`, so a missing encryption root would come up unencrypted. Whoops! The
-# oneshot service works around this by creating encryption roots itself and
-# configuring `disko-zfs` to ignore encryption-related properties.
+# `disko-zfs`'s stock service also cannot safely create encryption roots. ZFS
+# encryption properties are read-only after creation, and therefore must be
+# ignored when dataset properties are reconciled. Unfortunately, ignoring them
+# from reconciliation also omits them from `disko-zfs`'s `zfs create` invocation
+# when the dataset does not exist. That means that an encryption root that does
+# not yet exist would be created unencrypted. The oneshot creates encryption
+# roots itself and configures `disko-zfs` to ignore encryption-related
+# properties.
 #
-# If a pool contains *any* encrypted datasets, that whole pool is managed by the
-# oneshot, so that it can be reconciled by a single `disko-zfs` invocation.
-# Splitting a pool between the early stock `disko-zfs` service and the oneshot
-# runs afoul of `disko-zfs`'s `expand_sub_datasets`, which creates a dataset's
-# parents if they don't already exist (with no properties), and would therefore
-# clobber the intended properties of those datasets.
+# Pools containing one or more encryption root datasets are *always* managed by
+# a single late oneshot service. Splitting work between the early stock
+# disko-zfs service and the oneshot is unsafe, because when `disko-zfs`'s
+# `expand_sub_datasets` creates missing parent datasets, it does not set any
+# properties. Therefore, this could accidentally replace the declared properties
+# of a dataset created by the other service.
 #
-# Consumers of an encrypted pool MUST declare both `requires` and `after` on
-# `zfs-datasets-<pool>.target`. `requires` is necessary to ensure that the
-# service does not start if the unlock fails. If only `after` is set, the unit
-# will run after the oneshot regardless of whether it succeeds or fails, and
-# would write into the empty mountpoint directory on the root filesystem. A
-# failed unlock never blocks the rest of boot.
+# == Usage Notes ==
 #
-# The easiest way to declare a dependency on a dataset managed by this module is
-# `systemd.services.<name>.requiresZfsMounts = [ "/srv/path" ]`, which is also
-# declared here. Each path in the list of `requiresZfsMounts` is resolved to the
-# declared dataset whose mountpoint is its longest prefix, and the right
-# `requires`/`after` configurations are added to the service's config
-# automatically. Paths which are not managed by this module produce an error
-# when evaluated.
+# All local properties on datasets declared using this module are "owned" by
+# this module unless explicitly ignored. Just like with standard `disko-zfs`,
+# reconciling a pool's config will revert (using `zfs inherit`) any property set
+# by hand and not declared here.
 #
-#  === Operational consequences of the design ===
-#
-# This module's configuration owns every local property of a declared dataset.
-# Just like with standard `disko-zfs`, reconciliation reverts (`zfs inherit`)
-# anything set by hand and not declared here.
-#
-# Therefore, all properties must either be declared here or added to
+# Therefore, all properties **must** either be declared here or added to
 # `disko.zfs.settings.ignoredProperties`.
 #
-# Dataset changes are applied by `nixos-rebuild switch` as a unit *reload* (see
-# `reloadIfChanged` in `mkService`), so consumers stay up while the datasets are
-# reconciled. One race is possible, as a service added in the same switch as a
-# dataset it consumes can  before the reload has created that dataset. Consumers
-# declared via `requiresZfsMounts` are ordered after the oneshot and wait for
-# the reload, so this issue does not apply to them. On the other hand, a
-# hand-written `requires`/`after` on only the target does not, and such a service
-# may need one `systemctl start` after the switch.
+# === Services which depend on encrypted pool datasets ===
 #
-# Mountpoint underlay directories are made immutable (`chattr +i`) before each
-# mount. This ensures that while a dataset is unmounted, writes to its
-# mountpoint path fail with EPERM (even for root) instead of silently landing on
-# the parent filesystem and then blocking the next mount. The flag lives on the
-# underlay inode, so it is invisible while the dataset is mounted. The downside
-# is that an abandoned mountpoint directory cannot be removed, even by root,
-# until the flag is cleared. When a declared mountpoint changes, the runner
-# removes the old (empty) underlay directory itself after the dataset has been
-# remounted; a non-empty old directory is left in place with a warning, since
-# its contents were written while the dataset was unmounted and deleting them
-# silently would be data loss. To remove one by hand (that case, or an orphan
-# left by a run that failed between reconciliation and cleanup): `chattr -i
-# <dir>`, inspect the contents, then remove.
+# A service which requires filesystems on an encrypted pool **must** declare
+# both `requires` and `after` on `zfs-datasets-<pool>.target`, or else it may be
+# started before that dataset is unlocked. This is necessary if the pool
+# contains any encrypted datasets, **even if the dataset that the service
+# depends on is not encrypted**.
+#
+# Setting `requires` is necessary to prevent the service from starting when
+# unlocking the dataset fails. `after` without `requires` only establishes
+# *ordering*, so the service would still run after a failed oneshot and write
+# into the empty mountpoint directory on the root filesystem. A failed dataset
+# unlock does not block the rest of boot.
+#
+# Services that require filesystems on encrypted datasets may declare their
+# dependencies using the `requiresZfsMounts` setting from this module, like:
+#
+# ```
+# systemd.services.<name>.requiresZfsMounts = [ "/srv/path" ];
+# ```
+#
+# Each path is resolved to the declared dataset with the longest matching
+# mountpoint prefix, and adds the `requires` and `after` entries to the service.
+# If the path is not part of a dataset managed by this module, this will produce
+# an evaluation error.
+#
+# `nixos-rebuild switch` applies dataset changes by reloading the unit (see
+# `reloadIfChanged` in `mkService`). Existing consumers remain running while
+# datasets are reconciled. A service added in the same switch as a dataset it
+# consumes can start before the reload creates that dataset. Services that use
+# `requiresZfsMounts` wait for the reload, so they do not have this race. A
+# service with hand-written dependencies on only the target may need one
+# `systemctl start` after the switch.
+#
+# === Immutable mountpoint underlays ===
+#
+# Before mounting a dataset, the runner makes the mountpoint underlay directory
+# immutable (`chattr +i`). While a dataset is unmounted, writes to its
+# mountpoint fail with `EPERM`, even for root. This is intended to protect
+# against non-empty underlay directories preventing the filesystem from being
+# mounted. When the dataset is mounted, the immutable directory is overlayed by
+# the mounted filesystem.
+#
+# There is one important operational consideration that results from this: if a
+# dataset's mountpoint *changes*, this module will attempt to remove the old
+# immutable underlay directory. Typically, this occurs automatically, but on the
+# off chance that the underlay directory is non-empty, this module will refuse
+# to remove it, since, well, you might still want whatever's in there. Normally,
+# this shouldn't happen, since the non-empty underlay prevents the dataset from
+# being mounted in the first place, but this can occur if a mountpoint was
+# *accidentally* set to a non-empty underlay. If this *does* occur, note that
+# the underlay directory will still be immutable, so you will have to manually
+# run `chattr -i <path>` to make it mutable again.
+#
+# == Typed properties ==
+#
+# ZFS properties can be set using `config.profiles.zfs.pools.<pool>.properties`
+# (for pool-level defaults) and
+# `config.profiles.zfs.pools.<pool>.datasets.<dataset>.properties` (for
+# individual datasets). These are attrsets containing both freeform options (Nix
+# RFC 42 style) *and* typed options representing ZFS properties. The typed
+# options are used for ZFS properties that are either commonly used, require
+# multiple ZFS properties to configure, or are easy to misspell.
+#
+# The danger of typos or misspellings is worse for ZFS *user* properties (i.e.
+# anything with `:` in its name, such as `com.sun:auto-snapshot`) than for
+# native properties (those defined by ZFS). The `zfs create` or `zfs set`
+# commands will fail when encountering misspelt native properties, but since
+# they don't have an exhaustive list of user properties, they cannot
+# distinguish between typos and intended user propertiy names. For example, if
+# we were to misspell `com.sun:auto-snapshot` as `com.sun:autosnapshot`, which
+# I've done a bunch of times, it would be valid as far as ZFS is concerned,
+# and the zfs-autosnapshot service that consumes that property will just never
+# see it, which sucks. Thus, typed properties help to protect against stuff
+# like this. They also encode the expected *values* of those properties: for
+# example, `atime` expects `on` or `off`, while `com.sun:auto-snapshot`
+# expects `true` or `false`, so that the user of this module doesn't have to
+# remember how many different ways of spelling true/false there are.
+#
+# Typed properties default to `null`, meaning that they are not managed by
+# this module. If they are not `null`, then they are managed by this module
+# and will be set by disko-zfs reconciliation. Any attributes without a typed
+# option is passed through as a freeform ZFS property verbatim.
 { config, lib, pkgs, utils, ... }:
 let
   inherit (lib)
@@ -94,128 +143,136 @@ let
 
   cfg = config.profiles.zfs;
 
-  # Properties intrinsic to encryption, which `disko-zfs` reconciliation must
-  # never touch:
-  # * `encryption`, `keyformat`, `encryptionroot`, and `keystatus` are
-  #   read-only after they are set, so reconciling them errors,
-  # * `pbkdf2iters` and `pbkdf2salt` are set at key-load time, so inheriting
-  #   them away would break things,
-  # * `keylocation` is managed by this module, but not by disko-zfs
+  # Encryption properties excluded from `disko-zfs` reconciliation:
   cryptoProperties = [
+    # `encryption`, `keyformat`, `encryptionroot`, and `keystatus` are read-only
+    # after creation. Attempting to reconcile them will always fail.
     "encryption"
     "keyformat"
+    # This module's typed attribute manages keylocation and keyformat, while
+    # disko-zfs treats them as normal properties. Therefore, don't let disko-zfs
+    # mess with them.
     "keylocation"
     "keystatus"
     "encryptionroot"
+    # `pbkdf2iters` and `pbkdf2salt` are set when keys are loaded, and touching
+    #  them will probably break things, so we mustn't mess with them.
     "pbkdf2iters"
     "pbkdf2salt"
   ];
 
-  # == Typed properties ==
-  #
-  # `properties` is a freeform attrset (RFC 42 style), plus typed options for
-  # the properties that are commonly used and dangerous to spell freehand. The
-  # danger of typos or misspellings is worse for ZFS *user* properties than for
-  # built-in ones: a typoed native property name fails loudly when `zfs create`
-  # or `zfs set` is run, but a typoed *user* property name (anything with a `:`,
-  # e.g. `com.sun:autosnapshot` for `com.sun:auto-snapshot`) is valid as far as
-  # ZFS is concerned and gets set, even if it's misspelt. Whatever other
-  # software consumes that property will just never see it, which sucks. Typed
-  # properties also encode each property's value spelling (`atime` wants on/off,
-  # `com.sun:auto-snapshot` wants true/false), so nobody has to remember which
-  # is which.
-  #
-  # Typed properties default to `null`, meaning that they are not managed by
-  # this module. If this module manages a property, it is reconciled by
-  # disko-zfs, so a non-null default would silently take ownership of that
-  # property on every dataset. Anything without a typed option passes through
-  # freeform, verbatim, under its ZFS name.
-  onOff = b: if b then "on" else "off";
-  trueFalse = b: if b then "true" else "false";
-  sizeType = types.either types.ints.unsigned
-    (types.strMatching "[0-9]+(\\.[0-9]+)?[KMGTPkmgtp]?");
-  typedProperties = {
-    mountpoint = {
-      property = "mountpoint";
-      render = v: v;
-      type = types.either (types.enum [ "none" "legacy" ]) (types.strMatching "/.*");
-      description = ''
-        Where the dataset is mounted: an absolute path, `none`, or `legacy`.
-      '';
+  # Definitions of typed options for ZFS properties managed by this module (see
+  # "Typed properties" in the module-level comment). These must define the
+  # following:
+  #  - the option's `type` and `description`,
+  #  - `property`, a string with the name of the actual ZFS property the option
+  #    configures,
+  #  - `toZfsValue`, a function that converts the option's value to a string
+  #    containing the value of the property in the format ZFS expects.
+  typedProperties =
+    let
+      # converts a boolean value to a ZFS property value that expects the
+      # strings "on" or "off".
+      onOff = b: if b then "on" else "off";
+      # converts a boolean value to a ZFS property value that expects the
+      # strings "true" or "false".
+      trueFalse = b: if b then "true" else "false";
+      # option type for sizes as either an integer number of bytes or a string
+      # matching the format used by ZFS (e.g. `"1M"`, `"128K"`).
+      sizeType = types.either types.ints.unsigned
+        (types.strMatching "[0-9]+(\\.[0-9]+)?[KMGTPkmgtp]?");
+    in
+    {
+      mountpoint = {
+        property = "mountpoint";
+        toZfsValue = v: v;
+        type = types.either (types.enum [ "none" "legacy" ]) (types.strMatching "/.*");
+        description = ''
+          Where the dataset is mounted. This must be either an absolute path,
+          `none`, or `legacy`.
+        '';
+      };
+      canmount = {
+        property = "canmount";
+        toZfsValue = v: v;
+        type = types.enum [ "on" "off" "noauto" ];
+        description = "Whether the dataset can be mounted.";
+      };
+      recordsize = {
+        property = "recordsize";
+        toZfsValue = toString;
+        type = sizeType;
+        description = ''
+          Suggested block size cap for files in this dataset (e.g. `"1M"`,
+          `"128K"`). Files smaller than this are stored as a single block of
+          roughly the file's size.
+        '';
+      };
+      specialSmallBlocks = {
+        property = "special_small_blocks";
+        toZfsValue = toString;
+        type = sizeType;
+        description = ''
+          Blocks at or below this size are allocated on the pool's special vdev
+          (`0` disables). Must be strictly less than the recordsize, or *all*
+          data is routed to the special vdev.
+        '';
+      };
+      quota = {
+        property = "quota";
+        toZfsValue = toString;
+        type = types.either sizeType (types.enum [ "none" ]);
+        description = "Size limit for the dataset and its descendants.";
+      };
+      atime = {
+        property = "atime";
+        # ZFS expects this property as "on" or "off", rather than "true" or
+        # "false".
+        toZfsValue = onOff;
+        type = types.bool;
+        description = "Whether to update access times on read.";
+      };
+      autoSnapshot = {
+        property = "com.sun:auto-snapshot";
+        toZfsValue = trueFalse;
+        type = types.bool;
+        description = ''
+          If `true`, this dataset should be snapshotted by the `zfs-auto-snapshot`
+          service. This sets the `com.sun.auto-snapshot` user property.
+        '';
+      };
+      autoSnapshotFrequent = {
+        property = "com.sun:auto-snapshot:frequent";
+        toZfsValue = trueFalse;
+        type = types.bool;
+        description = ''
+          Per-label override for the `frequent` (15-minute) auto-snapshot label.
+          This overrides {option}`autoSnapshot` for that label only.
+        '';
+      };
     };
-    canmount = {
-      property = "canmount";
-      render = v: v;
-      type = types.enum [ "on" "off" "noauto" ];
-      description = "Whether the dataset can be mounted.";
-    };
-    recordsize = {
-      property = "recordsize";
-      render = toString;
-      type = sizeType;
-      description = ''
-        Suggested block size cap for files in this dataset (e.g. `"1M"`,
-        `"128K"`). Files smaller than this are stored as a single block of
-        roughly the file's size.
-      '';
-    };
-    specialSmallBlocks = {
-      property = "special_small_blocks";
-      render = toString;
-      type = sizeType;
-      description = ''
-        Blocks at or below this size are allocated on the pool's special vdev
-        (`0` disables). Must be strictly less than the recordsize, or *all*
-        data is routed to the special vdev.
-      '';
-    };
-    quota = {
-      property = "quota";
-      render = toString;
-      type = types.either sizeType (types.enum [ "none" ]);
-      description = "Space limit for the dataset and its descendants.";
-    };
-    atime = {
-      property = "atime";
-      render = onOff;
-      type = types.bool;
-      description = "Whether to update access times on read (renders as on/off).";
-    };
-    autoSnapshot = {
-      property = "com.sun:auto-snapshot";
-      render = trueFalse;
-      type = types.bool;
-      description = ''
-        Whether `zfs-auto-snapshot` snapshots this dataset (renders as the
-        `com.sun:auto-snapshot` user property, spelled true/false).
-      '';
-    };
-    autoSnapshotFrequent = {
-      property = "com.sun:auto-snapshot:frequent";
-      render = trueFalse;
-      type = types.bool;
-      description = ''
-        Per-label override for the `frequent` (15-minute) auto-snapshot label;
-        overrides {option}`autoSnapshot` for that label only.
-      '';
-    };
-  };
 
   typedPropertyNames = attrNames typedProperties;
+  # Given an attrset containing both typed and freeform properties, returns an
+  # attrset containing only the freeform properties.
   freeformProps = p: removeAttrs p typedPropertyNames;
+  # Given an attrset containing both typed and freeform properties, returns an
+  # attrset containing the generated ZFS property values for the typed
+  # properties.
   typedProps = p:
     listToAttrs (concatMap
       (n:
         let t = typedProperties.${n}; in
-        optional (p.${n} != null) (nameValuePair t.property (t.render p.${n})))
+        optional (p.${n} != null) (nameValuePair t.property (t.toZfsValue p.${n})))
       typedPropertyNames);
-  # Render the properties as ZFS expects them: non-null typed properties using
-  # their rendered keys and values, and freeform keys verbatim.
-  # Everything downstream (create args, disko-zfs spec, mount logic) consumes
-  # only this rendered form.
-  renderProperties = p: freeformProps p // typedProps p;
-  # A property defined both ways (typed option *and* freeform ZFS name) has no
-  # principled merge; asserted against below.
+
+  # Takes an attrset containing typed and freeform properties, and converts them
+  # to a freeform attrset in the form expected by disko-zfs and the zfs create
+  # and mount commands emitted by this module.
+  toZfsProps = p: freeformProps p // typedProps p;
+  # If a property is defined both as a freeform and typed option, we cannot
+  # determine which one to use. Therefore, if there are any such conflicts, we
+  # emit an evaluation error.
   propertyConflicts = p: attrNames (builtins.intersectAttrs (freeformProps p) (typedProps p));
 
   propertiesSubmodule = types.submodule {
@@ -235,14 +292,21 @@ let
       typedProperties;
   };
 
-  # Flatten `pools.<name>.{properties,datasets}` into a single list of records
-  # carrying each dataset's full name, rendered properties (typed properties
-  # folded in under their ZFS names), encryption, and ownership:
-  # `{ name; properties; conflicts; encryption; owner; group; mode; }`. The
-  # pool root is included only when it has declared properties (see
-  # `unmanagedRoots`).
+  # Given an attrset declaring a pool (in `pools.<name>.{properties,datasets}`),
+  # flattens it into records containing the following:
+  #
+  # - `name`: the name of the dataset or pool,
+  # - `properties`: the generated properties,
+  # - `conflicts`: any conflicts between typed and untyped properties, used to
+  #   output evaluation errors if non-empty,
+  # - `encryption`: the encryption configuration for the dataset, or null,
+  # - `owner`, `group`, and `mode`  to chown the mountpoint, or `null` if not
+  #    configured,
+  #
+  #
+  # The pool root is only included here if pool-level defaults are declared.
   poolDatasets = pool: pcfg:
-    let rootProps = renderProperties pcfg.properties; in
+    let rootProps = toZfsProps pcfg.properties; in
     optional (rootProps != { })
       {
         name = pool;
@@ -256,7 +320,7 @@ let
     ++ mapAttrsToList
       (rel: d: {
         name = "${pool}/${rel}";
-        properties = renderProperties d.properties;
+        properties = toZfsProps d.properties;
         conflicts = propertyConflicts d.properties;
         inherit (d) encryption owner group mode;
       })
@@ -274,8 +338,8 @@ let
   poolOf = name: head (splitString "/" name);
   depth = name: length (splitString "/" name);
 
-  # Pools containing at least one encryption root are managed by a late oneshot;
-  # every other pool goes through the stock early `disko-zfs` service.
+  # Pools containing an encryption root are managed by a late oneshot. All
+  # other pools are managed by the stock early `disko-zfs` service.
   latePools = unique (map (d: poolOf d.name) encryptionRoots);
   isLate = d: elem (poolOf d.name) latePools;
 
@@ -286,7 +350,7 @@ let
   # then inherit-away (clobber) the pool root's real local properties.
   unmanagedRoots = attrNames
     (filterAttrs
-      (_: pcfg: renderProperties pcfg.properties == { } && pcfg.datasets != { })
+      (_: pcfg: toZfsProps pcfg.properties == { } && pcfg.datasets != { })
       cfg.pools);
 
   datasetSpec = d: nameValuePair d.name { inherit (d) properties; };
@@ -316,8 +380,8 @@ let
     let
       inPool = filter (d: poolOf d.name == pool) datasetList;
       # Create parents before children so that, by the time we create a child
-      # dataset, its parent (and, for encrypted children, the parent's now-loaded
-      # key) already exists.
+      # dataset, its parent already exists (and for encrypted children, so that
+      # the parent's encrypted key has already been loaded).
       parentFirst = sort (a: b: depth a.name < depth b.name) inPool;
 
       spec = (pkgs.formats.json { }).generate "zfs-datasets-${pool}-spec.json" {
@@ -333,27 +397,33 @@ let
         datasets = listToAttrs (map datasetSpec inPool);
       };
 
-      # Per dataset: create it if missing, and for encryption roots, reconcile
-      # `keylocation` and load the key. `keylocation` is pool state written at
-      # creation; if the key file moves (say, an agenix secret is renamed),
-      # unlock has to follow the configuration rather than fail against the
-      # stale stored path, so it is re-set before every load-key. disko-zfs
-      # never touches it (see `cryptoProperties`).
+      # For each dataset, create it if missing, and for encryption roots, set
+      # `keylocation` and load the key.
       #
-      # Datasets are created `-u` (unmounted): first mounts then always go
-      # through the mount step below, which `chattr -i`s the underlay before
-      # mounting. Running a normal `zfs create` without `-u` would automatically
-      # mount the dataset, preventing us from making the underlay immutable.
+      # The `keylocation` property is set when the dataset is created. If the
+      # key file's path changes (say, because an agenix secret is renamed),
+      # unlocking the dataset should use the new path rather than the old one.
+      # Therefore, we re-set this property before `zfs load-key` attempts to
+      # unlock the dataset.
+      #
+      # We do *not* create or set the keylocation for externally-unlocked
+      # encryption roots (configured with `encryption.external`). Since we do
+      # not know where to get the key material for such datasets, we can only
+      # create them unencrypted, which would be wrong. Similarly, messing with
+      # their `keylocation` would break whatever does unlock it. Instead, we
+      # just check that any such datasets already exist and have their keys
+      # loaded.
+      #
+      # Datasets are created `-u` (unmounted), so that the first time we mount
+      # the dataset then always goes through the mount step below. This is so we
+      # can `chattr -i`s the underlay directory before mounting. Running a
+      # normal `zfs create` without `-u` would automatically mount the dataset,
+      # preventing us from making the underlay immutable.
       #
       # The pool root (depth 1) is excluded: it always exists (the pool is
       # imported before this runs) and is reconciled by disko-zfs like any
       # other declared dataset.
-      # Externally-unlocked encryption roots (`encryption.external`) are
-      # verify-only: this module has no key material for them, so creating one
-      # would necessarily create it unencrypted, and touching `keylocation`
-      # would break whatever does unlock it (initrd clevis dispatches the
-      # prompt fallback on the stored keylocation). Existence and a loaded key
-      # are asserted instead, loudly.
+      #
       createDatasets = concatMapStringsSep "\n"
         (d:
           let
@@ -402,15 +472,11 @@ let
           '')
         (filter (d: depth d.name > 1) parentFirst);
 
-      # Before each mount, make the underlay directory immutable (`chattr +i`):
-      # while the dataset is unmounted, writes to the mountpoint path fail with
-      # EPERM (even for root) instead of silently landing on the parent
-      # filesystem and then blocking the next mount. Because this runs only if
-      # the dataset is not mounted, the flag always lands on the underlay inode,
-      # never the dataset root. Not every filesystem supports this flag, so this
-      # is a best-effort attempt to guard against writes to the mountpoint while
-      # the dataset is not mounted. If we can't chattr the underlay, we just log
-      # a warning.
+      # Before each mount, we make the underlay directory immutable (`chattr
+      # +i`), to protect against files at that path from being written while the
+      # dataset is unmounted, which would break the mount. Not every filesystem
+      # supports this flag, so this is a best-effort attempt. If we can't
+      # chattr the underlay, we just log a warning.
       mountDatasets = concatMapStringsSep "\n"
         (d:
           let
@@ -763,10 +829,9 @@ let
           (`encryption`, `keyformat`, `keylocation`, ...) are managed
           automatically from the encryption options and must not be set here.
 
-          The configuration owns *every* declared local property of a dataset:
-          a property set by hand with `zfs set` and not declared here is
-          reverted (`zfs inherit`) the next time reconciliation runs. Declare
-          such properties here, or add them to
+          The configuration owns every declared local property. A property set
+          with `zfs set` but absent here is inherited away at the next
+          reconciliation. Declare it here or add it to
           {option}`disko.zfs.settings.ignoredProperties`.
         '';
       };
@@ -790,23 +855,24 @@ let
         default = null;
         example = "users";
         description = ''
-          Group for the dataset's root directory, applied at creation like
-          {option}`owner`. Must exist in {option}`users.groups` (asserted at
-          evaluation time).
+          Sets the group of the dataset root when it is created, as with
+          {option}`owner`. The group must exist in {option}`users.groups`
+          (checked at evaluation-time).
         '';
       };
 
       mode = mkOption {
-        # Three or four octal digits (a leading digit for setuid/setgid/sticky
-        # is allowed --- setgid dirs are useful for shared trees).
+        # Three or four octal digits. The optional leading digit supports
+        # setuid, setgid, and sticky bits (setgid directories may be useful for
+        # shared trees).
         type = types.nullOr (types.strMatching "[0-7]{3,4}");
         default = null;
         example = "0750";
         description = ''
-          Mode (chmod) for the dataset's root directory, applied at creation
-          like {option}`owner`. `0750` or `0700` is recommended for per-user
-          datasets; the default directory mode (`0755`) lets every local user
-          read every other user's data despite the per-user encryption roots.
+          Sets the mode of the dataset root when it is created, as with
+          {option}`owner`. Use `0750` or `0700` for per-user datasets. The
+          default directory mode, `0755`, lets every local user read every other
+          user's data despite separate encryption roots.
         '';
       };
     };
@@ -829,10 +895,10 @@ let
         default = { };
         example = { mountpoint = "none"; compression = "lz4"; };
         description = ''
-          ZFS properties for the pool's *root* dataset (equivalent to disko's
-          `rootFsOptions`); typed options plus freeform, as for dataset
-          properties. If left empty while child datasets are declared, the
-          root dataset is left untouched (neither created nor reconciled).
+          Sets ZFS properties for the pool's *root* dataset, equivalent to
+          disko's `rootFsOptions`. It supports the same typed and freeform
+          properties as a dataset. If this is empty while child datasets are
+          declared, the root dataset is neither created nor reconciled.
         '';
       };
 

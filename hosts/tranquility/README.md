@@ -1,5 +1,45 @@
 # tranquility: storage
 
+This is a ZFS-based storage system. Its purpose in life is to host backups,
+media, NFS/SFTP shares, and not much else. Therefore, the current hardware
+consists of a low-end Ryzen CPU, an ASRockRack [B650D4U-2L2T/BCM] AM5 server
+motherboard with dual 10GbE, and a generous amount of DDR5 ECC RAM for the ZFS
+ARC. And a whole bunch of hard drives.
+
+```console
+eliza@tranquility ~ $ inxi -bM
+System:
+  Host: tranquility Kernel: 7.0.13 arch: x86_64 bits: 64
+  Console: pty pts/0 Distro: NixOS 26.11 (Zokor)
+Machine:
+  Type: Server System: AsrockRack product: B650D4U-2L2T/BCM v: N/A serial: <superuser required>
+  Mobo: ASRockRack model: B650D4U-2L2T/BCM v: 4.01 serial: <superuser required> Firmware: UEFI
+    vendor: American Megatrends LLC. v: 21.08 date: 05/22/2025
+CPU:
+  Info: 6-core AMD Ryzen 5 9600X [MT MCP] speed (MHz): avg: 3008 min/max: 628/5486
+Graphics:
+  Device-1: ASPEED Graphics Family driver: ast v: kernel
+  Device-2: Advanced Micro Devices [AMD/ATI] Granite Ridge [Radeon Graphics] driver: amdgpu
+    v: kernel
+  Display: unspecified server: X.org v: 1.21.1.24 driver: gpu: ast note: X driver n/a, try
+    sudo/root tty: 122x70
+  API: OpenGL Message: GL data unavailable in console, glxinfo missing.
+  Info: Tools: x11: xprop,xrandr
+Network:
+  Device-1: Intel I210 Gigabit Network driver: igb
+  Device-2: Intel I210 Gigabit Network driver: igb
+  Device-3: Broadcom BCM57416 NetXtreme-E Dual-Media 10G RDMA Ethernet driver: bnxt_en
+  Device-4: Broadcom BCM57416 NetXtreme-E Dual-Media 10G RDMA Ethernet driver: bnxt_en
+  Device-5: American Megatrends Virtual Ethernet. driver: cdc_ether type: USB
+Drives:
+  Local Storage: total: raw: 93.49 TiB usable: 68.09 TiB used: 28.96 GiB (0.0%)
+Info:
+  Memory: total: 128 GiB available: 123.44 GiB used: 24.95 GiB (20.2%)
+  Processes: 474 Uptime: 90d 22h 31m Init: systemd Shell: Zsh inxi: 3.3.41
+```
+
+[B650D4U-2L2T/BCM]: https://www.asrockrack.com/general/productdetail.asp?Model=B650D4U-2L2T%2FBCM
+
 ## Root Filesystem
 
 `tranquility` boots unattended from a **mirrored pair of NVMe devices** with a
