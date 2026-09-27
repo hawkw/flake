@@ -256,11 +256,18 @@
         };
 
         flake = {
-          ###########
-          ## NixOS ##
-          ###########
+          ##########################
+          ## NixOS configurations ##
+          ##########################
           nixosConfigurations = lib.genNixOSHosts {
             inherit inputs config overlays self;
+
+            # include the home-manager configuration for the `eliza` user as
+            # part of the NixOS configuration for each host.
+            homeManager = {
+              user = "eliza";
+              baseModules = [ self.homeModules.default ];
+            };
 
             baseModules = [
               utils.nixosModules.autoGenFromInputs
@@ -284,6 +291,16 @@
           ## NixOS modules ###
           ####################
           nixosModules.default = import ./modules/nixos;
+
+          ##########################
+          ## Home Manager modules ##
+          ##########################
+          # home-manager configurations are built as part of each host's
+          # `nixosConfigurations` entry (see above) rather than as standalone
+          # `homeConfigurations`. however, we must include the home-manager
+          # *modules* as a flake output so they can be referenced by the HM
+          # configs.
+          homeModules.default = import ./modules/home;
 
           ####################
           ## NixOS (images) ##
@@ -350,20 +367,6 @@
                 tranquility = mkNode { hostname = "tranquility"; };
               };
           };
-
-
-          ##################
-          ## Home Manager ##
-          ##################
-          homeConfigurations = lib.genHomeHosts {
-            inherit inputs config overlays;
-
-            user = "eliza";
-
-            baseModules = [ self.homeModules.default ];
-          };
-
-          homeModules.default = import ./modules/home;
 
           ################
           ## checks ######

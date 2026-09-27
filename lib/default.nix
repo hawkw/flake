@@ -31,11 +31,43 @@ in
     , builder ? nixpkgs.lib.nixosSystem
     , specialArgs ? { }
     , baseModules ? [ ]
+    , homeManager ? null
     , overlays ? [ ]
     , config ? { allowUnfree = true; }
     }:
     let
-      mkHost = { system, modules, hostname, }:
+      mkHost = conf@{ system, modules, hostname, ... }:
+        let
+          homeManagerModule =
+            if homeManager != null && hasAttr "home" conf then
+              [
+                ({ ... }: {
+                  home-manager = {
+                    # set `useUserPackages` to move `home.packages` into the
+                    # system closure (as `/etc/profiles/per-user/<user>`), so
+                    # that home-manager packages switch and roll back atomically
+                    # with the system config.
+                    #
+                    # this also moves `home.profileDirectory` into
+                    # `/etc/profiles/per-user`, there, so a standalone
+                    # `home-manager switch` would build a *different* generation
+                    # (in `~/.local/state/nix/profile`) while sharing the
+                    # same activation state, and each would undo the other's
+                    # package installation. this is why we *only* build the HM
+                    # config as part of the system config, and avoid standalone
+                    # `homeConfigurations`.
+                    useUserPackages = true;
+                    extraSpecialArgs = { inherit inputs self; };
+                    users.${homeManager.user} = {
+                      nixpkgs = { inherit overlays config; };
+                      imports = homeManager.baseModules ++ conf.home.modules;
+                    };
+                  };
+                })
+              ]
+            else
+              [ ];
+        in
         builder {
           inherit system;
 
@@ -47,59 +79,13 @@ in
 
               nixpkgs = { inherit overlays config; };
             })
-          ] ++ baseModules ++ modules;
+          ] ++ baseModules ++ modules ++ homeManagerModule;
         };
     in
     listToAttrs (map
       (conf: {
         name = conf.hostname;
-        value = mkHost (removeAttrs conf [ "home" ]);
-      })
-      (loadHosts directory inputs));
-
-  # Discover home-manager configurations.
-  # It will find all sub-directories in `directory` and
-  # include it if it has a default.nix.
-  genHomeHosts =
-    { inputs
-    , user
-    , directory ? "${inputs.self}/hosts"
-    , nixpkgs ? inputs.nixpkgs
-    , home ? inputs.home
-    , builder ? home.lib.homeManagerConfiguration
-    , specialArgs ? { }
-    , baseModules ? [ ]
-    , overlays ? [ ]
-    , config ? { allowUnfree = true; }
-    ,
-    }:
-    let
-      homeHosts = concatMap
-        (h:
-          if (hasAttr "home" h) then
-            [ ((removeAttrs h [ "home" "modules" ]) // h.home) ]
-          else
-            [ ])
-        (loadHosts directory inputs);
-
-      mkHost = { system, modules, hostname, }:
-        let pkgs = import nixpkgs { inherit system config overlays; };
-        in builder {
-          inherit pkgs;
-          extraSpecialArgs = { inherit inputs; } // specialArgs;
-
-          modules = [
-            ({ lib, ... }: {
-              home.username = lib.mkDefault user;
-              home.homeDirectory = lib.mkDefault "/home/${user}";
-            })
-          ] ++ baseModules ++ modules;
-        };
-    in
-    listToAttrs (map
-      (conf: {
-        name = "${user}@${conf.hostname}";
         value = mkHost conf;
       })
-      homeHosts);
+      (loadHosts directory inputs));
 }
