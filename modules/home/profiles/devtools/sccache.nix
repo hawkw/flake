@@ -4,7 +4,7 @@ let
 in
 with lib;
 {
-  options.profiles.devtools.sccache = w {
+  options.profiles.devtools.sccache = {
     enable = mkEnableOption "sccache compilation cache";
     package = mkPackageOption pkgs "sccache";
     baseDirs = mkOption {
