@@ -22,7 +22,7 @@
 
   profiles.devtools.sccache = {
     enable = true;
-    cacheDir = "$XDG_CACHE_HOME/sccache";
+    cacheDir = "/home/eliza/.cache/sccache";
     cacheSize = "128G";
   };
 
