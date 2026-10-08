@@ -28,7 +28,7 @@ with lib;
       '';
     };
     cacheSize = mkOption {
-      type = with types; nullOr strMatching "\d+[KMGT]?";
+      type = with types; nullOr strMatching "[0-9]+[KMGT]?";
       example = "100G";
       default = null;
       description = ''
