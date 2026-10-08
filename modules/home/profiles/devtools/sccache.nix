@@ -6,7 +6,7 @@ with lib;
 {
   options.profiles.devtools.sccache = {
     enable = mkEnableOption "sccache compilation cache";
-    package = mkPackageOption pkgs "sccache";
+    package = mkPackageOption pkgs "sccache" { };
     baseDirs = mkOption {
       type = types.envVar;
       example = "/home/my/project:/home/my/other/project";
