@@ -180,6 +180,11 @@
         };
       };
 
+      sccache = {
+        url = "github:mozilla/sccache";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
     };
 
   ############################################################################
@@ -230,6 +235,8 @@
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.stdenv.hostPlatform.system}.ectool; })
         inputs.claude-code.overlays.default
+        # sccache overlay
+        (_: prev: { sccache = inputs.sccache.packages.${prev.stdenv.hostPlatform.system}.sccache; })
       ];
 
       lib = import ./lib;

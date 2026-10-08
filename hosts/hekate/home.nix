@@ -20,6 +20,12 @@
     };
   };
 
+  profiles.devtools.sccache = {
+    enable = true;
+    cacheDir = "$XDG_CACHE_HOME/sccache";
+    cacheSize = "128G";
+  };
+
   home.sessionVariables.EDITOR = lib.mkForce "nano"; # headless...
 
   home.packages = with pkgs; [
