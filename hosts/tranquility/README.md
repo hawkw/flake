@@ -119,14 +119,20 @@ This must be run as root, as the seal requires root access to the TPM
 (`/dev/tpmrm0` is `root:tss`).
 
 ```console
-sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
-  sh -c "printf '%s' $RPOOL_PASSPHRASE | clevis encrypt tpm2 '{}'" \
-  > hosts/tranquility/tranquility-rpool-crypt.jwe
+sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c bash -c \
+  'IFS= read -rsp "rpool passphrase: " P && echo >&2 && printf "%s" "$P" | clevis encrypt tpm2 "$1"' \
+  _ '{}' > hosts/tranquility/tranquility-rpool-crypt.jwe
 ```
 
-The resulting `.jwe` is decryptable **only by this host's TPM**, so commit it to
-the repo (same trust model as the TPM-backed SSH host key and agenix secrets),
-then rebuild to activate unattended unlock:
+The passphrase is read from the terminal rather than interpolated into the
+command line, which would strip any spaces from the sealed value and leave the
+passphrase in shell history.
+
+The resulting `.jwe` is decryptable **only by this host's TPM**, so it can be
+committed to the repo. This is the same trust model as the TPM-backed SSH host
+key and agenix secrets. 
+
+Then, rebuild to activate unattended unlock:
 
 ```console
 nixos-rebuild switch --flake '.#tranquility'
@@ -275,8 +281,9 @@ key to it. The TPM then releases the key **only** under your signed boot
 chain, defeating boot-chain tampering while staying unattended:
 
 ```console
-printf '%s' 'YOUR-ZFS-PASSPHRASE' | clevis encrypt tpm2 '{"pcr_ids":"7"}' \
-  > hosts/tranquility/tranquility-rpool-crypt.jwe
+sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c bash -c \
+  'IFS= read -rsp "rpool passphrase: " P && echo >&2 && printf "%s" "$P" | clevis encrypt tpm2 "$1"' \
+  _ '{"pcr_ids":"7"}' > hosts/tranquility/tranquility-rpool-crypt.jwe
 nixos-rebuild switch --flake '.#tranquility'
 ```
 
@@ -468,16 +475,17 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    agenix rekey -a
    ```
 
-2. **Recommended:** copy each passphrase into 1Password so the datasets can be
-   unlocked on *any* machine with nothing but the password manager (the whole
-   point of `keyformat=passphrase`). Read the generated values with:
+2. **Recommended:** escrow each passphrase in 1Password (or another password
+   manager), so that datasets can be unlocked on another machine for recovery
+   purposes. This is why `keyformat=passphrase` is used rather than binary
+   keys. Read the generated values with:
 
    ```console
-   agenix view   # interactive; decrypts with the master identity
+   agenix view
    ```
 
-   Without this, offline/foreign-machine recovery also needs this flake plus the
-   agenix master identity.
+   If the passphrases are not escrowed externally, recovery will only be
+   possible with the Agenix master identity and access to this flake.
 
 3. Rebuild. The oneshot creates, unlocks, and mounts the datasets during
    the switch itself (and again at every boot). Verify, including that
@@ -492,9 +500,20 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    ls -la /srv/users/eliza/   # shares & backups: eliza:users, 0700
    ```
 
-   Then reboot once and re-check: the boot path (pool import -> TPM decrypt
-   -> oneshot) is different from the switch path, and this box is headless
-   --- see it work before calling it done.
+   Then reboot again. This is necessary to check that everything works, because
+   the unlock path when booting the system is different from 
+   `nixos-rebuild switch`, as will import the pool and decrypt the TPM-sealed
+   passphrase before running the oneshot.
+
+   At boot, agenix decrypts the passphrases in the `initrd`. With systemd
+   in stage 1, NixOS runs the activation script in stage 1, before switch-root.
+   To confirm that `age-plugin-tpm` works in the `initrd`, check the system
+   journal for Agenix "decrypting" lines prior to "switching root", with no
+   errors:
+
+   ```console
+   journalctl -b -o short-monotonic | grep -E 'agenix|Switching root'
+   ```
 
 4. **Test the recovery path once.** The disaster-recovery story rests on the
    invariant *key-file contents ≡ what you type at the prompt* (libzfs strips
