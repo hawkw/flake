@@ -309,7 +309,7 @@ If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
 passphrase itself:
 
 ```console
-zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
+zfs change-key tranquility-rpool/crypt   # key must be loaded; prompts for the new passphrase
 ```
 
 ## Storage pool setup
@@ -441,8 +441,9 @@ moonpool
 
 #### How it is applied
 
-`moonpool` contains encrypted datasets, so the whole pool is managed by the
-module's late per-pool oneshot (`zfs-datasets-moonpool.service`). Systemd units
+`moonpool` is a *data pool* (nothing needed for boot lives on it), so the whole
+pool is managed by the module's late per-pool oneshot
+(`zfs-datasets-moonpool.service`). Systemd units
 which require `moonpool` datasets be mounted can depend on
 `zfs-datasets-moonpool.target`. The implementation of declarative pool
 management and its operational characteristics are documented in 

@@ -38,7 +38,7 @@
 # fails, then `local-fs.target` fails, and the system doesn't boot. Services
 # which require pools managed by disko-zfs cannot depend on `zfs-mount.service`
 # to ensure they are not started if the pool is unavailable, either, since it is
-# only ordered after `zfs-import.target`. Whhen a data pool fails to import,
+# only ordered after `zfs-import.target`. When a data pool fails to import,
 # `zfs mount -a` still runs, has nothing to mount from that pool, and succeeds
 # (spuriously).
 #
@@ -387,7 +387,7 @@ let
     in
     ''
       "${pool}" is a root pool (it contains the following filesystems needed
-       for boot: ${concatStringsSep ", " bootMountPoints})'';
+      for boot: ${concatStringsSep ", " bootMountPoints})'';
 
   # Data pools with at least one declared dataset, or declared pool-root
   # properties (if it doesn't declare anything, it doesn't need to be managed).
@@ -661,10 +661,10 @@ let
           # 1. Create every declared dataset (parent-first) that does not yet
           #    exist, and load encryption keys. This is done here, late, so
           #    that a missing or undecryptable key file fails this unit (and
-          #    therefore its target) rather stopping the system from booting.
-          #    Creating the datasets ourselves (rather than letting disko-zfs do
-          #    it) guarantees that encryption root is never accidentally
-          #    created unencrypted.
+          #    therefore its target) rather than stopping the system from
+          #    booting. Creating the datasets ourselves (rather than letting
+          #    disko-zfs do it) guarantees that an encryption root is never
+          #    accidentally created unencrypted.
           ${createDatasets}
 
           # 2. Record every declared dataset's pre-reconcile mountpoint, so
@@ -676,7 +676,7 @@ let
           #    after step 1, so disko-zfs only sets and inherits properties. We
           #    run it on a snapshot of the pool via `--file`, so it won't see
           #    any other pools, and the encryption-intrinsic properties are in
-          #   `ignoredProperties`.
+          #    `ignoredProperties`.
           zfs get all -t filesystem --json --json-int -r ${escapeShellArg pool} \
             > "$RUNTIME_DIRECTORY/actual.json"
           disko-zfs --file "$RUNTIME_DIRECTORY/actual.json" --log-level info \
