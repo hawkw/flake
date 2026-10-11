@@ -56,7 +56,7 @@ with lib; {
             in
             {
               ${sn17} = {
-                probe = "0483:3754:003200124741500820383733";
+                probe = "1fc9:0143:BWGT34BHJIVRB";
                 archive = "/gimlet/hubris/archives/build-gimlet-b-dev-image-default.zip";
                 cmds = {
                   power = {
