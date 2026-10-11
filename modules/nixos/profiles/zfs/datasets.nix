@@ -720,7 +720,14 @@ let
       # against units that don't exist are ignored). However, `requires` is not,
       # so the import unit is only required for pools this module actually
       # imports.
-      after = [ importUnit "zfs-mount.service" ];
+      #
+      # In its `systemd.sysusers`/`services.userborn` mode, `agenix` installs
+      # secrets from `agenix-install-secrets.service`, which is wanted by, but
+      # not ordered before, `sysinit.target`, so without this ordering the
+      # runner could look for key files before they exist. In its default
+      # activation-script mode, secrets are installed before any unit starts
+      # and that unit does not exist, so we can depend on it unconditionally.
+      after = [ importUnit "zfs-mount.service" "agenix-install-secrets.service" ];
       requires = optional cfg.pools.${pool}.importAtBoot importUnit;
       # Binding the target to *success* of the datasets service using
       # `Requires`, ensures that consumers that depend on the target will not
