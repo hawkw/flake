@@ -204,11 +204,11 @@ with pkgs; with lib; {
 
   # moonpool dataset layout (see hosts/tranquility/README.md). The
   # `profiles.zfs.pools` wrapper (modules/nixos/profiles/zfs/datasets.nix)
-  # routes unencrypted datasets through the early disko-zfs service and the
-  # encrypted subtrees through a late per-pool oneshot (their passphrases are
-  # agenix secrets, unavailable when the early service runs). The pool itself is
-  # created and grown statefully (drives fail and get replaced); only the dataset
-  # layout is declarative.
+  # manages the whole pool with a late per-pool oneshot, because it is a data
+  # pool (no filesystem needed for boot lives on it): if importing or unlocking
+  # it fails, only the services that use the pool are held back, not the rest of
+  # boot. The pool itself is created and grown statefully (drives fail and get
+  # replaced); only the dataset layout is declarative.
   profiles.zfs.pools.moonpool = {
     # Pool-root properties. All creation-time local properties are declared so
     # disko-zfs does not inherit (unset) them during reconciliation.

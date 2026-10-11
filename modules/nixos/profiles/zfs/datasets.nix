@@ -1,43 +1,80 @@
 # Declarative ZFS dataset management extending `disko-zfs` with typed dataset
-# properties and support for agenix-provided dataset encryption keys.
+# properties, management of data pools that do not block boot on failure, and
+# managed dataset encryption keys (such as `agenix` secrets).
 #
 # == Theory of operation ==
 #
 # This is a wrapper around [`disko-zfs`](https://github.com/numtide/disko-zfs)
 # that lets every dataset in a pool be declared in one place, and then
-# configures the mechanism to manage that pool. How the pool is managed depends
-# on its encryption properties:
+# configures the mechanism to manage that pool. How a pool is managed depends
+# on whether the system needs it in order to boot, based on the categorization
+# in the Nixpkgs ZFS module:
 #
-# * unencrypted pools are managed by the stock `disko-zfs` service, which runs
-#   early in boot (before `local-fs-pre.target`);
-# * pools containing an encryption root are managed by a late, per-pool
-#   oneshot service (`zfs-datasets-<pool>.service`), which runs after the pool
-#   is imported. This service invokes `disko-zfs` to create missing datasets and
-#   reconcile properties, loads keys, and mounts the datasets.
+# * a *root pool* backs at least one filesystem that is needed for boot: a
+#   `fileSystems` entry for which `utils.fsNeededForBoot` is true (i.e. either
+#   `neededForBoot = true` is set explicitly, or it is mounted at `/`, `/nix`,
+#   `/var`, `/etc`, ...).
 #
-# The separate oneshot service is necessary when the encryption keys are
-# `agenix` secrets. `agenix` installs secrets in an activation script, so there
-# is no systemd unit an early service could depend on to ensure that the
-# reconcilation occurs after the pool is unlocked. The stock `disko-zfs` service
-# runs before `local-fs-pre.target`, at which time, the agenix keys are not
-# decrypted, and therefore, the encrypted datasets are not unlocked.
-# The oneshot service in this module runs at `multi-user.target`, instead.
+#   NixOS imports root pools, and loads their encryption keys, in the initrd.
+#   Datasets on root pools are reconciled by the stock `disko-zfs` service,
+#   which runs early in boot.
+# * pools not needed for boot are *data pools*. Each data pool is managed by a
+#   late, per-pool oneshot service (`zfs-datasets-<pool>.service`), which runs
+#   after the pool is imported. This service creates missing datasets, loads
+#   keys, reconciles properties with `disko-zfs`, and mounts the datasets.
 #
-# `disko-zfs`'s stock service also cannot safely create encryption roots. ZFS
-# encryption properties are read-only after creation, and therefore must be
-# ignored when dataset properties are reconciled. Unfortunately, ignoring them
-# from reconciliation also omits them from `disko-zfs`'s `zfs create` invocation
-# when the dataset does not exist. That means that an encryption root that does
-# not yet exist would be created unencrypted. The oneshot creates encryption
-# roots itself and configures `disko-zfs` to ignore encryption-related
-# properties.
+# === Management of Data Pools ===
 #
-# Pools containing one or more encryption root datasets are *always* managed by
-# a single late oneshot service. Splitting work between the early stock
-# disko-zfs service and the oneshot is unsafe, because when `disko-zfs`'s
-# `expand_sub_datasets` creates missing parent datasets, it does not set any
-# properties. Therefore, this could accidentally replace the declared properties
-# of a dataset created by the other service.
+# Booting the system does not depend on a data pool, so a data pool that cannot
+# be imported and configured should not stop boot. Instead, only the services
+# that depend on that pool should not start when it is in a bad state, so that
+# the issue may be resolved on a booted system. A data pool can fail to import
+# (a missing disk or HBA), and its encryption keys, which are not loaded in the
+# initrd, can fail to load (the key file was never decrypted, the TPM refused,
+# and so on).
+#
+# The stock `disko-zfs` service cannot provide this: it is required by
+# `local-fs-pre.target` and `zfs-mount.service`, so if any pool it manages
+# fails, then `local-fs.target` fails, and the system doesn't boot. Services
+# which require pools managed by disko-zfs cannot depend on `zfs-mount.service`
+# to ensure they are not started if the pool is unavailable, either, since it is
+# only ordered after `zfs-import.target`. Whhen a data pool fails to import,
+# `zfs mount -a` still runs, has nothing to mount from that pool, and succeeds
+# (spuriously).
+#
+# The per-pool oneshot instead runs at `multi-user.target`, and is not required
+# for `local-fs.target` to succeed. It requires the pool's import unit, and
+# represents its own success as `zfs-datasets-<pool>.target`, which consumers
+# require (see "Services which use data pool datasets" below). If the import or
+# the oneshot fails, that target and its consumers do not start, and nothing
+# else is affected. This way, the issue can be diagnosed and repaired
+# interactively on an otherwise healthy system.
+#
+# === Creating datasets ===
+#
+# `disko-zfs` cannot safely create encryption roots. ZFS encryption properties
+# are read-only after creation, and therefore must be ignored when dataset
+# properties are reconciled. Unfortunately, ignoring them from reconciliation
+# also omits them from `disko-zfs`'s `zfs create` invocation when the dataset
+# does not exist. That means that an encryption root that does not yet exist
+# would be created unencrypted. The oneshot creates a data pool's datasets
+# itself, and configures `disko-zfs` to ignore encryption-related properties.
+#
+# Each data pool is managed by exactly one service, its oneshot. Splitting a
+# pool between the early stock `disko-zfs` service and the oneshot would be
+# unsafe, because when `disko-zfs` creates missing parent datasets, it does not
+# set any properties. Therefore, it could create a parent without the
+# properties that the other service declares for it.
+#
+# Root pools are unlocked in the initrd, before this module runs, so on a root
+# pool this module can only manage encryption roots that something else unlocks
+# (`encryption.external`, typically `boot.initrd.clevis` or a console prompt).
+# Module-managed keys (`encryption.keyFile`) and declared ownership
+# (`owner`/`group`/`mode`, applied by the oneshot) are therefore only supported
+# on data pools; both are asserted. An external encryption root on a root pool
+# is still reconciled by the early `disko-zfs` service, which would create it
+# unencrypted if it were missing, so this module adds a check to that service
+# which fails it instead.
 #
 # == Usage Notes ==
 #
@@ -49,21 +86,19 @@
 # Therefore, all properties **must** either be declared here or added to
 # `disko.zfs.settings.ignoredProperties`.
 #
-# === Services which depend on encrypted pool datasets ===
+# === Services which use data pool datasets ===
 #
-# A service which requires filesystems on an encrypted pool **must** declare
-# both `requires` and `after` on `zfs-datasets-<pool>.target`, or else it may be
-# started before that dataset is unlocked. This is necessary if the pool
-# contains any encrypted datasets, **even if the dataset that the service
-# depends on is not encrypted**.
+# A service which requires filesystems on a data pool **must** declare both
+# `requires` and `after` on `zfs-datasets-<pool>.target`, or else it may be
+# started before the pool is imported, unlocked (if encrypted), and mounted.
 #
 # Setting `requires` is necessary to prevent the service from starting when
-# unlocking the dataset fails. `after` without `requires` only establishes
+# bringing up the pool fails. `after` without `requires` only establishes
 # *ordering*, so the service would still run after a failed oneshot and write
-# into the empty mountpoint directory on the root filesystem. A failed dataset
-# unlock does not block the rest of boot.
+# into the empty mountpoint directory on the root filesystem. A failed data
+# pool does not block the rest of boot.
 #
-# Services that require filesystems on encrypted datasets may declare their
+# Services that require filesystems on a data pool may declare their
 # dependencies using the `requiresZfsMounts` setting from this module, like:
 #
 # ```
@@ -139,7 +174,7 @@ let
     splitString unique sort length concatMap concatLists concatMapStringsSep
     concatStringsSep escapeShellArg listToAttrs nameValuePair getExe hasPrefix
     removeAttrs removeSuffix stringLength optional optionalString filterAttrs
-    attrNames attrValues;
+    attrNames;
 
   cfg = config.profiles.zfs;
 
@@ -328,22 +363,45 @@ let
 
   datasetList = concatLists (mapAttrsToList poolDatasets cfg.pools);
 
-  # A dataset is an *encryption root* iff it has an `encryption` block. Testing
-  # `!= null` only forces the option to WHNF (null vs. submodule), NOT the key
-  # file inside it --- important because the key file is typically
-  # `config.age.secrets.*.path`, and forcing that while computing the set of
-  # config keys (below) would create a module-system evaluation cycle.
-  encryptionRoots = filter (d: d.encryption != null) datasetList;
-
   poolOf = name: head (splitString "/" name);
   depth = name: length (splitString "/" name);
 
-  # Pools containing an encryption root are managed by a late oneshot. All
-  # other pools are managed by the stock early `disko-zfs` service.
-  latePools = unique (map (d: poolOf d.name) encryptionRoots);
-  isLate = d: elem (poolOf d.name) latePools;
+  # Determine which pools are root pools (those that contain filesystems needed
+  # for boot). This is identical to the classification in nixpkgs'
+  # `nixos/modules/tasks/filesystems/zfs.nix` (`rootPools`/`dataPools`), and
+  # must be kept in sync with upstream. Otherwise, if the two were to disagree,
+  # we would either end up having a late oneshot service waiting on a pool
+  # already imported in initrd, or the early service would attempt to manage a
+  # pool that has not yet been imported.
+  zfsFileSystems = filter (fs: fs.fsType == "zfs" && fs.device != null)
+    config.system.build.fileSystems;
+  rootPools = unique (map (fs: poolOf fs.device)
+    (filter utils.fsNeededForBoot zfsFileSystems));
+  isRootPool = pool: elem pool rootPools;
+  # For assertion messages: why `pool` is a root pool.
+  describeRootPool = pool:
+    let
+      bootFileSystems =
+        filter (fs: poolOf fs.device == pool && utils.fsNeededForBoot fs) zfsFileSystems;
+      bootMountPoints = map (fs: fs.mountPoint) bootFileSystems;
+    in
+    ''
+      "${pool}" is a root pool (it contains the following filesystems needed
+       for boot: ${concatStringsSep ", " bootMountPoints})'';
 
-  earlyDatasets = filter (d: !isLate d) datasetList;
+  # Data pools with at least one declared dataset, or declared pool-root
+  # properties (if it doesn't declare anything, it doesn't need to be managed).
+  # Each of these pools will be managed by their own late oneshots.
+  dataPools = filter (p: !isRootPool p) (unique (map (d: poolOf d.name) datasetList));
+  inDataPool = d: !isRootPool (poolOf d.name);
+
+  rootPoolDatasets = filter (d: !inDataPool d) datasetList;
+
+  # External encryption roots on root pools. These pools are reconciled by the
+  # `disko-zfs` service, and it would create these roots *unencrypted* if they
+  # are missing; see the guard on that service below.
+  rootPoolExternalEncryptionRoots = filter (d: d.encryption != null && d.encryption.external)
+    rootPoolDatasets;
 
   # Pool roots with children but no declared properties. They must be ignored, or
   # `disko-zfs`'s `expand_sub_datasets` would add an empty-property root entry and
@@ -601,11 +659,12 @@ let
           : > "$RUNTIME_DIRECTORY/created-datasets"
 
           # 1. Create every declared dataset (parent-first) that does not yet
-          #    exist, and load encryption keys. This is done here, late, because
-          #    the passphrase files are agenix secrets that are unavailable when
-          #    the early disko-zfs service runs. Creating the datasets ourselves
-          #    (rather than letting disko-zfs do it) is what guarantees an
-          #    encryption root is never accidentally created unencrypted.
+          #    exist, and load encryption keys. This is done here, late, so
+          #    that a missing or undecryptable key file fails this unit (and
+          #    therefore its target) rather stopping the system from booting.
+          #    Creating the datasets ourselves (rather than letting disko-zfs do
+          #    it) guarantees that encryption root is never accidentally
+          #    created unencrypted.
           ${createDatasets}
 
           # 2. Record every declared dataset's pre-reconcile mountpoint, so
@@ -614,10 +673,10 @@ let
           ${captureMountpoints}
 
           # 3. Reconcile properties with disko-zfs. Every dataset already exists
-          #    after step 1, so disko-zfs only sets/inherits properties (drift
-          #    from the declared spec). We feed it a snapshot of the pool via
-          #    `--file` so it neither touches nor reports on other pools, and
-          #    the encryption-intrinsic properties are in `ignoredProperties`.
+          #    after step 1, so disko-zfs only sets and inherits properties. We
+          #    run it on a snapshot of the pool via `--file`, so it won't see
+          #    any other pools, and the encryption-intrinsic properties are in
+          #   `ignoredProperties`.
           zfs get all -t filesystem --json --json-int -r ${escapeShellArg pool} \
             > "$RUNTIME_DIRECTORY/actual.json"
           disko-zfs --file "$RUNTIME_DIRECTORY/actual.json" --log-level info \
@@ -677,27 +736,28 @@ let
       };
     };
 
-  # The target consumers gate on (`requires` + `after`) to guarantee the pool's
-  # datasets are unlocked and mounted before they start. Only `wantedBy` (not
-  # required by) multi-user.target, so a failed unlock never blocks the rest of
-  # boot.
+  # Generates the systemd target that services can depend on (`requires` +
+  # `after`) to guarantee the pool's datasets are unlocked and mounted before
+  # they start. This target is only `wantedBy` (not required by)
+  # multi-user.target, so a failed data pool never blocks the rest of boot.
   mkTarget = pool: {
     description = "ZFS datasets on ${pool} are unlocked and mounted";
     wantedBy = [ "multi-user.target" ];
   };
 
-  perPool = f: listToAttrs (map (p: nameValuePair "zfs-datasets-${p}" (f p)) latePools);
+  perPool = f: listToAttrs (map (p: nameValuePair "zfs-datasets-${p}" (f p)) dataPools);
 
   # Resolve a filesystem path to the units which a consumer service that
   # requires that path to be mounted must depend on. This finds the pool
   # containing the declared dataset whose mountpoint is the longest path-prefix
   # of the given path.
   #
-  # If it's a late pool, then the consumer will depend on the per-pool target
+  # If it's on a data pool, then the consumer will depend on the per-pool target
   # (`requires` + `after`, plus `after` on the oneshot itself so a start racing
-  # a reload waits for it). Consumers of early pools can instead depend on
-  # `zfs-mount.service`. A path which no declared dataset mounts is an eval-time
-  # error, to catch typos or missing datasets.
+  # a reload waits for it). Consumers of root pool datasets instead depend on
+  # `zfs-mount.service`; boot itself depends on root pools, so there is no
+  # partial failure to hold them back from. A path which no declared dataset
+  # mounts is an eval-time error, to catch typos or missing datasets.
   zfsMountDeps = serviceName: path:
     let
       p = if path == "/" then path else removeSuffix "/" path;
@@ -730,7 +790,7 @@ let
         systemd.services.${serviceName}.requiresZfsMounts: no mountable
         dataset declared in `profiles.zfs.pools` owns a prefix of "${path}".
         Declared mountpoints: ${concatStringsSep ", " declaredMountpoints}''
-    else if isLate d then {
+    else if inDataPool d then {
       requires = [ "zfs-datasets-${pool}.target" ];
       after = [ "zfs-datasets-${pool}.target" "zfs-datasets-${pool}.service" ];
     } else {
@@ -750,10 +810,16 @@ let
           `keylocation` (an external unlock mechanism may dispatch on the
           stored value, e.g. `prompt`), does not load keys, and **refuses to
           create the dataset if it is missing** --- with no key material,
-          creation could only produce an unencrypted dataset. The key must
-          already be loaded when the oneshot runs; PAM-at-login unlocking is
-          therefore not supported. Mutually exclusive with {option}`keyFile`
-          and {option}`keyFormat` (asserted).
+          creation could only produce an unencrypted dataset. On a data pool,
+          the key must already be loaded when the pool's oneshot runs, so
+          PAM-at-login unlocking is not supported.
+
+          On a root pool, `external` is the only supported kind of encryption
+          root. A missing encryption root (which must be manually created) will
+          fail the early `disko-zfs` service.
+
+          This is mutually exclusive with {option}`keyFile` and
+          {option}`keyFormat`.
         '';
       };
 
@@ -763,15 +829,18 @@ let
         example = lib.literalExpression "config.age.secrets.moonpool-system-pass.path";
         description = ''
           Path to the file containing the encryption key (such as an agenix
-          secret's `.path`). Required unless {option}`external` is set. The
-          dataset is created with `keylocation = file://<this path>` and
-          unlocked from it at boot; if the path later changes, the stored
-          `keylocation` is reconciled to follow it.
+          secret's `.path`). Required unless {option}`external` is set.
+
+          This is only supported on data pools. A root pool's keys are loaded
+          in the initrd, before this module runs. The dataset is created with
+          `keylocation = file://<this path>` and unlocked from it at boot; if
+          the path later changes, the stored `keylocation` is reconciled to
+          follow it.
 
           To rotate the key itself, deploy the new file contents first, then
-          run `zfs change-key <dataset>` on the host: it reads the *new* key
-          from the stored `keylocation`, and the already-loaded key keeps the
-          dataset available in the meantime.
+          run `zfs change-key <dataset>` on the host. This will read the *new*
+          key from the stored `keylocation`, and the already-loaded key keeps
+          the dataset available in the meantime.
         '';
       };
 
@@ -806,10 +875,11 @@ let
           { keyFile = config.age.secrets.moonpool-system-pass.path; keyFormat = "passphrase"; }
         '';
         description = ''
-          If set, this dataset is an *encryption root*: it is created with the
-          given key, and the entire pool it lives on is managed by a late oneshot
-          rather than the early `disko-zfs` service (so the key file, an agenix
-          secret, is available when the dataset is created and unlocked).
+          If set, this dataset is an *encryption root*. On a data pool, the
+          pool's oneshot creates it with the given key and loads that key at
+          boot; on a root pool, it must be {option}`external`. Encryption does
+          not change how the pool is managed: that depends only on whether the
+          pool is a root pool or a data pool.
 
           Leave unset for unencrypted datasets and for children of an encryption
           root (children inherit their parent's key automatically).
@@ -847,6 +917,10 @@ let
           later ownership changes are user data and are left alone. The user
           must exist in {option}`users.users` (asserted at evaluation time),
           and the dataset must declare a path mountpoint.
+
+          Ownership is applied by a data pool's oneshot, so it is only supported
+          on data pools (asserted). Configuring owner, group, or mode for a root
+          pool is an evaluation-time error.
         '';
       };
 
@@ -857,7 +931,8 @@ let
         description = ''
           Sets the group of the dataset root when it is created, as with
           {option}`owner`. The group must exist in {option}`users.groups`
-          (checked at evaluation-time).
+          (checked at evaluation-time). Configuring owner, group, or mode for a
+          root pool is an evaluation-time error.
         '';
       };
 
@@ -873,6 +948,9 @@ let
           {option}`owner`. Use `0750` or `0700` for per-user datasets. The
           default directory mode, `0755`, lets every local user read every other
           user's data despite separate encryption roots.
+
+          Configuring owner, group, or mode for a root pool is an
+          evaluation-time error.
         '';
       };
     };
@@ -884,9 +962,11 @@ let
         type = types.bool;
         default = true;
         description = ''
-          Whether to import this pool at boot (adds it to
-          {option}`boot.zfs.extraPools`). Do not enable this for the root pool,
-          which is imported from the initrd.
+          Whether to import this data pool at boot (adds it to
+          {option}`boot.zfs.extraPools`). If this is `false`, the pool must be
+          imported some other way before its oneshot runs. Root pools are
+          always imported by the initrd, so setting this to `false` for one is
+          an evaluation error.
         '';
       };
 
@@ -933,14 +1013,19 @@ in
         default = [ ];
         example = [ "/srv/media" ];
         description = ''
-          Paths this service needs mounted before it starts. Each path must
-          live under a mountpoint declared in {option}`profiles.zfs.pools`
-          (evaluation fails otherwise); the service gains `requires` and
-          `after` on whatever unlocks and mounts that dataset ---
-          `zfs-datasets-<pool>.target` for pools with encrypted datasets,
-          `zfs-mount.service` otherwise. `requires` (not just ordering) means
-          the service is not started when unlock or mount fails, instead of
-          running against the empty mountpoint directory.
+          Paths this service needs mounted before it starts.
+
+          Each path must be under a mountpoint declared in
+          {option}`profiles.zfs.pools`; paths not on mountpoints managed by this
+          module result in an evaluation error.
+
+          Adding a path to {option}`requiresZfsMounts` for a service will add
+          `requires` and `after` on whatever mounts that path to the service.
+          For data pools, this is `zfs-datasets-<pool>.target`; for root pools,
+          it is `zfs-mount.service`. Setting `requires` in addition to `after`
+          ensures that the service is not started when importing, unlocking, or
+          mounting a data pool fails, instead of running with the empty
+          mountpoint directory.
         '';
       };
       config = mkIf (config.requiresZfsMounts != [ ]) (
@@ -980,10 +1065,11 @@ in
   };
 
   # NOTE: the top-level config keys here are all *static*; only the nested
-  # systemd unit names depend on `latePools`. A top-level key (or a `mkMerge`
-  # list length) that depends on an option value forces that option while the
-  # module fixpoint is still being computed, which deadlocks:
-  # `_module.check` -> our config -> the option -> `_module.check`.
+  # systemd unit names depend on `dataPools` (and therefore, on `fileSystems`).
+  # A top-level key (or a `mkMerge` list) that depends on an option value
+  # would force that option while the module fixpoint is still being computed,
+  # which would deadlock, because `_module.check` depends on our config, which
+  # depends on the option, which in turn would depend on `_module.check`.
   config = mkIf (cfg.enable && cfg.pools != { }) {
     assertions = concatMap
       (d:
@@ -1007,6 +1093,15 @@ in
             profiles.zfs.pools: dataset "${d.name}" declares owner/group/mode,
             but is never mounted (no path mountpoint, or canmount=off) ---
             there is nothing to chown.'';
+        }
+        ++ optional ((d.owner != null || d.group != null || d.mode != null) && !inDataPool d) {
+          assertion = false;
+          message = ''
+            profiles.zfs.pools: dataset "${d.name}" declares a POSIX owner,
+            group, or mode, but ${describeRootPool (poolOf d.name)}.
+
+            Permissions are applied by a data pool's oneshot, which root pools
+            do not have; use `systemd.tmpfiles` rules instead.'';
         }
         ++ optional (filter (n: elem n cryptoProperties) (attrNames d.properties) != [ ]) {
           assertion = false;
@@ -1037,34 +1132,36 @@ in
               profiles.zfs.pools: dataset "${d.name}" declares `encryption` but
               is missing `keyFile` and/or `keyFormat` (required unless
               `encryption.external` is set).'';
+        }
+        ++ optional (d.encryption != null && !d.encryption.external && !inDataPool d) {
+          assertion = false;
+          message = ''
+            profiles.zfs.pools: dataset "${d.name}" uses a key file managed by
+            this module (`encryption.keyFile`), but
+            ${describeRootPool (poolOf d.name)}. Keys for root pools are loaded
+            in the initrd, before this module runs.
+
+            Instead, unlock it in the initrd (such as by using
+            `boot.initrd.clevis`, or a prompt via
+            `boot.zfs.requestEncryptionCredentials`) and set
+            `encryption.external = true`.'';
         })
       datasetList
-    # Pools backing boot-critical filesystems are imported by the initrd;
-    # adding them to `boot.zfs.extraPools` (what `importAtBoot` does) makes the
-    # extra import unit try to `zfs load-key` every locked dataset in the pool
-    # at boot --- interactive prompts and a failed unit on hosts with
-    # login-unlocked datasets.
+    # nixpkgs creates stage-2 import units only for data pools; root pools are
+    # imported by the initrd no matter what `boot.zfs.extraPools` says, so
+    # `importAtBoot = false` on one would be incorrect.
     ++ mapAttrsToList
-      (poolName: pcfg:
-        let
-          bootFs = filter
-            (fs:
-              fs.fsType == "zfs" && fs.device != null
-                && poolOf fs.device == poolName
-                && utils.fsNeededForBoot fs)
-            (attrValues config.fileSystems);
-        in
-        {
-          assertion = pcfg.importAtBoot -> bootFs == [ ];
-          message = ''
-            profiles.zfs.pools: pool "${poolName}" backs filesystems needed for
-            boot (${concatStringsSep ", " (map (fs: fs.mountPoint) bootFs)}) and
-            is therefore imported from the initrd; set `importAtBoot = false`
-            for it.'';
-        })
+      (poolName: pcfg: {
+        assertion = isRootPool poolName -> pcfg.importAtBoot;
+        message = ''
+          profiles.zfs.pools: pool ${describeRootPool poolName}, so it will always
+          be imported by the initrd. Therefore, `importAtBoot = false` has no
+          effect.'';
+      })
       cfg.pools;
 
-    boot.zfs.extraPools = attrNames (filterAttrs (_: p: p.importAtBoot) cfg.pools);
+    boot.zfs.extraPools = filter (p: !isRootPool p && cfg.pools.${p}.importAtBoot)
+      (attrNames cfg.pools);
 
     # Configure disko-zfs to ignore the things we are managing in this module,
     # and not mess with other properties that it shouldn't touch.
@@ -1083,7 +1180,7 @@ in
       # priority, user additions merge by concatenation instead.
       ignoredProperties =
         [ "nixos:shutdown-time" ":generation" ] ++ cryptoProperties;
-      # Unencrypted pools go through the stock (early) disko-zfs service.
+      # Root pools are reconciled by the stock (early) disko-zfs service.
       #
       # The second merge entry compensates for a gap in upstream disko-zfs's
       # auto-import of `disko.devices.zpool`: it copies each dataset's
@@ -1095,7 +1192,7 @@ in
       # the missing mountpoints so the spec matches what disko actually
       # created. TODO: upstream this into disko-zfs's auto-import.
       datasets = mkMerge [
-        (listToAttrs (map datasetSpec earlyDatasets))
+        (listToAttrs (map datasetSpec rootPoolDatasets))
         (mkIf (config.disko or { } ? devices)
           (listToAttrs (concatLists (mapAttrsToList
             (poolName: zpool: concatLists (mapAttrsToList
@@ -1107,15 +1204,35 @@ in
               (removeAttrs zpool.datasets [ "__root" ])))
             (config.disko.devices.zpool or { })))))
       ];
-      # Keep the early stock `disko-zfs` service away from pools this module is
-      # managing via its late oneshot service, as well as from any unmanaged
-      # (undeclared) pool root. It will not try to create their datasets nor
-      # clobber their settings or destroy them.
+      # Keep the early stock `disko-zfs` service away from data pools, which
+      # their own oneshots manage, as well as from any unmanaged (undeclared)
+      # pool root. It will not try to create their datasets nor clobber their
+      # settings or destroy them.
       ignoredDatasets =
-        concatMap (p: [ p "${p}/*" ]) latePools
-        ++ filter (p: !(elem p latePools)) unmanagedRoots;
+        concatMap (p: [ p "${p}/*" ]) dataPools
+        ++ filter (p: !(elem p dataPools)) unmanagedRoots;
     };
-    systemd.services = perPool mkService;
+    systemd.services = mkMerge [
+      (perPool mkService)
+      # The early `disko-zfs` service would create a missing external encryption
+      # root on a root pool *unencrypted* (see the module level comments).
+      #
+      # This is almost certainly not the intended behavior, so fail, instead.
+      # This, in turn, fails `local-fs.target`, which is the best thing we could
+      # do under these circumstances. A root pool with a missing declared
+      # encryption root is not the system that was configured, so this
+      # configuration cannot boot.
+      (mkIf (config.disko.zfs.enable && rootPoolExternalEncryptionRoots != [ ]) {
+        disko-zfs.preStart = concatMapStringsSep "\n"
+          (d: ''
+            if ! ${config.boot.zfs.package}/bin/zfs list -H -o name ${escapeShellArg d.name} >/dev/null 2>&1; then
+              echo "<3>external encryption root ${d.name} does not exist. Refusing to let disko-zfs create it unencrypted" >&2
+              exit 1
+            fi
+          '')
+          rootPoolExternalEncryptionRoots;
+      })
+    ];
     systemd.targets = perPool mkTarget;
   };
 }
