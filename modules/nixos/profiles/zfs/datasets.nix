@@ -7,21 +7,24 @@
 # This is a wrapper around [`disko-zfs`](https://github.com/numtide/disko-zfs)
 # that lets every dataset in a pool be declared in one place, and then
 # configures the mechanism to manage that pool. How a pool is managed depends
-# on whether the system needs it in order to boot, based on the categorization
-# in the Nixpkgs ZFS module:
+# on whether the system needs it in order to boot, determined based on where its
+# filesystems are mounted:
 #
-# * a *root pool* backs at least one filesystem that is needed for boot: a
-#   `fileSystems` entry for which `utils.fsNeededForBoot` is true (i.e. either
-#   `neededForBoot = true` is set explicitly, or it is mounted at `/`, `/nix`,
-#   `/var`, `/etc`, ...).
+# * a *root pool* has at least one dataset mounted somewhere needed for boot:
+#   one of the paths in nixpkgs' `utils.pathsNeededForBoot` (`/`, `/nix`,
+#   `/var`, `/etc`, ...), or has `neededForBoot = true`. This is the same rule
+#   nixpkgs applies to `fileSystems` entries to decide which pools should be
+#   imported in the initrd.
 #
 #   NixOS imports root pools, and loads their encryption keys, in the initrd.
 #   Datasets on root pools are reconciled by the stock `disko-zfs` service,
 #   which runs early in boot.
-# * pools not needed for boot are *data pools*. Each data pool is managed by a
-#   late, per-pool oneshot service (`zfs-datasets-<pool>.service`), which runs
-#   after the pool is imported. This service creates missing datasets, loads
-#   keys, reconciles properties with `disko-zfs`, and mounts the datasets.
+# * every other pool is a *data pool*. Each data pool is managed by a late,
+#   per-pool oneshot service (`zfs-datasets-<pool>.service`), which runs after
+#   the pool is imported. This service creates missing datasets, loads keys,
+#   reconciles properties with `disko-zfs`. The service also mounts any
+#   zfs-mounted datasets, and systemd-mounted datasets are mounted after the
+#   service succeeds  (see "Mounting datasets" for more details).
 #
 # === Management of Data Pools ===
 #
@@ -43,12 +46,81 @@
 # (spuriously).
 #
 # The per-pool oneshot instead runs at `multi-user.target`, and is not required
-# for `local-fs.target` to succeed. It requires the pool's import unit, and
-# represents its own success as `zfs-datasets-<pool>.target`, which consumers
-# require (see "Services which use data pool datasets" below). If the import or
-# the oneshot fails, that target and its consumers do not start, and nothing
-# else is affected. This way, the issue can be diagnosed and repaired
-# interactively on an otherwise healthy system.
+# for `local-fs.target` to succeed. It requires the import unit for the pool,
+# and represents its own success as `zfs-datasets-<pool>.target`. The data
+# pool's systemd mounts have `nofail` (so `local-fs.target` does not require or
+# wait for for them), but do require the oneshot. Therefore, if the import unit
+# or the oneshot fails, the mounts, the target, and every service that depends
+# on them (see "Services which use datasets" below) do not start, but nothing
+# else is affected. This way, any issues that prevent the datasets from mounting
+# can be diagnosed and repaired interactively on an otherwise healthy system.
+#
+# === Mounting datasets ===
+#
+# Each dataset with a path `mountpoint` may be mounted either by systemd, by
+# zfs, or by an external mechanism (such as `pam_zfs_key`). This is configured
+# by the `mountedBy` option, which defaults to "systemd".
+#
+#   mountedBy  | root pool                         | data pool
+#   -----------+-----------------------------------+-----------------------------
+#   systemd    | `fileSystems` entry with          | `fileSystems` entry with
+#              | `zfsutil` (from disko, if the     | `nofail` and
+#              | pool uses disko); the `mountpoint`| `x-systemd.requires=` on the
+#              | property is the path              | oneshot; the `mountpoint`
+#              |                                   | property is `legacy`
+#   zfs        | mounted by `zfs-mount.service`    | mounted by the oneshot;
+#              |                                   | `canmount=noauto`
+#   explicit   | not mounted at boot; `canmount=noauto` and
+#              | `org.openzfs.systemd:ignore=on` (both pools)
+#
+# Properties implied by the various `mountedBy` options (such as `legacy`,
+# `noauto`, `ignore`) are applied and reconciled through the same means as
+# explicitly declared properties. Explicitly declared `canmount`/`ignore`
+# properties precedence. These properties must be set to ensure that exactly one
+# thing mounts each dataset, since `zfs mount -a` (in `zfs-mount.service`) will
+# attempt to mount every dataset with a path `mountpoint` and `canmount=on`
+# whose key is loaded, as soon as the pool is imported.
+#
+# ==== systemd vs zfs mounts ====
+#
+# `systemd` is the default because having a systemd mount unit lets consuming
+# systemd units use `RequiresMountsFor=` to depend on the mountpoint. Because
+# the initrd only mounts `fileSystems` entries, datasets needed for boot
+# *must* be mounted by systemd.
+#
+# In contrast, the `zfs` mount options keep the path in the pool itself, so if
+# the pool is imported on another system, running `zfs import`  plus `zfs mount`
+# will mount its datasets at the configured mountpoints. This comes at the cost
+# of consuming systemd units needing explicit dependencies.
+#
+# Finally, the `explicit`option is for datasets whose keys are not available at
+# boot, such as PAM-at-login unlocking, or datasets which are mounted by hand or
+# by other software.
+#
+# `nixos-rebuild switch` remounts a systemd-mounted dataset in place when only
+# its mount options change, and restarts its mount unit (which stops any
+# consuming units consumers) only when the dataset behind a path changes. ZFS
+# property changes do not touch mount units at all.
+#
+# === Disko ===
+#
+# A pool's devices (disks, partitions, vdevs, pool options) may be declared with
+# disko, for root and data pools alike. To do so, set the `disko` option and
+# this module configure `disko.devices.zpool.<pool>` for that pool, with the
+# contents of the that attrset, plus any `rootFsOptions` determined from the
+# pool's `properties`. Both root pools and data pools may provide disko device
+# configuration.
+#
+# A root pool's datasets are also written to the disko config , because
+# `disko-install` must create and mount them under `/mnt` before
+# `nixos-install`. disko then generates their `fileSystems` entries
+# (systemd-mounted ones get disko's top-level `mountpoint`), which are imported
+# into `disko-zfs`'s spec. On the other hand, a data pool's datasets are never
+# passed to disko; its oneshot creates the datasets, and this module generates
+# their `fileSystems` entries.
+#
+# Datasets of pools in `profiles.zfs.pools` must be declared here only, not in
+# `disko.devices`. This is checked by an assertion to avoid misconfigurations.
 #
 # === Creating datasets ===
 #
@@ -88,9 +160,14 @@
 #
 # === Services which use data pool datasets ===
 #
-# A service which requires filesystems on a data pool **must** declare both
-# `requires` and `after` on `zfs-datasets-<pool>.target`, or else it may be
-# started before the pool is imported, unlocked (if encrypted), and mounted.
+# A service which requires filesystems on a data pool **must** depend on what
+# mounts them, with both `requires` and `after`, or else it may be started
+# before the pool is imported, unlocked (if encrypted), and mounted:
+#
+# * for a systemd-mounted dataset, the mount unit for that dataset
+#   (`RequiresMountsFor=`);
+# * for a ZFS-mounted dataset, the oneshot service for that pool
+#   (`zfs-datasets-<pool>.target`).
 #
 # Setting `requires` is necessary to prevent the service from starting when
 # bringing up the pool fails. `after` without `requires` only establishes
@@ -98,17 +175,18 @@
 # into the empty mountpoint directory on the root filesystem. A failed data
 # pool does not block the rest of boot.
 #
-# Services that require filesystems on a data pool may declare their
-# dependencies using the `requiresZfsMounts` setting from this module, like:
+# Services may declare these dependencies using the `requiresZfsMounts` setting
+# from this module, like:
 #
 # ```
 # systemd.services.<name>.requiresZfsMounts = [ "/srv/path" ];
 # ```
 #
 # Each path is resolved to the declared dataset with the longest matching
-# mountpoint prefix, and adds the `requires` and `after` entries to the service.
-# If the path is not part of a dataset managed by this module, this will produce
-# an evaluation error.
+# mountpoint prefix, and adds the right dependency for that dataset (including
+# `zfs-mount.service` for ZFS-mounted datasets on root pools). If the path is
+# not part of a dataset managed by this module, or is on an explicitly mounted
+# dataset, this will produce an evaluation error.
 #
 # `nixos-rebuild switch` applies dataset changes by reloading the unit (see
 # `reloadIfChanged` in `mkService`). Existing consumers remain running while
@@ -120,23 +198,24 @@
 #
 # === Immutable mountpoint underlays ===
 #
-# Before mounting a dataset, the runner makes the mountpoint underlay directory
-# immutable (`chattr +i`). While a dataset is unmounted, writes to its
-# mountpoint fail with `EPERM`, even for root. This is intended to protect
-# against non-empty underlay directories preventing the filesystem from being
-# mounted. When the dataset is mounted, the immutable directory is overlayed by
-# the mounted filesystem.
+# Before mounting a ZFS-mounted dataset on a data pool, the runner makes the
+# mountpoint underlay directory immutable (`chattr +i`). While the dataset is
+# unmounted, writes to its mountpoint fail with `EPERM`, even for root. Without
+# this, such writes would succeed and then be silently hidden once the dataset
+# is mounted over them (ZFS's `overlay` property, on by default on Linux, lets
+# it mount over a non-empty directory). When the dataset is mounted, the
+# immutable directory is overlayed by the mounted filesystem. Systemd-mounted
+# datasets rely on consumers' dependencies instead.
 #
 # There is one important operational consideration that results from this: if a
 # dataset's mountpoint *changes*, this module will attempt to remove the old
 # immutable underlay directory. Typically, this occurs automatically, but on the
 # off chance that the underlay directory is non-empty, this module will refuse
-# to remove it, since, well, you might still want whatever's in there. Normally,
-# this shouldn't happen, since the non-empty underlay prevents the dataset from
-# being mounted in the first place, but this can occur if a mountpoint was
-# *accidentally* set to a non-empty underlay. If this *does* occur, note that
-# the underlay directory will still be immutable, so you will have to manually
-# run `chattr -i <path>` to make it mutable again.
+# to remove it, since, well, you might still want whatever's in there. A
+# non-empty underlay means something wrote there before the directory was made
+# immutable, or a mountpoint was *accidentally* set to a non-empty directory. If
+# this *does* occur, note that the underlay directory will still be immutable,
+# so you will have to manually run `chattr -i <path>` to make it mutable again.
 #
 # == Typed properties ==
 #
@@ -327,37 +406,71 @@ let
       typedProperties;
   };
 
+  # The ZFS properties determined by how a mounted dataset is mounted (see
+  # "Mounting datasets" in the header). Explicitly declared properties take
+  # precedence, except that a systemd-mounted dataset on a data pool must always
+  # have `mountpoint=legacy`, to ensure that it is only mounted by systemd.
+  mountProperties = { rootPool, mounted, mountedBy }: props:
+    if !mounted then props
+    else if mountedBy == "systemd" then
+      (if rootPool then props else props // { mountpoint = "legacy"; })
+    else if mountedBy == "zfs" then
+      (if rootPool then props else { canmount = "noauto"; } // props)
+    else { canmount = "noauto"; "org.openzfs.systemd:ignore" = "on"; } // props;
+
   # Given an attrset declaring a pool (in `pools.<name>.{properties,datasets}`),
   # flattens it into records containing the following:
   #
-  # - `name`: the name of the dataset or pool,
-  # - `properties`: the generated properties,
+  # - `name`: the name of the dataset or pool, and `relname`, its name relative
+  #   to the pool (or `null` for the pool root),
+  # - `rootPool`: whether the pool is a root pool (see `isRootPool`), and
+  #   `diskoPool`: whether its devices are declared with disko (it sets
+  #   `disko`),
+  # - `mountpoint`: the *declared* `mountpoint` property (a path, `none`,
+  #   `legacy`, or `null` if undeclared), and `mounted`: whether it is a path
+  #   and the declared `canmount` property is not `off`,
+  # - `properties`: the ZFS properties to apply. This includes both the
+  #   declared ones and those implied by `mountedBy` (see `mountProperties`).
+  #   For a systemd-mounted dataset on a data pool, `properties.mountpoint` is
+  #   therefore `legacy`, and the path is only in `mountpoint`.
   # - `conflicts`: any conflicts between typed and untyped properties, used to
   #   output evaluation errors if non-empty,
-  # - `encryption`: the encryption configuration for the dataset, or null,
-  # - `owner`, `group`, and `mode`  to chown the mountpoint, or `null` if not
-  #    configured,
+  # - `encryption`, `owner`, `group`, `mode`, `mountedBy`, `neededForBoot`,
+  #   and `disko`: the dataset options of the same names.
   #
-  #
-  # The pool root is only included here if pool-level defaults are declared.
+  # The pool root is only included here if pool-level defaults are declared. It
+  # is never mounted (asserted).
   poolDatasets = pool: pcfg:
-    let rootProps = toZfsProps pcfg.properties; in
-    optional (rootProps != { })
-      {
-        name = pool;
-        properties = rootProps;
-        conflicts = propertyConflicts pcfg.properties;
+    let
+      diskoPool = pcfg.disko != null;
+      rootPool = isRootPool pool;
+      record = relname: props: opts:
+        let
+          inherit (props) mountpoint;
+          mounted = mountpoint != null && hasPrefix "/" mountpoint
+            && props.canmount != "off";
+        in
+        opts // {
+          name = if relname == null then pool else "${pool}/${relname}";
+          inherit relname rootPool diskoPool mountpoint mounted;
+          properties = mountProperties { inherit rootPool mounted; inherit (opts) mountedBy; }
+            (toZfsProps props);
+          conflicts = propertyConflicts props;
+        };
+    in
+    optional (toZfsProps pcfg.properties != { })
+      (record null pcfg.properties {
         encryption = null;
         owner = null;
         group = null;
         mode = null;
-      }
+        mountedBy = "zfs";
+        neededForBoot = false;
+        disko = { };
+      })
     ++ mapAttrsToList
-      (rel: d: {
-        name = "${pool}/${rel}";
-        properties = toZfsProps d.properties;
-        conflicts = propertyConflicts d.properties;
-        inherit (d) encryption owner group mode;
+      (relname: d: record relname d.properties {
+        inherit (d) encryption owner group mode mountedBy neededForBoot disko;
       })
       pcfg.datasets;
 
@@ -366,42 +479,73 @@ let
   poolOf = name: head (splitString "/" name);
   depth = name: length (splitString "/" name);
 
-  # Determine which pools are root pools (those that contain filesystems needed
-  # for boot). This is identical to the classification in nixpkgs'
-  # `nixos/modules/tasks/filesystems/zfs.nix` (`rootPools`/`dataPools`), and
-  # must be kept in sync with upstream. Otherwise, if the two were to disagree,
-  # we would either end up having a late oneshot service waiting on a pool
-  # already imported in initrd, or the early service would attempt to manage a
-  # pool that has not yet been imported.
-  zfsFileSystems = filter (fs: fs.fsType == "zfs" && fs.device != null)
+  # A pool is a *root pool* if any dataset declared on it is mounted somewhere
+  # needed for boot, either at one of nixpkgs' `utils.pathsNeededForBoot` (`/`,
+  # `/nix`, `/var`, ...), or with `neededForBoot = true`. This is the same way
+  # that nixpkgs' `utils.fsNeededForBoot` uses to determine which should be
+  # imported in the initrd (see `rootPools` in
+  # `nixos/modules/tasks/filesystems/zfs.nix`). This module determine this
+  # separately, based on the declared datasets on the pool, so that we do not
+  # need to depend on the `fileSystems` configuration, because we will generate
+  # `fileSystems` entries.
+  isBootMount = d:
+    let inherit (d.properties) mountpoint canmount; in
+    mountpoint != null && hasPrefix "/" mountpoint && canmount != "off"
+    && (d.neededForBoot || elem mountpoint utils.pathsNeededForBoot);
+  isRootPool = pool: lib.any isBootMount (lib.attrValues cfg.pools.${pool}.datasets);
+
+  # The pools nixpkgs imports in the initrd, computed from `fileSystems` as
+  # nixpkgs does. Only used to check that `isRootPool` agrees.
+  nixpkgsBootFileSystems = filter
+    (fs: fs.fsType == "zfs" && fs.device != null && utils.fsNeededForBoot fs)
     config.system.build.fileSystems;
-  rootPools = unique (map (fs: poolOf fs.device)
-    (filter utils.fsNeededForBoot zfsFileSystems));
-  isRootPool = pool: elem pool rootPools;
-  # For assertion messages: why `pool` is a root pool.
-  describeRootPool = pool:
-    let
-      bootFileSystems =
-        filter (fs: poolOf fs.device == pool && utils.fsNeededForBoot fs) zfsFileSystems;
-      bootMountPoints = map (fs: fs.mountPoint) bootFileSystems;
-    in
-    ''
-      "${pool}" is a root pool (it contains the following filesystems needed
-      for boot: ${concatStringsSep ", " bootMountPoints})'';
 
   # Data pools with at least one declared dataset, or declared pool-root
   # properties (if it doesn't declare anything, it doesn't need to be managed).
   # Each of these pools will be managed by their own late oneshots.
   dataPools = filter (p: !isRootPool p) (unique (map (d: poolOf d.name) datasetList));
-  inDataPool = d: !isRootPool (poolOf d.name);
 
-  rootPoolDatasets = filter (d: !inDataPool d) datasetList;
+  rootPoolDatasets = filter (d: d.rootPool) datasetList;
 
   # External encryption roots on root pools. These pools are reconciled by the
   # `disko-zfs` service, and it would create these roots *unencrypted* if they
   # are missing; see the guard on that service below.
   rootPoolExternalEncryptionRoots = filter (d: d.encryption != null && d.encryption.external)
     rootPoolDatasets;
+
+  # Root pool datasets on disko pools also generate disko config, so that disko
+  # can create and mount them at install time. This means that disko will then
+  # generates their `fileSystems` entries. For all other systemd-mounted
+  # datasets, this module generates their `fileSystems` entries.
+  inDisko = d: d.diskoPool && d.rootPool && d.relname != null;
+  systemdMounts = filter (d: d.mounted && d.mountedBy == "systemd") datasetList;
+
+  # Generates a Disko `zfs_fs` config for a dataset. disko creates it with these
+  # options at install time (including the encryption properties, which disko,
+  # unlike `disko-zfs`, passes to `zfs create`), they are reconciled by
+  # `disko-zfs` reconciles them afterwards.
+  toDiskoDataset = d:
+    let
+
+      # Only systemd-mounted datasets get disko's top-level `mountpoint`, which
+      # is what makes disko generate a `fileSystems` entry. Non-systemd-mounted
+      # datasets get only the `mountpoint` property, in `options`.
+      diskoMountpoint = lib.optionalAttrs
+        (d.mounted && d.mountedBy == "systemd")
+        {
+          inherit (d) mountpoint;
+        };
+    in
+    d.disko // {
+      type = "zfs_fs";
+      options = mapAttrs (_: toString) (d.properties
+      // lib.optionalAttrs (d.encryption != null) {
+        encryption = d.encryption.algorithm;
+        keyformat = d.encryption.keyFormat;
+        keylocation = "prompt";
+      });
+    } // diskoMountpoint;
+
 
   # Pool roots with children but no declared properties. They must be ignored, or
   # `disko-zfs`'s `expand_sub_datasets` would add an empty-property root entry and
@@ -421,18 +565,16 @@ let
       (mapAttrsToList (k: v: "-o ${escapeShellArg "${k}=${toString v}"}")
         (removeAttrs d.properties cryptoProperties));
 
-  # Datasets that declare a real (path) mountpoint and are allowed to mount.
-  # Sorted by *mountpoint* path depth, not dataset depth: mount ordering must
-  # follow the shape of the mount tree, and a shallow dataset may declare a
-  # mountpoint nested under a deeper dataset's mountpoint.
+  # Datasets with `mountedBy = "zfs"` are mounted by the per-pool runner
+  # oneshot. These are sorted by the path depth of the *mountpoint*, not the
+  # depth of the dataset, to ensure that they are mounted in order by
+  # mountpoint rather than by how deeply nested the datasets are.
   mountable = ds:
     let
-      wanted = d:
-        hasPrefix "/" (d.properties.mountpoint or "none")
-        && (d.properties.canmount or "on") != "off";
-      mountDepth = d: length (splitString "/" d.properties.mountpoint);
+      mountDepth = d: length (splitString "/" d.mountpoint);
     in
-    sort (a: b: mountDepth a < mountDepth b) (filter wanted ds);
+    sort (a: b: mountDepth a < mountDepth b)
+      (filter (d: d.mounted && d.mountedBy == "zfs") ds);
 
   mkRunner = pool:
     let
@@ -539,7 +681,7 @@ let
         (d:
           let
             name = escapeShellArg d.name;
-            mountpoint = escapeShellArg d.properties.mountpoint;
+            mountpoint = escapeShellArg d.mountpoint;
           in
           ''
             if [ "$(zfs get -H -o value mounted ${name})" != yes ]; then
@@ -628,14 +770,29 @@ let
               if d.owner != null then
                 (if d.group != null then "${d.owner}:${d.group}" else d.owner)
               else ":${d.group}";
+            setOwnership = ''
+              ${optionalString (d.owner != null || d.group != null)
+                ''chown ${escapeShellArg chownArg} "$dir"''}
+              ${optionalString (d.mode != null)
+                ''chmod ${escapeShellArg d.mode} "$dir"''}
+            '';
           in
           ''
             if grep -qxF ${name} "$RUNTIME_DIRECTORY/created-datasets"; then
-              echo "<5>applying declared ownership to ${d.name} (${d.properties.mountpoint})"
-              ${optionalString (d.owner != null || d.group != null)
-                "chown ${escapeShellArg chownArg} ${mountpoint}"}
-              ${optionalString (d.mode != null)
-                "chmod ${escapeShellArg d.mode} ${mountpoint}"}
+              echo "<5>applying declared ownership to ${d.name}"
+          '' + (if d.mountedBy == "systemd" then ''
+            dir="$RUNTIME_DIRECTORY/mnt"
+            mkdir -p "$dir"
+            mount.zfs ${name} "$dir"
+            if ! { ${setOwnership} }; then
+              umount "$dir"
+              exit 1
+            fi
+            umount "$dir"
+          '' else ''
+            dir=${escapeShellArg d.mountpoint}
+            ${setOwnership}
+          '') + ''
             fi
           '')
         (filter (d: d.owner != null || d.group != null || d.mode != null) inPool);
@@ -754,10 +911,10 @@ let
 
   perPool = f: listToAttrs (map (p: nameValuePair "zfs-datasets-${p}" (f p)) dataPools);
 
-  # Resolve a filesystem path to the units which a consumer service that
-  # requires that path to be mounted must depend on. This finds the pool
-  # containing the declared dataset whose mountpoint is the longest path-prefix
-  # of the given path.
+  # Resolve a filesystem path to the dependencies of a consumer service that
+  # requires that path to be mounted. This finds the declared dataset whose
+  # mountpoint is the longest path-prefix of the given path, and returns
+  # `requires`/`after` units and `mountsFor` paths for `RequiresMountsFor=`.
   #
   # If it's on a data pool, then the consumer will depend on the per-pool target
   # (`requires` + `after`, plus `after` on the oneshot itself so a start racing
@@ -768,24 +925,17 @@ let
   zfsMountDeps = serviceName: path:
     let
       p = if path == "/" then path else removeSuffix "/" path;
-      # A dataset "owns" a path only if the runner will actually mount it:
-      # a path `mountpoint` AND `canmount` != off. Without the canmount check, a
-      # container dataset could win the prefix match and the consumer would
-      # require a target that never actually mounts the path it cares about.
-      owns = d:
-        let
-          mountpoint = d.properties.mountpoint or "none";
-          canmount = (d.properties.canmount or "on");
-        in
-        hasPrefix "/" mountpoint && (canmount != "off")
-        && (p == mountpoint || hasPrefix "${mountpoint}/" p);
-      byMountpointLen = a: b:
-        stringLength a.properties.mountpoint > stringLength b.properties.mountpoint;
+      # A dataset "owns" a path only if it is actually mounted: a path
+      # `mountpoint` AND `canmount` != off. Without the canmount check, a
+      # container dataset could win the prefix match, and the consumer would
+      # depend on something that never mounts the path it cares about.
+      owns = d: d.mounted && (p == d.mountpoint || hasPrefix "${d.mountpoint}/" p);
+      byMountpointLen = a: b: stringLength a.mountpoint > stringLength b.mountpoint;
       candidates = sort byMountpointLen (filter owns datasetList);
       d = head candidates;
       pool = poolOf d.name;
-      declaredMountpoints = map (d: d.properties.mountpoint)
-        (filter (d: hasPrefix "/" (d.properties.mountpoint or "none")) datasetList);
+      declaredMountpoints = map (d: d.mountpoint) (filter (d: d.mounted) datasetList);
+      none = { requires = [ ]; after = [ ]; mountsFor = [ ]; };
     in
     if !cfg.enable then
       throw ''
@@ -797,10 +947,17 @@ let
         systemd.services.${serviceName}.requiresZfsMounts: no mountable
         dataset declared in `profiles.zfs.pools` owns a prefix of "${path}".
         Declared mountpoints: ${concatStringsSep ", " declaredMountpoints}''
-    else if inDataPool d then {
+    else if d.mountedBy == "explicit" then
+      throw ''
+        systemd.services.${serviceName}.requiresZfsMounts: "${path}" is on
+        dataset "${d.name}", which has `mountedBy = "explicit"` and is not 
+        automatically mounted by this module. There is nothing for the service
+        to depend on.''
+    else if d.mountedBy == "systemd" then none // { mountsFor = [ p ]; }
+    else if !d.rootPool then none // {
       requires = [ "zfs-datasets-${pool}.target" ];
       after = [ "zfs-datasets-${pool}.target" "zfs-datasets-${pool}.service" ];
-    } else {
+    } else none // {
       requires = [ "zfs-mount.service" ];
       after = [ "zfs-mount.service" ];
     };
@@ -822,11 +979,13 @@ let
           PAM-at-login unlocking is not supported.
 
           On a root pool, `external` is the only supported kind of encryption
-          root. A missing encryption root (which must be manually created) will
-          fail the early `disko-zfs` service.
+          root. If the pool uses disko, disko will create it at install time
+          (with `keylocation=prompt`, and the {option}`algorithm` and
+          {option}`keyFormat` given here); otherwise it must be created by
+          hand. After that, a missing encryption root will cause the early
+          `disko-zfs` service to fail.
 
-          This is mutually exclusive with {option}`keyFile` and
-          {option}`keyFormat`.
+          This is mutually exclusive with {option}`keyFile`.
         '';
       };
 
@@ -855,9 +1014,14 @@ let
         type = types.nullOr (types.enum [ "passphrase" "hex" "raw" ]);
         default = null;
         description = ''
-          The `keyformat` for the encryption root. Required unless
-          {option}`external` is set, and deliberately without a default: it
-          must match the actual contents of {option}`keyFile`.
+          The `keyformat` for the encryption root. Required if
+          {option}`keyFile`, is set, when it must match the file's actual
+          contents. Also required for {option}`external` encryption roots on
+          root pools that use disko, which disko will use when creating the
+          encryption root.
+
+          This option deliberately has no default, since it must match the
+          actual key for the encryption root.
 
           `passphrase` (with an actual passphrase in the file) is recommended:
           the same passphrase can unlock the dataset on any machine (using `zfs
@@ -890,6 +1054,69 @@ let
 
           Leave unset for unencrypted datasets and for children of an encryption
           root (children inherit their parent's key automatically).
+        '';
+      };
+
+      mountedBy = mkOption {
+        type = types.enum [ "systemd" "zfs" "explicit" ];
+        default = "systemd";
+        description = ''
+          How to mount this dataset at its {option}`properties.mountpoint`, if
+          that is a path (otherwise, this has no effect). See "Mounting
+          datasets" in this module's header for the trade-offs.
+
+          - `systemd`: generates a `fileSystems` entry, which creates a systemd
+            mount unit. Other systemd units can depend on mount units with
+            `RequiresMountsFor=`.
+
+            On a root pool that uses disko, disko will generate the
+            `fileSystems` entry. Otherwise, this module generates it.
+            On a root pool, the entry uses `zfsutil` and the dataset's
+            `mountpoint` property, as disko's entries do. On a data pool, it
+            will set `nofail` and requires the pool's oneshot, and the dataset's
+            ZFS `mountpoint` property will be set to `legacy`.
+          - `zfs`: generates a ZFS  `mountpoint` property so that the dataset
+             is mounted natively by ZFS.
+
+             The dataset will be mounted by `zfs-mount.service` on a root pool,
+             or by the pool's oneshot on a data pool (in which case, the dataset
+             also gets `canmount=noauto`, so that `zfs-mount.service` will
+             ignore it).
+          - `explicit`: not mounted at boot (for PAM-at-login unlocking,
+            or mounting by hand). The dataset gets `canmount=noauto` and
+            `org.openzfs.systemd:ignore=on`, unless it declares them explicitly.
+            Note that `canmount` is not inherited.
+
+          Datasets mounted somewhere needed for boot (see
+          {option}`neededForBoot`) must use `systemd` (asserted).
+        '';
+      };
+
+      neededForBoot = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Whether this dataset is needed for boot, in addition to the paths
+          NixOS always considers needed for boot (`/`, `/nix`, `/var`, `/etc`,
+          and so on, see `utils.pathsNeededForBoot` in nixpkgs). This is passed
+          to the dataset's `fileSystems` entry. A pool with any dataset needed
+          for boot is a *root pool*, and will be imported by NixOS in the
+          initrd.
+        '';
+      };
+
+      disko = mkOption {
+        type = types.attrsOf types.anything;
+        default = { };
+        example = { mountOptions = [ "rw" ]; };
+        description = ''
+          Passed through to this dataset's disko `zfs_fs` definition (e.g.
+          `mountOptions`, `postCreateHook`). Only allowed on root pools that
+          set the pool's `disko` option, since only their datasets are passed
+          to disko. Using this on other pools is an eval-time error.
+
+          This module sets `type`, `options`, and `mountpoint` itself, so any
+          values given for those here are overridden.
         '';
       };
 
