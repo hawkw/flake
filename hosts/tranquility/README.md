@@ -443,9 +443,14 @@ moonpool
 
 `moonpool` is a *data pool* (nothing needed for boot lives on it), so the whole
 pool is managed by the module's late per-pool oneshot
-(`zfs-datasets-moonpool.service`). Systemd units
-which require `moonpool` datasets be mounted can depend on
-`zfs-datasets-moonpool.target`. The implementation of declarative pool
+(`zfs-datasets-moonpool.service`), which creates the datasets and loads their
+keys. Its datasets are mounted by systemd, using `fileSystems` entries with
+`nofail` which require the oneshot. Because they are mounted by systemd, their
+ZFS `mountpoint` property is `legacy`, and their state can be checked with
+`findmnt /srv/media` or `systemctl status srv-media.mount`. Systemd units which
+require `moonpool` datasets to be mounted should use `requiresZfsMounts` (see
+below), which adds `RequiresMountsFor=` dependencies on the mounts. The
+implementation of declarative pool
 management and its operational characteristics are documented in 
 `modules/nixos/profiles/zfs/datasets.nix`.
 
@@ -496,7 +501,7 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    ```console
    nix build '.#nixosConfigurations.tranquility.config.system.build.toplevel'  # cheap pre-flight
    nixos-rebuild switch --flake '.#tranquility'
-   systemctl status zfs-datasets-moonpool.service
+   systemctl status zfs-datasets-moonpool.service 'srv-*.mount'
    zfs get -r keystatus,mounted moonpool
    ls -la /srv/users/eliza/   # shares & backups: eliza:users, 0700
    ```

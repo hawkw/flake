@@ -115,9 +115,21 @@ with pkgs; with lib; {
       enable = true;
       # Allow a root rescue shell in the initrd emergency target. Without this,
       # a failed pool import (or any stage-1 failure) drops to emergency mode
-      # with root locked, which strands a headless box. This is reachable only
-      # *before* the pool is unlocked, so it exposes no decrypted data. It's
-      # just for debugging, and manually unlocking the pool if necessary.
+      # with root locked, which strands a headless box. It's just for
+      # debugging, and for manually unlocking the pool if necessary.
+      #
+      # This shell is reached before the pool is unlocked, so it doesn't expose
+      # any decrypted data. However, it does have the same TPM access as the
+      # clevis unlock, so it could `clevis decrypt` the initrd's JWE itself.
+      # This is still the case after binding the JWE to PCR 7 (see README),
+      # because the initrd sees the same Secure Boot state. Therefore, anyone
+      # at the console who can cause a stage-1 failure could recover the
+      # passphrase.
+      #
+      # TODO(eliza): before relying on the PCR 7 binding, set this to a hashed
+      # root password instead of `true` (the option accepts one). Note that the
+      # hash is stored in the unencrypted initrd, so the password must be strong
+      # enough to resist offline cracking.
       emergencyAccess = true;
     };
     # Unattended unlock of the root pool's encryption root from the TPM via
