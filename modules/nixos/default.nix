@@ -22,6 +22,7 @@
     ./profiles/raspberry-pi
     ./profiles/server.nix
     ./profiles/vu-dials.nix
+    ./profiles/wol.nix
     ./profiles/yubikey.nix
     ./profiles/zfs.nix
     ./programs/openrgb.nix

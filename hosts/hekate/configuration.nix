@@ -1,5 +1,7 @@
-{ config, pkgs, ... }:
-
+{ config, lib, pkgs, ... }:
+let
+  wol = import ../../lib/wol.nix { inherit lib; };
+in
 {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
@@ -50,6 +52,31 @@
     # Per-interface useDHCP will be mandatory in the future, so this generated config
     # replicates the default behaviour.
     useDHCP = false;
+  };
+
+  # Arm Wake-on-LAN on the onboard NIC, so that `ssh hekate` can wake the
+  # machine (see `lib/wol.nix`).
+  #
+  # This is a hand-written .link rather than
+  # `networking.interfaces.<name>.wakeOnLan`, because that option generates a
+  # .link matching on `OriginalName=<name>`, which matches the *kernel-assigned*
+  # name (`ethN`), not the predictable name (`eno1np0`). It therefore never
+  # applies to interfaces that udev renames.
+  #
+  # Only the first matching .link file is applied, so this one preempts
+  # systemd's `99-default.link`. Its naming policies must be copied here, or the
+  # interface will keep its kernel name. Keep these in sync with
+  # `lib/systemd/network/99-default.link` in the systemd package.
+  #
+  # `bnxt_en` only supports magic-packet wake (`ethtool` mode `g`).
+  systemd.network.links."40-wol-onboard" = {
+    matchConfig.PermanentMACAddress = wol.targets.hekate.mac;
+    linkConfig = {
+      WakeOnLan = "magic";
+      NamePolicy = "keep kernel database onboard slot path";
+      AlternativeNamesPolicy = "database onboard slot path mac";
+      MACAddressPolicy = "persistent";
+    };
   };
 
   #### Boot configuration ####
