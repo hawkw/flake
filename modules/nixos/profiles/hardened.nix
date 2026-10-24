@@ -127,12 +127,12 @@ in
         # force-enable the Page Table Isolation (PTI) Linux kernel feature
         forcePageTableIsolation = true;
 
-        # User namespaces are required for sandboxing.
-        # this means you cannot set `"user.max_user_namespaces" = 0;` in sysctl
+        # User namespaces are required for sandboxing. this means you cannot set
+        # `"user.max_user_namespaces" = 0;` in sysctl i think the
+        # `unprivileged_userns_clone` sysctl has also been removed/deprecated in
+        # newer linuces?
         allowUserNamespaces = true;
 
-        # Disable unprivileged user namespaces, unless containers are enabled
-        unprivilegedUsernsClone = config.virtualisation.containers.enable;
         allowSimultaneousMultithreading = true;
       };
 
