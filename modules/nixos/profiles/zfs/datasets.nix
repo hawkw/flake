@@ -62,15 +62,15 @@
 # zfs, or by an external mechanism (such as `pam_zfs_key`). This is configured
 # by the `mountedBy` option, which defaults to "systemd".
 #
-#   mountedBy  | root pool                         | data pool
-#   -----------+-----------------------------------+-----------------------------
-#   systemd    | `fileSystems` entry with          | `fileSystems` entry with
-#              | `zfsutil` (from disko, if the     | `nofail` and
-#              | pool uses disko); the `mountpoint`| `x-systemd.requires=` on the
-#              | property is the path              | oneshot; the `mountpoint`
-#              |                                   | property is `legacy`
-#   zfs        | mounted by `zfs-mount.service`    | mounted by the oneshot;
-#              |                                   | `canmount=noauto`
+#   mountedBy  | root pool                       | data pool
+#   -----------+---------------------------------+-----------------------------
+#   systemd    | `fileSystems` entry with        | `fileSystems` entry with
+#              | `zfsutil` (from disko, if the   | `nofail` and
+#              | pool uses disko); the           | `x-systemd.requires=` on the
+#              | `mountpoint` property is the    | oneshot; the `mountpoint`
+#              | path                            | property is `legacy`
+#   zfs        | mounted by `zfs-mount.service`  | mounted by the oneshot;
+#              |                                 | `canmount=noauto`
 #   explicit   | not mounted at boot; `canmount=noauto` and
 #              | `org.openzfs.systemd:ignore=on` (both pools)
 #
@@ -380,11 +380,16 @@ let
   # attrset containing the generated ZFS property values for the typed
   # properties.
   typedProps = p:
-    listToAttrs (concatMap
-      (n:
+    let
+      # Typed properties that are `null` are not declared, so they are not
+      # managed by this module.
+      declared = filter (n: p.${n} != null) typedPropertyNames;
+      # Converts a typed option to the ZFS property that option configures.
+      toZfsProperty = n:
         let t = typedProperties.${n}; in
-        optional (p.${n} != null) (nameValuePair t.property (t.toZfsValue p.${n})))
-      typedPropertyNames);
+        nameValuePair t.property (t.toZfsValue p.${n});
+    in
+    listToAttrs (map toZfsProperty declared);
 
   # Takes an attrset containing typed and freeform properties, and converts them
   # to a freeform attrset in the form expected by disko-zfs and the zfs create
@@ -453,7 +458,7 @@ let
       record = relname: props: opts:
         let
           inherit (props) mountpoint;
-          mounted = isMounted props;
+          mounted = isDatasetMounted props;
         in
         opts // {
           name = if relname == null then pool else "${pool}/${relname}";
@@ -484,35 +489,42 @@ let
   poolOf = name: head (splitString "/" name);
   depth = name: length (splitString "/" name);
 
-  # A pool is a *root pool* if any dataset declared on it is mounted somewhere
-  # needed for boot, either at one of nixpkgs' `utils.pathsNeededForBoot` (`/`,
-  # `/nix`, `/var`, ...), or with `neededForBoot = true`. This is the same rule
-  # that nixpkgs' `utils.fsNeededForBoot` uses to determine which pools should
-  # be imported in the initrd (see `rootPools` in
-  # `nixos/modules/tasks/filesystems/zfs.nix`). This module determines this
-  # separately, based on the declared datasets on the pool, so that we do not
-  # need to depend on the `fileSystems` configuration, because we will generate
-  # `fileSystems` entries.
+  # Define predicates for determining if a dataset is mounted or needed for
+  # boot.
   #
   # These take the dataset's declared properties and options, rather than a
   # dataset record (see `poolDatasets`), because records are computed from
   # `isRootPool`.
-  #
-  # A dataset is mounted at all if it has a path `mountpoint`, and its
-  # `canmount` property is not `off`.
-  isMounted = props:
+  isDatasetMounted = props:
+    # A dataset is mounted at all if it has a path `mountpoint`, and its
+    # `canmount` property is not `off`. This takes the dataset's declared
+    # `properties`, rather than the dataset itself, so that it also works for
+    # a pool's root dataset, which is declared by the pool's `properties`.
     props.mountpoint != null && hasPrefix "/" props.mountpoint
     && props.canmount != "off";
-  # A mounted dataset is needed for boot if it says so, or if it is mounted
-  # at one of the paths NixOS always needs for boot.
-  isNeededForBoot = { mountpoint, neededForBoot }:
+
+  # A mounted dataset is needed for boot if it explicitly indicates that it is,
+  # or if it is mounted at one of the paths NixOS always needs for boot.
+  isDatasetNeededForBoot = { mountpoint, neededForBoot }:
     neededForBoot || elem mountpoint utils.pathsNeededForBoot;
-  isBootMount = d:
-    isMounted d.properties && isNeededForBoot {
-      inherit (d.properties) mountpoint;
-      inherit (d) neededForBoot;
-    };
-  isRootPool = pool: lib.any isBootMount (lib.attrValues cfg.pools.${pool}.datasets);
+
+  # A pool is a *root pool* if any dataset declared on it is mounted somewhere
+  # needed for boot, either at one of nixpkgs' `utils.pathsNeededForBoot` (`/`,
+  # `/nix`, `/var`, ...), or with `neededForBoot = true`. As discussed in the
+  # module level comment, this is equivalent to how `nixpkgs` would determine
+  # which pools must be mounted in the initrd. This module determines this
+  # separately, based on the declared datasets on the pool, so that we do not
+  # need to depend on the `fileSystems` configuration, because we will generate
+  # `fileSystems` entries.
+  isRootPool =
+    let
+      isBootMount = dataset:
+        isDatasetMounted dataset.properties && isDatasetNeededForBoot {
+          inherit (dataset.properties) mountpoint;
+          inherit (dataset) neededForBoot;
+        };
+    in
+    pool: lib.any isBootMount (lib.attrValues cfg.pools.${pool}.datasets);
 
   # The filesystems which nixpkgs considers needed for boot, computed from
   # `fileSystems` the same way nixpkgs does. This is only used in an assertion
@@ -524,13 +536,15 @@ let
   # Data pools with at least one declared dataset, or declared pool-root
   # properties (if it doesn't declare anything, it doesn't need to be managed).
   # Each of these pools will be managed by their own late oneshots.
-  dataPools = filter (p: !isRootPool p) (unique (map (d: poolOf d.name) datasetList));
+  dataPools =
+    let declaredPools = unique (map (d: poolOf d.name) datasetList); in
+    filter (p: !isRootPool p) declaredPools;
 
   rootPoolDatasets = filter (d: d.rootPool) datasetList;
 
   # External encryption roots on root pools. These pools are reconciled by the
   # `disko-zfs` service, and it would create these roots *unencrypted* if they
-  # are missing; see the guard on that service below.
+  # are missing; see the check on that service below.
   rootPoolExternalEncryptionRoots = filter (d: d.encryption != null && d.encryption.external)
     rootPoolDatasets;
 
@@ -547,7 +561,6 @@ let
   # them afterwards.
   toDiskoDataset = d:
     let
-
       # Only systemd-mounted datasets get disko's top-level `mountpoint`, which
       # is what makes disko generate a `fileSystems` entry. Non-systemd-mounted
       # datasets get only the `mountpoint` property, in `options`.
@@ -556,21 +569,24 @@ let
         {
           inherit (d) mountpoint;
         };
+      encryptionOptions = lib.optionalAttrs (d.encryption != null)
+        {
+          encryption = d.encryption.algorithm;
+          keyformat = d.encryption.keyFormat;
+          keylocation = "prompt";
+        };
+      options = mapAttrs (_: toString) (d.properties // encryptionOptions);
     in
     d.disko // {
       type = "zfs_fs";
-      options = mapAttrs (_: toString) (d.properties
-      // lib.optionalAttrs (d.encryption != null) {
-        encryption = d.encryption.algorithm;
-        keyformat = d.encryption.keyFormat;
-        keylocation = "prompt";
-      });
+      inherit options;
     } // diskoMountpoint;
 
 
-  # Pool roots with children but no declared properties. They must be ignored, or
-  # `disko-zfs`'s `expand_sub_datasets` would add an empty-property root entry and
-  # then inherit-away (clobber) the pool root's real local properties.
+  # Pool roots with children but no declared properties. They must be ignored,
+  # or `disko-zfs`'s `expand_sub_datasets` would add an empty-property root
+  # entry and then inherit away the pool root's real local properties,
+  # clobbering them.
   unmanagedRoots = attrNames
     (filterAttrs
       (_: pcfg: toZfsProps pcfg.properties == { } && pcfg.datasets != { })
@@ -578,32 +594,36 @@ let
 
   datasetSpec = d: nameValuePair d.name { inherit (d) properties; };
 
-  # Render a dataset's declared properties as `-o key=value` arguments,
-  # defensively dropping any encryption-intrinsic property (those come from the
-  # encryption options, never from `properties`).
-  propArgs = d:
-    concatStringsSep " "
-      (mapAttrsToList (k: v: "-o ${escapeShellArg "${k}=${toString v}"}")
-        (removeAttrs d.properties cryptoProperties));
+  # Format a dataset's declared properties as `-o key=value` arguments.
+  propsAsArgs = dataset:
+    let
+      # Format a single dataset property k/v pair as an argument.
+      propAsArg = k: v: "-o ${escapeShellArg "${k}=${toString v}"}";
+      # Drop any encryption-intrinsic properties, since these should not be
+      # declared through the `properties` attrset.
+      props = removeAttrs dataset.properties cryptoProperties;
+      args = mapAttrsToList propAsArg props;
+    in
+    concatStringsSep " " args;
 
   # Datasets with `mountedBy = "zfs"` are mounted by the per-pool runner
   # oneshot. These are sorted by the path depth of the *mountpoint*, not the
   # depth of the dataset, to ensure that they are mounted in order by
   # mountpoint rather than by how deeply nested the datasets are.
-  mountable = ds:
+  runnerMountedDatasets = ds:
     let
       mountDepth = d: length (splitString "/" d.mountpoint);
     in
-    sort (a: b: mountDepth a < mountDepth b)
-      (filter (d: d.mounted && d.mountedBy == "zfs") ds);
+    lib.pipe ds [
+      # exclude datasets that are not zfs-mounted
+      (filter (d: d.mounted && d.mountedBy == "zfs"))
+      # sort the datasets by mount depth.
+      (sort (a: b: mountDepth a < mountDepth b))
+    ];
 
   mkRunner = pool:
     let
       inPool = filter (d: poolOf d.name == pool) datasetList;
-      # Create parents before children so that, by the time we create a child
-      # dataset, its parent already exists (and for encrypted children, so that
-      # the parent's encrypted key has already been loaded).
-      parentFirst = sort (a: b: depth a.name < depth b.name) inPool;
 
       spec = (pkgs.formats.json { }).generate "zfs-datasets-${pool}-spec.json" {
         inherit (config.disko.zfs.settings) logLevel;
@@ -618,140 +638,188 @@ let
         datasets = listToAttrs (map datasetSpec inPool);
       };
 
-      # For each dataset, create it if missing, and for encryption roots, set
-      # `keylocation` and load the key.
-      #
-      # The `keylocation` property is set when the dataset is created. If the
-      # key file's path changes (say, because an agenix secret is renamed),
-      # unlocking the dataset should use the new path rather than the old one.
-      # Therefore, we re-set this property before `zfs load-key` attempts to
-      # unlock the dataset.
-      #
-      # We do *not* create or set the keylocation for externally-unlocked
-      # encryption roots (configured with `encryption.external`). Since we do
-      # not know where to get the key material for such datasets, we can only
-      # create them unencrypted, which would be wrong. Similarly, messing with
-      # their `keylocation` would break whatever does unlock it. Instead, we
-      # just check that any such datasets already exist and have their keys
-      # loaded.
+      # For each dataset, create it if missing, and for encryption roots, load
+      # the key. Datasets are handled parent-first (see `parentFirst`).
       #
       # Datasets are created `-u` (unmounted), so that the first time we mount
       # the dataset then always goes through the mount step below. This is so we
       # can `chattr -i`s the underlay directory before mounting. Running a
       # normal `zfs create` without `-u` would automatically mount the dataset,
       # preventing us from making the underlay immutable.
-      #
-      # The pool root (depth 1) is excluded: it always exists (the pool is
-      # imported before this runs) and is reconciled by disko-zfs like any
-      # other declared dataset.
-      #
-      createDatasets = concatMapStringsSep "\n"
-        (d:
-          let
-            name = escapeShellArg d.name;
-            # Lazy: only forced in the internally-keyed encrypted branch, where
-            # `d.encryption` (and its `keyFile`) is known non-null.
-            keyLoc = escapeShellArg "file://${d.encryption.keyFile}";
-          in
-          if d.encryption != null && d.encryption.external then ''
-            if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
-              echo "<3>externally-unlocked encryption root ${d.name} does not exist; refusing to create it (this module has no key material for it)" >&2
-              exit 1
-            fi
-            if [ "$(zfs get -H -o value keystatus ${name})" != available ]; then
-              echo "<3>key for externally-unlocked encryption root ${d.name} is not loaded (its external unlock mechanism has not run?)" >&2
-              exit 1
-            fi
-          '' else if d.encryption != null then ''
-            if [ ! -e ${escapeShellArg d.encryption.keyFile} ]; then
-              echo "<3>key file ${d.encryption.keyFile} for ${d.name} is missing (is agenix ready?)" >&2
-              exit 1
-            fi
-            if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
-              echo "<5>creating encryption root ${d.name}"
-              zfs create -u \
-                -o encryption=${escapeShellArg d.encryption.algorithm} \
-                -o keyformat=${escapeShellArg d.encryption.keyFormat} \
-                -o keylocation=${keyLoc} \
-                ${propArgs d} ${name}
-              echo ${name} >> "$RUNTIME_DIRECTORY/created-datasets"
-            fi
-            if [ "$(zfs get -H -o value keylocation ${name})" != ${keyLoc} ]; then
-              echo "<5>updating keylocation for ${d.name}"
-              zfs set keylocation=${keyLoc} ${name}
-            fi
-            if [ "$(zfs get -H -o value keystatus ${name})" != available ]; then
-              echo "<6>loading key for ${d.name}"
-              zfs load-key ${name}
-            fi
-          '' else ''
-            if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
-              echo "<5>creating dataset ${d.name}"
-              zfs create -u ${propArgs d} ${name}
-              echo ${name} >> "$RUNTIME_DIRECTORY/created-datasets"
-            fi
-          '')
-        (filter (d: depth d.name > 1) parentFirst);
+      createDatasets =
+        let
+          # Create parents before children so that, by the time we create a
+          # child dataset, its parent already exists (and for encrypted
+          # children, so that the parent's encrypted key has already been
+          # loaded).
+          parentFirst = sort (a: b: depth a.name < depth b.name) inPool;
 
-      # Before each mount, we make the underlay directory immutable (`chattr
-      # +i`), to protect against files at that path from being written while the
-      # dataset is unmounted, which would break the mount. Not every filesystem
-      # supports this flag, so this is a best-effort attempt. If we can't
-      # chattr the underlay, we just log a warning.
-      mountDatasets = concatMapStringsSep "\n"
-        (d:
-          let
-            name = escapeShellArg d.name;
-            mountpoint = escapeShellArg d.mountpoint;
-          in
-          ''
-            if [ "$(zfs get -H -o value mounted ${name})" != yes ]; then
-              mkdir -p ${mountpoint}
-              chattr +i ${mountpoint} \
-                || echo "<4>could not set +i on underlay of ${mountpoint}; writes while unmounted will not be blocked" >&2
-              echo "<6>mounting ${d.name} at ${mountpoint}"
-              zfs mount ${name}
-            fi
-          '')
-        (mountable inPool);
+          # The pool root (depth 1) does not need to be created, it always
+          # exists (since the pool is imported before this runs). The pool
+          # root's properties are reconciled by disko-zfs like any other
+          # declared dataset.
+          datasetsToCreate = filter (d: depth d.name > 1) parentFirst;
+
+          # Unencrypted datasets (and the children of encryption roots, which
+          # inherit their parent's key) are simply created if missing.
+          createDataset = d:
+            let name = escapeShellArg d.name;
+            in
+            ''
+              if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
+                echo "<5>creating dataset ${d.name}"
+                zfs create -u ${propsAsArgs d} ${name}
+                echo ${name} >> "$RUNTIME_DIRECTORY/created-datasets"
+              fi
+            '';
+
+          # We do *not* create or set the keylocation for externally-unlocked
+          # encryption roots (configured with `encryption.external`). Since we
+          # do not know where to get the key material for such datasets, we
+          # can only create them unencrypted, which would be wrong. Similarly,
+          # messing with their `keylocation` would break whatever does unlock
+          # it. Instead, we just check that any such datasets already exist and
+          # have their keys loaded.
+          checkExternalRoot = d:
+            let name = escapeShellArg d.name; in
+            ''
+              if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
+                echo "<3>externally-unlocked encryption root ${name} does not exist; refusing to create it unencrypted. it will need to be created manually" >&2
+                exit 1
+              fi
+              if [ "$(zfs get -H -o value keystatus ${name})" != available ]; then
+                echo "<3>key for externally-unlocked encryption root ${name} is not loaded (its external unlock mechanism has not run?)" >&2
+                exit 1
+              fi
+            '';
+
+          # Encryption roots with a key file are created with
+          # `keylocation=file://<key file>`, and their key is loaded.
+          #
+          # The `keylocation` property is set when the dataset is created. If
+          # the key file's path changes (say, because an agenix secret is
+          # renamed), unlocking the dataset should use the new path rather than
+          # the old one. Therefore, we re-set this property before
+          # `zfs load-key` attempts to unlock the dataset.
+          createEncryptionRoot = d:
+            let
+              name = escapeShellArg d.name;
+              keyLoc = escapeShellArg "file://${d.encryption.keyFile}";
+            in
+            ''
+              if [ ! -e ${escapeShellArg d.encryption.keyFile} ]; then
+                echo "<3>key file ${d.encryption.keyFile} for ${d.name} is missing (is agenix ready?)" >&2
+                exit 1
+              fi
+              if ! zfs list -H -o name ${name} >/dev/null 2>&1; then
+                echo "<5>creating encryption root ${d.name}"
+                zfs create -u \
+                  -o encryption=${escapeShellArg d.encryption.algorithm} \
+                  -o keyformat=${escapeShellArg d.encryption.keyFormat} \
+                  -o keylocation=${keyLoc} \
+                  ${propsAsArgs d} ${name}
+                echo ${name} >> "$RUNTIME_DIRECTORY/created-datasets"
+              fi
+              if [ "$(zfs get -H -o value keylocation ${name})" != ${keyLoc} ]; then
+                echo "<5>updating keylocation for ${d.name}"
+                zfs set keylocation=${keyLoc} ${name}
+              fi
+              if [ "$(zfs get -H -o value keystatus ${name})" != available ]; then
+                echo "<6>loading key for ${d.name}"
+                zfs load-key ${name}
+              fi
+            '';
+
+          create = d:
+            if d.encryption == null then createDataset d
+            else if d.encryption.external then checkExternalRoot d
+            else createEncryptionRoot d;
+        in
+        concatMapStringsSep "\n" create datasetsToCreate;
+
+      mountDatasets =
+        let
+          # Before each mount, we make the underlay directory immutable (`chattr
+          # +i`), to protect against files at that path from being written while
+          # the dataset is unmounted, which would break the mount. Not every
+          # filesystem supports this flag, so this is a best-effort attempt. If
+          # we can't chattr the underlay, we just log a warning.
+          mountOneDataset = d:
+            let
+              name = escapeShellArg d.name;
+              mountpoint = escapeShellArg d.mountpoint;
+            in
+            ''
+              if [ "$(zfs get -H -o value mounted ${name})" != yes ]; then
+                mkdir -p ${mountpoint}
+                chattr +i ${mountpoint} \
+                  || echo "<4>could not set +i on underlay of ${mountpoint}; writes while unmounted will not be blocked" >&2
+                echo "<6>mounting ${d.name} at ${mountpoint}"
+                zfs mount ${name}
+              fi
+            '';
+        in
+        concatMapStringsSep "\n" mountOneDataset (runnerMountedDatasets inPool);
 
       # Snapshot every declared dataset's effective mountpoint into
-      # old-mountpoints, after creation (so every declared dataset exists; a
-      # dataset created this run is born with its declared mountpoint and so
-      # never looks moved) but before disko-zfs reconciles properties.
-      # cleanupOldMountpoints (below) uses the snapshot to find underlay
-      # directories orphaned by a mountpoint change.
-      # Unrolled per dataset (not a shell loop over a generated list:
-      # shellcheck rejects a one-iteration `for` (SC2043) when a pool declares
-      # a single dataset), grouped into one redirect (SC2129), which also
-      # truncates the file per run.
-      captureMountpoints = ''
-        {
-      '' + concatMapStringsSep "\n"
-        (d: ''
-          printf '%s\t%s\n' ${escapeShellArg d.name} \
-            "$(zfs get -H -o value mountpoint ${escapeShellArg d.name})"
-        '')
-        inPool + ''
-        } > "$RUNTIME_DIRECTORY/old-mountpoints"
-      '';
+      # `$RUNTIME_DIRECTORY/old-mountpoints`, after any newly declared datasets
+      # are created (so that they do not appear to have 'moved') but before
+      # disko-zfs reconciles properties.
+      #
+      # cleanupOldMountpoints (below) uses this snapshot to find any old
+      # underlay directories left behind by a dataset's mountpoint changing.
+      captureMountpoints =
+        let
+          # We generate a separate line for each mountpoint, rather than
+          # generating a list of datasets and having the shell script loop over
+          # them, because shellcheck will complain about a loop over a list with
+          # one element, which is what this will generate when a pool only has
+          # one declared dataset. Isn't that fun?
+          captureOneMountpoint = d: ''
+            printf '%s\t%s\n' ${escapeShellArg d.name} \
+              "$(zfs get -H -o value mountpoint ${escapeShellArg d.name})"
+          '';
+          # Group all the generated printfs into one redirect, so that we can
+          # truncate the file if it already exists rather than having each
+          # printf append to it. This is necessary because a systemd unit's
+          # $RUNTIME_DIRECTORY persists when the unit is reloaded, so it may
+          # still be there after a previous run of the script.
+          captureAllMountpoints = ''
+            {
+            ${concatMapStringsSep "\n" captureOneMountpoint inPool}
+            } > "$RUNTIME_DIRECTORY/old-mountpoints"
+          '';
+        in
+        captureAllMountpoints;
 
       # When a declared mountpoint changes, `zfs set mountpoint=` (run by
       # disko-zfs during reconciliation) remounts the dataset at the new path
-      # and leaves the old underlay directory behind --- immutable, because the
-      # mount step chattr +i'd it, so a plain `rmdir` cannot remove it and
-      # orphans accumulate. Remove an old underlay only when all of these hold:
-      # the recorded pre-reconcile mountpoint is a real path (not
-      # none/legacy/-, and never `/` itself), it differs from the dataset's
-      # *current* mountpoint (which also makes re-runs no-ops), the directory
-      # still exists, and nothing is mounted there (a mountpoint swap can hand
-      # the old path to another dataset). Removal is `chattr -i` (best-effort,
-      # mirroring the +i in the mount step) plus `rmdir`, never `rm -rf`: a
-      # non-empty directory means something wrote there while the dataset was
-      # unmounted, and deleting it silently would be data loss, so it is logged
-      # and left for a human. If a run dies between reconciliation and this
-      # step the orphan is not retried (old == current on the next run); the
-      # header documents manual removal.
+      # and leaves the old underlay directory behind.
+      #
+      # Because the underlay directories are immutable, they can't be removed by
+      # a normal `rmdir` without first running `chattr -i` to unset the
+      # immutable flag. This makes cleaning up old underlays by hand a bit
+      # annoying, so it's nicer to remove them automatically. This also helps
+      # preventing disused underlays from gradually accumulating over time.
+      #
+      # After changing a dataset's mountpoint, we will delete the old mountpoint
+      # if all of the following conditions are true:
+      #
+      # 1. The pre-reconciliation mountpoint is different from the current one,
+      # 2. The old mountpoint is a real path ( not `none`, `legacy`, or `-`),
+      #    and is not `/`
+      # 3. The previous mountpoint directory still exists,
+      # 4. No other dataset is mounted at that path (we could have just swapped
+      #    mountpoints).
+      #
+      # Old underlays are removed by running `chattr -i` to unset the immutable
+      # flag, and then `rmdir` to remove the directory if, and only if, it is
+      # empty. We use `rmdir` rather than `rm -rf` because we want the removal
+      # to fail if any data has been written to the underlay since the dataset
+      # was unmounted (unlikely, since it was immutable, but we may have raced
+      # with something else since the directory was made mutable...). If
+      # something *is* there, we log a warning and leave it for manual
+      # intervention.
       cleanupOldMountpoints = ''
         while IFS=$'\t' read -r ds old_mp; do
           case "$old_mp" in
@@ -763,14 +831,14 @@ let
             continue
           fi
           if mountpoint -q "$old_mp"; then
-            echo "<6>not removing old mountpoint $old_mp of $ds: something is mounted there"
+            echo "<6>not removing old mountpoint $old_mp (of dataset $ds): something else is mounted there"
             continue
           fi
           chattr -i "$old_mp" 2>/dev/null || true
           if err="$(rmdir "$old_mp" 2>&1)"; then
-            echo "<5>removed orphaned mountpoint directory $old_mp ($ds moved to $new_mp)"
+            echo "<5>removed previous mountpoint directory $old_mp (dataset $ds moved to $new_mp)"
           else
-            echo "<4>could not remove old mountpoint $old_mp of $ds: $err; inspect and remove by hand" >&2
+            echo "<4>could not remove old mountpoint $old_mp of dataset $ds: $err. it will need to be removed manually." >&2
           fi
         done < "$RUNTIME_DIRECTORY/old-mountpoints"
       '';
@@ -788,40 +856,65 @@ let
       # the mountpoint is `legacy` and ZFS will let us mount it anywhere.
       #
       # TODO(eliza): is there a more systemd-y way to do that?
-      applyOwnership = concatMapStringsSep "\n"
-        (d:
-          let
-            name = escapeShellArg d.name;
-            chownArg =
-              if d.owner != null then
-                (if d.group != null then "${d.owner}:${d.group}" else d.owner)
-              else ":${d.group}";
-            setOwnership = ''
-              ${optionalString (d.owner != null || d.group != null)
-                ''chown ${escapeShellArg chownArg} "$dir"''}
-              ${optionalString (d.mode != null)
-                ''chmod ${escapeShellArg d.mode} "$dir"''}
+      chownAllDatasets =
+        let
+          # a dataset needs ownership attributes set if the configured owner,
+          # group, or mode settings are non-null.
+          datasetsToChown = filter
+            (d: d.owner != null || d.group != null || d.mode != null)
+            inPool;
+          # set the configured owner and mode attrs for one dataset.
+          chownDataset = d:
+            let
+              name = escapeShellArg d.name;
+              chownArg =
+                if d.owner != null then
+                  (if d.group != null then "${d.owner}:${d.group}" else d.owner)
+                else ":${d.group}";
+              setOwnership = ''
+                ${optionalString (d.owner != null || d.group != null)
+                  ''chown ${escapeShellArg chownArg} "$dir"''}
+                ${optionalString (d.mode != null)
+                  ''chmod ${escapeShellArg d.mode} "$dir"''}
+              '';
+
+              action =
+                # If the dataset is mounted by systemd, it hasn't been mounted
+                # by this point, so mount it briefly, set ownership, and unmount
+                # it so that systemd-mount can mount it again after the service
+                # succeeds.
+                if d.mountedBy == "systemd" then
+                  ''
+                    dir="$RUNTIME_DIRECTORY/mnt"
+                    mkdir -p "$dir"
+                    mount.zfs ${name} "$dir"
+                    if ! { ${setOwnership} }; then
+                      umount "$dir"
+                      exit 1
+                    fi
+                    umount "$dir"
+                  ''
+                # If it's mounted by ZFS, then the dataset is already
+                # mounted, so set ownership at its configured mountpoint.
+                else
+                  ''
+                    dir=${escapeShellArg d.mountpoint}
+                    ${setOwnership}
+                  ''
+              ;
+
+              # append something to the log message if we also changed the mode.
+              logMode = optionalString (d.mode != null)
+                ", and mode to ${escapeShellArg d.mode}";
+            in
+            ''
+              if grep -qxF ${name} "$RUNTIME_DIRECTORY/created-datasets"; then
+                echo "<5>setting dataset ${name}'s owner to ${chownArg}${logMode}"
+                ${action}
+              fi
             '';
-          in
-          ''
-            if grep -qxF ${name} "$RUNTIME_DIRECTORY/created-datasets"; then
-              echo "<5>applying declared ownership to ${d.name}"
-          '' + (if d.mountedBy == "systemd" then ''
-            dir="$RUNTIME_DIRECTORY/mnt"
-            mkdir -p "$dir"
-            mount.zfs ${name} "$dir"
-            if ! { ${setOwnership} }; then
-              umount "$dir"
-              exit 1
-            fi
-            umount "$dir"
-          '' else ''
-            dir=${escapeShellArg d.mountpoint}
-            ${setOwnership}
-          '') + ''
-            fi
-          '')
-        (filter (d: d.owner != null || d.group != null || d.mode != null) inPool);
+        in
+        concatMapStringsSep "\n" chownDataset datasetsToChown;
 
       runner = with pkgs; writeShellApplication {
         name = "zfs-datasets-${pool}";
@@ -861,9 +954,9 @@ let
           #    any other pools, and the encryption-intrinsic properties are in
           #    `ignoredProperties`.
           zfs get all -t filesystem --json --json-int -r ${escapeShellArg pool} \
-            > "$RUNTIME_DIRECTORY/actual.json"
+          > "$RUNTIME_DIRECTORY/actual.json"
           disko-zfs --file "$RUNTIME_DIRECTORY/actual.json" --log-level info \
-            apply --spec ${spec}
+          apply --spec ${spec}
 
           # 4. Mount any datasets with `mountedBy = "zfs"`. Datasets mounted
           #    by systemd will be mounted once this service succeeds.
@@ -875,7 +968,7 @@ let
           ${cleanupOldMountpoints}
 
           # 6. Apply declared ownership to datasets created by this run.
-          ${applyOwnership}
+          ${chownAllDatasets}
         '';
       };
     in
@@ -1006,9 +1099,9 @@ let
         description = ''
           This dataset is an encryption root unlocked by something *other*
           than this module (initrd clevis/TPM, `zfs load-key` over initrd
-          SSH, ...). The module then never touches its keys: it does not set
-          `keylocation` (an external unlock mechanism may dispatch on the
-          stored value, e.g. `prompt`), does not load keys, and **refuses to
+          SSH, ...). The module then  never touches its keys: it does not set
+          keylocation` (an external unlock mechanism may dispatch on the stored
+          value, e.g.`prompt`), does not load keys, and **refuses to
           create the dataset if it is missing** --- with no key material,
           creation could only produce an unencrypted dataset. On a data pool,
           the key must already be loaded when the pool's oneshot runs, so
@@ -1105,26 +1198,27 @@ let
             mount unit. Other systemd units can depend on mount units with
             `RequiresMountsFor=`.
 
-            On a root pool that uses disko, disko will generate the
-            `fileSystems` entry. Otherwise, this module generates it.
+            On a root pool that uses disko, the `fileSystems` entry is generated
+            by disko, otherwise, it is generated by this module.
             On a root pool, the entry uses `zfsutil` and the dataset's
-            `mountpoint` property, as disko's entries do. On a data pool, it
-            will set `nofail` and require the pool's oneshot, and the dataset's
-            ZFS `mountpoint` property will be set to `legacy`.
+            `mountpoint` property, as disko's `fileSystems` do. On a data pool,
+            it will set `nofail` and require the pool's oneshot, and the
+            dataset's ZFS `mountpoint` property will be set to `legacy`.
           - `zfs`: generates a ZFS `mountpoint` property so that the dataset
-             is mounted natively by ZFS.
+            is mounted natively by ZFS.
 
-             The dataset will be mounted by `zfs-mount.service` on a root pool,
-             or by the pool's oneshot on a data pool (in which case, the dataset
-             also gets `canmount=noauto`, so that `zfs-mount.service` will
-             ignore it).
+            The dataset will be mounted by `zfs-mount.service` on a root pool,
+            or by the pool's oneshot on a data pool (in which case, the dataset
+            also gets `canmount=noauto`, so that `zfs-mount.service` will
+            ignore it).
           - `explicit`: not mounted at boot (for PAM-at-login unlocking,
             or mounting by hand). The dataset gets `canmount=noauto` and
             `org.openzfs.systemd:ignore=on`, unless it declares them explicitly.
             Note that `canmount` is not inherited.
 
           Datasets mounted somewhere needed for boot (see
-          {option}`neededForBoot`) must use `systemd` (asserted).
+          {option}`neededForBoot`) must use `systemd`. Any other mount option
+          on a `neededForBoot` dataset is an evaluation error.
         '';
       };
 
@@ -1315,10 +1409,10 @@ let
   };
 in
 {
-  # Per-service sugar for the consumer discipline described in the header.
-  # Same extension pattern as `systemd-confinement`: this submodule merges
-  # into the stock `systemd.services.<name>` type, and derives its own
-  # `requires`/`after` from the new option.
+  # Per-service sugar for ensuring that services that require paths on a ZFS
+  # dataset mounted by this module are started after the dataset is mounted.
+  # This adds `requires`, `after`, and `RequiresMountsFor` to the
+  # `systemd.services.<name>` config for the configured units.
   options.systemd.services = mkOption {
     type = types.attrsOf (types.submodule ({ name, config, ... }: {
       options.requiresZfsMounts = mkOption {
@@ -1365,13 +1459,13 @@ in
     default = { };
     example = lib.literalExpression ''
       {
-        moonpool = {
+        tank = {
           properties.mountpoint = "none";
           datasets = {
             "ds1/media".properties.mountpoint = "/srv/media";
             "ds1/secret" = {
               encryption = {
-                keyFile = config.age.secrets.moonpool-secret.path;
+                keyFile = config.age.secrets.tank-secret-zfs-key.path;
                 keyFormat = "passphrase";
               };
               properties.mountpoint = "/srv/secret";
@@ -1400,7 +1494,7 @@ in
       (d:
         let
           declaresOwnership = d.owner != null || d.group != null || d.mode != null;
-          mountedForBoot = d.mounted && isNeededForBoot { inherit (d) mountpoint neededForBoot; };
+          mountedForBoot = d.mounted && isDatasetNeededForBoot { inherit (d) mountpoint neededForBoot; };
           # Encryption-intrinsic properties declared in `properties`, which
           # this module would otherwise silently discard.
           declaredCryptoProperties = filter (n: elem n cryptoProperties) (attrNames d.properties);
@@ -1723,8 +1817,8 @@ in
             zfs = "${config.boot.zfs.package}/bin/zfs";
             checkExists = d: ''
               if ! ${zfs} list -H -o name ${escapeShellArg d.name} >/dev/null 2>&1; then
-                echo "<3>external encryption root ${d.name} does not exist. Refusing to let disko-zfs create it unencrypted" >&2
-                exit 1
+              echo "<3>external encryption root ${d.name} does not exist. Refusing to let disko-zfs create it unencrypted" >&2
+              exit 1
               fi
             '';
           in
