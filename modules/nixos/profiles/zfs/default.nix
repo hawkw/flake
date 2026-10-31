@@ -1,5 +1,10 @@
+# ZFS profile: kernel/package selection, scrubbing, and auto-snapshotting.
+#
+# Declarative dataset management (`profiles.zfs.pools`) lives in ./datasets.nix.
 { lib, pkgs, config, ... }:
 let cfg = config.profiles.zfs; in with lib; {
+  imports = [ ./datasets.nix ];
+
   options.profiles.zfs = {
     enable = mkEnableOption "ZFS profile";
   };

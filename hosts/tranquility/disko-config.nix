@@ -49,7 +49,7 @@ let
 in
 {
   # enable disko-zfs to manage ZFS datasets from this configuration whenever
-  # the configuration is applied.inherit
+  # the configuration is applied.
   disko.zfs.enable = true;
 
   disko.devices =

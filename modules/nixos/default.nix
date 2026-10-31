@@ -21,9 +21,10 @@
     ./profiles/perftools.nix
     ./profiles/raspberry-pi
     ./profiles/server.nix
+    ./profiles/storage.nix
     ./profiles/vu-dials.nix
     ./profiles/yubikey.nix
-    ./profiles/zfs.nix
+    ./profiles/zfs
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix

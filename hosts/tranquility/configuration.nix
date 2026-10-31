@@ -1,6 +1,5 @@
 { config, pkgs, lib, ... }:
 
-let moonpool = "moonpool"; ds1 = "ds1"; in
 with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
@@ -17,6 +16,7 @@ with pkgs; with lib; {
       systemd.enable = true;
     };
     server.enable = true;
+    storage.enable = true;
     desktop = {
       gnome3.enable = true;
     };
@@ -53,14 +53,6 @@ with pkgs; with lib; {
   environment.systemPackages = with pkgs; [
     sbctl
     fwupd
-    # various LSI SAS card thingies
-    storcli2
-    lsirec
-    lsiutil
-    lsscsi
-    # seagate drive firmware utility
-    openseachest
-    sg3_utils
   ];
 
   # fwupd: firmware update
@@ -123,9 +115,21 @@ with pkgs; with lib; {
       enable = true;
       # Allow a root rescue shell in the initrd emergency target. Without this,
       # a failed pool import (or any stage-1 failure) drops to emergency mode
-      # with root locked, which strands a headless box. This is reachable only
-      # *before* the pool is unlocked, so it exposes no decrypted data. It's
-      # just for debugging, and manually unlocking the pool if necessary.
+      # with root locked, which strands a headless box. It's just for
+      # debugging, and for manually unlocking the pool if necessary.
+      #
+      # This shell is reached before the pool is unlocked, so it doesn't expose
+      # any decrypted data. However, it does have the same TPM access as the
+      # clevis unlock, so it could `clevis decrypt` the initrd's JWE itself.
+      # This is still the case after binding the JWE to PCR 7 (see README),
+      # because the initrd sees the same Secure Boot state. Therefore, anyone
+      # at the console who can cause a stage-1 failure could recover the
+      # passphrase.
+      #
+      # TODO(eliza): before relying on the PCR 7 binding, set this to a hashed
+      # root password instead of `true` (the option accepts one). Note that the
+      # hash is stored in the unencrypted initrd, so the password must be strong
+      # enough to resist offline cracking.
       emergencyAccess = true;
     };
     # Unattended unlock of the root pool's encryption root from the TPM via
@@ -176,6 +180,18 @@ with pkgs; with lib; {
   services.ssh-tpm-hostkeys.enable = true;
   services.openssh.enable = true;
 
+  # Convenience symlink so SFTP-relative paths resolve from $HOME:
+  # `scp f tranquility:shares/`, `sftp`'s `cd shares`, and
+  # `sshfs eliza@tranquility:shares mnt/` (the last needs
+  # `-o follow_symlinks`, or spell the absolute /srv path). SFTP resolves
+  # paths server-side, so the symlink is traversed like any directory; it
+  # also keeps GNOME/tracker and $HOME-scoped tools off the share (they do
+  # not follow symlinks), unlike a real mountpoint in the homedir would.
+  # `L` (not `L+`): never clobbers an existing ~/shares.
+  systemd.tmpfiles.rules = [
+    "L /home/eliza/shares - - - - /srv/users/eliza/shares"
+  ];
+
   users.motd = ''
     ┌┬────────────────┐
     ││ ELIZA NETWORKS │
@@ -183,6 +199,114 @@ with pkgs; with lib; {
     ${config.networking.hostName}: storage
   '';
 
+  # Per-encryption-root passphrases for the `moonpool` data pool. These are
+  # generated using an agenix random-word generator, stored encrypted to the
+  # agenix master identity in `secrets/generated/`, and rekeyed for this host's
+  # TPM-sealed identity into `secrets/rekeyed/tranquility/`. These keys are read
+  # by the `zfs-datasets-moonpool` oneshot to unlock the datasets unattended.
+  #
+  # `keyformat=passphrase` also means any of these can be unlocked by hand on
+  # any machine with `zfs load-key -L prompt <dataset>`. The passphrases can
+  # also be escrowed into an external password manager using `agenix view`.
+  age.secrets.moonpool-service-pass.generator.script = "passphrase";
+  age.secrets.moonpool-user-eliza-pass.generator.script = "passphrase";
+
+  # The main storage pool for this system.
+  #
+  # The zpool itself is created and managed statefully (using the ZFS CLI)`,
+  # while the datasets on it are declared here and managed by the `datasets.nix`
+  # module in this flake.
+  profiles.zfs.pools.moonpool = {
+    # Pool-root properties applied to all datasets by default.
+    properties = {
+      mountpoint = "none";
+      compression = "lz4";
+      atime = false;
+      # `acltype=posixacl` and `xattr=sa` are needed for NFS/Samba
+      acltype = "posixacl";
+      xattr = "sa";
+      dnodesize = "auto";
+      recordsize = "128K";
+      autoSnapshot = false;
+      # Disable the `frequent` label pool-wide by default to disable 15-minute
+      # snapshot intervals.
+      autoSnapshotFrequent = false;
+    };
+
+    datasets = {
+      # Reservation to ensure the pool is never completely full.
+      "reserved".properties = {
+        mountpoint = "none";
+        autoSnapshot = false;
+        reservation = "16G";
+      };
+
+      # Container for this generation of the dataset layout.
+      "ds1".properties = {
+        mountpoint = "none";
+        autoSnapshot = false;
+      };
+
+      # Media (movies, etc) that can be re-downloaded if lost.
+      "ds1/media".properties = {
+        mountpoint = "/srv/media";
+        # Use large blocks for movies etc. They are never partially rewritten,
+        # so there should be no RMW drawback to large recordsize.
+        recordsize = "1M";
+        # No need to snapshot anything that can be downloaded again and which
+        # and doesn't change once written.
+        autoSnapshot = false;
+      };
+
+      # Encrypted container dataset for services hosted by this system. These
+      # will generally be mounted into /srv, with child datasets for various
+      # services.
+      "ds1/services" = {
+        encryption = {
+          keyFile = config.age.secrets.moonpool-service-pass.path;
+          keyFormat = "passphrase";
+        };
+        properties = {
+          mountpoint = "none";
+          autoSnapshot = true;
+        };
+      };
+
+      # Container for per-user encrypted datasets.
+      "ds1/users".properties = {
+        mountpoint = "none";
+        autoSnapshot = false;
+      };
+
+      "ds1/users/eliza" = {
+        encryption = {
+          keyFile = config.age.secrets.moonpool-user-eliza-pass.path;
+          keyFormat = "passphrase";
+        };
+        properties = {
+          mountpoint = "none";
+          autoSnapshot = true;
+          # TODO: set a `quota` here...
+        };
+      };
+
+      # Fileshares for the eliza user
+      "ds1/users/eliza/export" = {
+        # Applied at dataset creation.
+        owner = "eliza";
+        group = "users";
+        mode = "0700";
+        properties = {
+          mountpoint = "/srv/eliza/export";
+          recordsize = "1M";
+          specialSmallBlocks = "512K";
+          # enable zstd rather than lz4 for better compression ratios.
+          compression = "zstd";
+          autoSnapshot = true;
+        };
+      };
+    };
+  };
 
   # This option defines the first version of NixOS you have installed on this
   # particular machine, and is used to maintain compatibility with application
@@ -205,6 +329,4 @@ with pkgs; with lib; {
   # For more information, see `man configuration.nix` or
   # https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
   system.stateVersion = "25.05"; # Did you read the comment?
-
-
 }

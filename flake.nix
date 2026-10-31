@@ -267,6 +267,11 @@
               # config.programs._1password.package
             ];
           };
+
+          checks = import ./modules/nixos/profiles/zfs/checks.nix {
+            inherit pkgs;
+            inherit (inputs) nixpkgs disko disko-zfs;
+          };
         };
 
         flake = {
