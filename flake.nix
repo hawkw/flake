@@ -18,8 +18,15 @@
   #### INPUTS ################################################################
   inputs =
     {
+
+      ### nixpkgs selection ##################################################
+      # currently, i'm using nixpkgs-weekly to try to reduce exposure to
+      # supply-chain attacks.
+
       # nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
-      nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+      # nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+      nixpkgs.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/0.1";
+
       flake-utils.url = "github:numtide/flake-utils";
       flake-parts.url = "github:hercules-ci/flake-parts";
 
@@ -31,7 +38,7 @@
           # don't download nix-darwin deps as this flake only contains Linux
           # configurations.
           ### NOTE: remove this line to enable nix-darwin support!!! ###
-          darwin.follows = "";
+          # darwin.follows = "";
         };
       };
       agenix-rekey = {
@@ -180,6 +187,11 @@
         };
       };
 
+      sccache = {
+        url = "github:mozilla/sccache";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
     };
 
   ############################################################################
@@ -230,6 +242,8 @@
         # system config...
         (_: prev: { fw-ectool = inputs.fw-ectool.packages.${prev.stdenv.hostPlatform.system}.ectool; })
         inputs.claude-code.overlays.default
+        # sccache overlay
+        (_: prev: { sccache = inputs.sccache.packages.${prev.stdenv.hostPlatform.system}.sccache; })
       ];
 
       lib = import ./lib;

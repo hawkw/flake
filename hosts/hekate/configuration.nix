@@ -147,10 +147,6 @@
 
   environment.systemPackages = with pkgs; [
     fwupd
-    # various LSI SAS card thingies
-    storcli2
-    lsirec
-    lsiutil
     lsscsi
   ];
 

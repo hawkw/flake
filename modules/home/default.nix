@@ -104,6 +104,8 @@ with lib; rec {
     };
 
     nushell.enable = lib.mkDefault true;
+    nushell.loadSessionVariables = true;
+
     zsh.enable = lib.mkDefault true;
     # zellij.enable = lib.mkDefault false;
     starship.enable = lib.mkDefault true;

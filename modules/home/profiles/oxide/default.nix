@@ -56,7 +56,7 @@ with lib; {
             in
             {
               ${sn17} = {
-                probe = "0483:3754:003200124741500820383733";
+                probe = "1fc9:0143:BWGT34BHJIVRB";
                 archive = "/gimlet/hubris/archives/build-gimlet-b-dev-image-default.zip";
                 cmds = {
                   power = {
@@ -66,6 +66,10 @@ with lib; {
                   };
                   console = ''/bin/sh -c "sp3-uart /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_BG00RVDP-if00-port0"'';
                 };
+              };
+              "grapefruit-sp" = {
+                probe = "1fc9:0143:TLPFYSGPHKMHP";
+                archive = "${basePath}/grapefruit-b/dist/default/build-grapefruit-b-image-default.zip";
               };
               "gimletlet" = {
                 probe = "0483:3754:000B00154D46501520383832";

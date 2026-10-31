@@ -3,7 +3,7 @@ let
   cfg = config.profiles.devtools;
 in
 {
-  imports = [ ./gdb-dashboard.nix ];
+  imports = [ ./gdb-dashboard.nix ./sccache.nix ];
 
   options.profiles.devtools = with lib; {
     enable = mkEnableOption "Profile for development tools";
