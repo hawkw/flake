@@ -394,79 +394,6 @@ config:
 errors: No known data errors
 ```
 
-### Dataset layout and encryption
-
-The pool is created and grown **statefully** (drives fail and get replaced), but
-its **dataset layout is declarative**, defined once in `configuration.nix` under
-`profiles.zfs.pools` (a thin wrapper over [`disko-zfs`], see
-`modules/nixos/profiles/zfs/datasets.nix`). The layout is:
-
-```
-moonpool
-└─ ds1
-   ├─ media                       unencrypted, no auto-snapshot   → /srv/media
-   ├─ system                      ENCRYPTED root, auto-snapshot   (service state)
-   └─ users
-      └─ eliza                    ENCRYPTED root, auto-snapshot
-         ├─ shares                → /srv/users/eliza/shares
-         └─ backups               → /srv/users/eliza/backups
-```
-
-- **`media`** is unencrypted (re-downloadable, non-sensitive) and not
-  snapshotted. `recordsize=1M`: large sequential files, fewer indirect blocks
-  (which also relieves the special vdev).
-- **`system`** holds state for data-serving services. Per-service child datasets
-  (added later, mounted into `/var/lib/<service>`) inherit its key.
-- Each **user** is their own encryption root with its own key, so their data is
-  cryptographically isolated. Add a user by adding another encrypted child under
-  `users`. `shares` and `backups` inherit the user's key.
-- **`shares`** holds a mixed corpus: mostly multi-megabyte PDFs (~1.2--35MB)
-  plus a tail of smaller files. `recordsize=1M` for the big files;
-  `specialSmallBlocks = "512K"` puts the small files --- the population where
-  per-file HDD seek latency hurts most --- on the special vdev's SSDs, while the
-  1M PDF chunks stay on the HDDs. Sizing: the kernel's metadata-only reserve
-  (`zfs_special_class_metadata_reserve_pct`, default 25%) is ~875GiB raw on this
-  special vdev, so the default is ample. Watch the consumption of space with
-  `zpool list -v moonpool`.
-- **`backups`** sets `recordsize=1M` for the same reason, and must never set
-  `specialSmallBlocks`: chunk-based backup tools (borg/restic) write exactly
-  midsize blocks and would soak terabytes into the special vdev.
-- Cap a user's usage by declaring `quota` on their encryption root (declared,
-  not `zfs set` by hand --- the module reconciles declared datasets' local
-  properties).
-- 15-minute (`frequent`) auto-snapshots are disabled pool-wide via
-  `autoSnapshotFrequent = false`: 15-minute recovery points buy nothing for
-  this workload. (SSD wear from snapshot churn is negligible; this is mostly to 
-  ensure that we aren't spending a bunch of time on snapshotst.)
-
-#### How it is applied
-
-`moonpool` is a *data pool* (nothing needed for boot lives on it), so the whole
-pool is managed by the module's late per-pool oneshot
-(`zfs-datasets-moonpool.service`), which creates the datasets and loads their
-keys. Its datasets are mounted by systemd, using `fileSystems` entries with
-`nofail` which require the oneshot. Because they are mounted by systemd, their
-ZFS `mountpoint` property is `legacy`, and their state can be checked with
-`findmnt /srv/media` or `systemctl status srv-media.mount`. Systemd units which
-require `moonpool` datasets to be mounted should use `requiresZfsMounts` (see
-below), which adds `RequiresMountsFor=` dependencies on the mounts. The
-implementation of declarative pool
-management and its operational characteristics are documented in 
-`modules/nixos/profiles/zfs/datasets.nix`.
-
-Host specifics:
-
-- the pool is imported at boot via `boot.zfs.extraPools` and unlocked with
-  the agenix passphrases below; a failed unlock never blocks boot, and
-  services gated on the target stay stopped instead of writing to the root
-  pool.
-- services that use the pool declare their paths, e.g.:
-
-  ```nix
-  systemd.services.jellyfin.requiresZfsMounts = [ "/srv/media" ];
-  ```
-
-[`disko-zfs`]: https://github.com/numtide/disko-zfs
 
 ### Provision the dataset encryption keys
 
@@ -496,7 +423,7 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
 3. Rebuild. The oneshot creates, unlocks, and mounts the datasets during
    the switch itself (and again at every boot). Verify, including that
    declared ownership landed (the one step that can fail silently if the run
-   aborts partway --- fix by hand with `chown`/`chmod` if so):
+   aborts partway --- fix this by hand with `chown`/`chmod` if needed):
 
    ```console
    nix build '.#nixosConfigurations.tranquility.config.system.build.toplevel'  # cheap pre-flight

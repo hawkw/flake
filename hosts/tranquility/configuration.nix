@@ -200,30 +200,24 @@ with pkgs; with lib; {
   '';
 
   # Per-encryption-root passphrases for the `moonpool` data pool. These are
-  # generated (six random words), stored encrypted to the agenix master identity
-  # in `secrets/generated/`, and rekeyed for this host's TPM-sealed identity
-  # into `secrets/rekeyed/tranquility/`. They are delivered to `/run/agenix/...`
-  # at boot and read by the `zfs-datasets-moonpool` oneshot to unlock the
-  # datasets unattended.
+  # generated using an agenix random-word generator, stored encrypted to the
+  # agenix master identity in `secrets/generated/`, and rekeyed for this host's
+  # TPM-sealed identity into `secrets/rekeyed/tranquility/`. These keys are read
+  # by the `zfs-datasets-moonpool` oneshot to unlock the datasets unattended.
   #
   # `keyformat=passphrase` also means any of these can be unlocked by hand on
-  # any machine with `zfs load-key -L prompt <dataset>`. For that offline /
-  # foreign-machine recovery path to need nothing but a password manager, copy
-  # each generated passphrase into 1Password once (read it with `agenix view`);
-  # otherwise recovery also needs this flake + the master identity.
-  age.secrets.moonpool-system-pass.generator.script = "passphrase";
+  # any machine with `zfs load-key -L prompt <dataset>`. The passphrases can
+  # also be escrowed into an external password manager using `agenix view`.
+  age.secrets.moonpool-service-pass.generator.script = "passphrase";
   age.secrets.moonpool-user-eliza-pass.generator.script = "passphrase";
 
-  # moonpool dataset layout (see hosts/tranquility/README.md). The
-  # `profiles.zfs.pools` wrapper (modules/nixos/profiles/zfs/datasets.nix)
-  # manages the whole pool with a late per-pool oneshot, because it is a data
-  # pool (no filesystem needed for boot lives on it): if importing or unlocking
-  # it fails, only the services that use the pool are held back, not the rest of
-  # boot. The pool itself is created and grown statefully (drives fail and get
-  # replaced); only the dataset layout is declarative.
+  # The main storage pool for this system.
+  #
+  # The zpool itself is created and managed statefully (using the ZFS CLI)`,
+  # while the datasets on it are declared here and managed by the `datasets.nix`
+  # module in this flake.
   profiles.zfs.pools.moonpool = {
-    # Pool-root properties. All creation-time local properties are declared so
-    # disko-zfs does not inherit (unset) them during reconciliation.
+    # Pool-root properties applied to all datasets by default.
     properties = {
       mountpoint = "none";
       compression = "lz4";
@@ -234,33 +228,42 @@ with pkgs; with lib; {
       dnodesize = "auto";
       recordsize = "128K";
       autoSnapshot = false;
-      # Disable the `frequent` label pool-wide by default to disable 15-minute snapshot
-      # intervals.
+      # Disable the `frequent` label pool-wide by default to disable 15-minute
+      # snapshot intervals.
       autoSnapshotFrequent = false;
     };
 
     datasets = {
+      # Reservation to ensure the pool is never completely full.
+      "reserved".properties = {
+        mountpoint = "none";
+        autoSnapshot = false;
+        reservation = "16G";
+      };
+
       # Container for this generation of the dataset layout.
       "ds1".properties = {
         mountpoint = "none";
         autoSnapshot = false;
       };
 
-      # Bulk media: unencrypted (re-downloadable, non-sensitive) and not
-      # auto-snapshotted. Large records: fewer indirect blocks (which also
-      # relieves the special vdev) and better sequential throughput; media
-      # files are never partially rewritten, so there is no RMW downside.
+      # Media (movies, etc) that can be re-downloaded if lost.
       "ds1/media".properties = {
         mountpoint = "/srv/media";
+        # Use large blocks for movies etc. They are never partially rewritten,
+        # so there should be no RMW drawback to large recordsize.
         recordsize = "1M";
+        # No need to snapshot anything that can be downloaded again and which
+        # and doesn't change once written.
         autoSnapshot = false;
       };
 
-      # Encrypted state for data-serving services. Child datasets (added later,
-      # per service, mounted into /var/lib/<service>) inherit this key.
-      "ds1/system" = {
+      # Encrypted container dataset for services hosted by this system. These
+      # will generally be mounted into /srv, with child datasets for various
+      # services.
+      "ds1/services" = {
         encryption = {
-          keyFile = config.age.secrets.moonpool-system-pass.path;
+          keyFile = config.age.secrets.moonpool-service-pass.path;
           keyFormat = "passphrase";
         };
         properties = {
@@ -269,8 +272,7 @@ with pkgs; with lib; {
         };
       };
 
-      # Unencrypted container under which each user gets their own encryption
-      # root (own key). Add more users by adding another encrypted child here.
+      # Container for per-user encrypted datasets.
       "ds1/users".properties = {
         mountpoint = "none";
         autoSnapshot = false;
@@ -284,48 +286,22 @@ with pkgs; with lib; {
         properties = {
           mountpoint = "none";
           autoSnapshot = true;
-          # TODO: set `quota` here to cap this user's total usage. It must be
-          # declared *here*: a hand-run `zfs set quota=...` is local property
-          # drift, which reconciliation reverts on the next service run.
+          # TODO: set a `quota` here...
         };
       };
 
-      # Fileshares hold a mixed corpus whose largest category is
-      # multi-megabyte PDFs (~1.2--35MB), plus assorted smaller files.
-      # `recordsize=1M` suits the big files (whole-file sequential I/O, 8x
-      # fewer indirect blocks than the 128K default); files smaller than the
-      # recordsize are stored as a single block of roughly the file's size,
-      # so the cap costs them nothing. `special_small_blocks=512K` routes
-      # those small blocks (files up to ~512K) to the special vdev's SSDs,
-      # where per-file seek latency hurts most; the 1M PDF chunks stay on the
-      # HDDs. Do NOT raise the threshold to the recordsize --- that routes
-      # *all* data to the special vdev. Metadata is protected from this data
-      # by the built-in class gate (`zfs_special_class_metadata_reserve_pct`,
-      # default 25%); watch the fill with `zpool list -v moonpool`.
-      "ds1/users/eliza/shares" = {
-        # Applied once, at dataset creation; never reconciled afterwards.
+      # Fileshares for the eliza user
+      "ds1/users/eliza/export" = {
+        # Applied at dataset creation.
         owner = "eliza";
         group = "users";
         mode = "0700";
         properties = {
-          mountpoint = "/srv/users/eliza/shares";
+          mountpoint = "/srv/eliza/export";
           recordsize = "1M";
           specialSmallBlocks = "512K";
-          autoSnapshot = true;
-        };
-      };
-
-      # Backups are large sequential blobs; large records, same as media.
-      # Never set `special_small_blocks` here: chunk-based backup tools
-      # (borg/restic) write exactly midsize blocks and would soak terabytes
-      # of backup data into the special vdev.
-      "ds1/users/eliza/backups" = {
-        owner = "eliza";
-        group = "users";
-        mode = "0700";
-        properties = {
-          mountpoint = "/srv/users/eliza/backups";
-          recordsize = "1M";
+          # enable zstd rather than lz4 for better compression ratios.
+          compression = "zstd";
           autoSnapshot = true;
         };
       };
