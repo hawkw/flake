@@ -112,7 +112,6 @@ with pkgs; with lib; {
     # systemd-based initrd is required for clevis TPM unlocking and for
     # lanzaboote's extraEfiSysMountPoints.
     initrd.systemd = {
-      enable = true;
       # Allow a root rescue shell in the initrd emergency target. Without this,
       # a failed pool import (or any stage-1 failure) drops to emergency mode
       # with root locked, which strands a headless box. It's just for

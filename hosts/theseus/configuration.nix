@@ -75,7 +75,6 @@ with lib; {
     # FIDO2 unlock requires the systemd-based stage 1; the scripted-initrd
     # fido2 path (fido2luks) is deprecated and incompatible with it.
     initrd.systemd = {
-      enable = true;
       # Allow a root rescue shell in the initrd emergency target. Without
       # this, any stage-1 failure drops to emergency mode with root locked,
       # and un-stranding the machine requires a live USB. This is reachable
@@ -86,7 +85,7 @@ with lib; {
 
     initrd.luks.devices =
       let
-        # Luks options to enable 
+        # Luks options to enable
         crypttabExtraOpts = [
           "fido2-device=auto"
           # How long to wait for a FIDO2 token before falling back to the
