@@ -5,7 +5,6 @@ let
   systemDataset = "${cryptDataset}/system";
   userDataset = "${cryptDataset}/user";
   zfs_fs = "zfs_fs";
-  optAutosnapshot = "com.sun:auto-snapshot";
 
   # Each NVMe device gets its own 4G ESP plus a ZFS partition. lanzaboote signs
   # and installs the bootloader to *both* ESPs on every `nixos-rebuild` (its
@@ -80,6 +79,10 @@ in
               xattr = "sa";
             };
             # Dataset layout based on https://grahamc.com/blog/nixos-on-zfs/
+            #
+            # Which of these datasets are snapshotted is decided by the zrepl
+            # snapshot job's `filesystems` filter (`services.zrepl` in
+            # configuration.nix), not by dataset properties.
             datasets = {
               ${cryptDataset} = {
                 type = zfs_fs;
@@ -105,30 +108,18 @@ in
               "${localDataset}/nix" = {
                 type = zfs_fs;
                 mountpoint = "/nix";
-                options = {
-                  ${optAutosnapshot} = "false";
-                };
               };
               "${localDataset}/tmp" = {
                 type = zfs_fs;
                 mountpoint = "/tmp";
-                options = {
-                  ${optAutosnapshot} = "false";
-                };
               };
               "${localDataset}/cache" = {
                 type = zfs_fs;
                 mountpoint = "/home/eliza/.cache";
-                options = {
-                  ${optAutosnapshot} = "false";
-                };
               };
               "${localDataset}/root-cache" = {
                 type = zfs_fs;
                 mountpoint = "/root/.cache";
-                options = {
-                  ${optAutosnapshot} = "false";
-                };
               };
               "${localDataset}/reserved" = {
                 type = zfs_fs;
@@ -136,7 +127,6 @@ in
                   mountpoint = "none";
                   canmount = "off";
                   refreservation = "50G";
-                  ${optAutosnapshot} = "false";
                 };
               };
               "${systemDataset}" = {
@@ -150,7 +140,6 @@ in
                 # these sometimes get mounted ro by initrd?
                 mountOptions = [ "rw" ];
                 options = {
-                  ${optAutosnapshot} = "true";
                   dnodesize = "auto";
                 };
                 postCreateHook = "zfs list -t snapshot -H -o name | grep -E '^${rpool}/${systemDataset}/root@blank$' || zfs snapshot ${rpool}/${systemDataset}/root@blank";
@@ -159,8 +148,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/var";
                 options = {
-                  # Disable autosnapshot for `/var`.
-                  ${optAutosnapshot} = "false";
                   dnodesize = "auto";
                 };
               };
@@ -168,9 +155,6 @@ in
                 type = zfs_fs;
                 mountpoint = "/etc";
                 options = {
-                  # Disable autosnapshot for `/etc` --- this should all come
-                  # from the nix store!
-                  ${optAutosnapshot} = "false";
                   dnodesize = "auto";
                 };
               };
@@ -179,16 +163,11 @@ in
                 options = {
                   mountpoint = "none";
                   dnodesize = "auto";
-                  # Snapshot all user datasets.
-                  ${optAutosnapshot} = "true";
                 };
               };
               "${userDataset}/home" = {
                 type = zfs_fs;
                 mountpoint = "/home";
-                options = {
-                  ${optAutosnapshot} = "true";
-                };
               };
             };
           };

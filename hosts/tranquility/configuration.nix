@@ -1,5 +1,17 @@
 { config, pkgs, lib, ... }:
 
+let
+  # Names of ZFS storage pools and datasets.
+  moonpool = "moonpool";
+  datasetNames = rec {
+    services = "services";
+    immich = "${services}/immich";
+    immichThumbs = "${immich}/thumbs";
+    users = "users";
+    eliza = "${users}/eliza";
+    backups = "backups";
+  };
+in
 with pkgs; with lib; {
 
   imports = [ ./hardware-configuration.nix ./disko-config.nix ];
@@ -209,13 +221,14 @@ with pkgs; with lib; {
   # also be escrowed into an external password manager using `agenix view`.
   age.secrets.moonpool-service-pass.generator.script = "passphrase";
   age.secrets.moonpool-user-eliza-pass.generator.script = "passphrase";
+  age.secrets.moonpool-backups-pass.generator.script = "passphrase";
 
   # The main storage pool for this system.
   #
   # The zpool itself is created and managed statefully (using the ZFS CLI)`,
   # while the datasets on it are declared here and managed by the `datasets.nix`
   # module in this flake.
-  profiles.zfs.pools.moonpool = {
+  profiles.zfs.pools.${moonpool} = {
     # Pool-root properties applied to all datasets by default.
     properties = {
       mountpoint = "none";
@@ -226,85 +239,393 @@ with pkgs; with lib; {
       xattr = "sa";
       dnodesize = "auto";
       recordsize = "128K";
-      autoSnapshot = false;
-      # Disable the `frequent` label pool-wide by default to disable 15-minute
-      # snapshot intervals.
-      autoSnapshotFrequent = false;
+      # For security hardening: this pool will never store setuid binaries or
+      # device nodes. Most datasets additionally do not store executables and
+      # can also set `exec - "off"`, but this is configured on a per-dataset
+      # basis. Some service state dirs may need executables for plugins.
+      setuid = "off";
+      devices = "off";
     };
 
     datasets = {
-      # Reservation to ensure the pool is never completely full.
+      # Fill margin for the whole pool. This ensures that all other datasets see
+      # the pool as "full" while about 15% of the data vdev capacity remains.
+      # ZFS performance tends to degrade over 80% capacity due to fragmentation
+      # (see https://docs.oracle.com/cd/E26505_01/html/E37384/zfspools-4.html).
+      #
+      # This is not needed to guarantee that deletes can succeed on a full
+      # pool, since ZFS's own slop space already does that.
+      #
+      # This is sized for one 6-wide raidz2 vdev of 16 TB disks (~58 TiB
+      # usable). It does not scale automatically, so it will need to be
+      # increased when adding new data vdevs.
+      #
+      # In an emergency, the reservation can be released with
+      # `zfs set reservation=none moonpool/reserved`.
       "reserved".properties = {
         mountpoint = "none";
-        autoSnapshot = false;
-        reservation = "16G";
+        reservation = "8T";
       };
 
-      # Container for this generation of the dataset layout.
-      "ds1".properties = {
+      # Media (movies, etc) that can be re-downloaded if lost
+      #
+      # These are never snapshotted, since anything here can be downloaded again
+      # and doesn't change once written. This tree does not need to be
+      # encyrpted.
+      "media".properties = {
         mountpoint = "none";
-        autoSnapshot = false;
+        # Don't let a large download queue fill up the whole pool.
+        # NOTE: consider expanding this when adding new data vdevs.
+        quota = "30T";
+        exec = "off";
+        # Don't keep a ditto copy of files' level-1 indirect blocks, which are
+        # the bulk of metadata by volume and all live on the special vdev. This
+        # halves the metadata write churn from torrents' out-of-order writes to
+        # `media/incomplete` (the largest source of special-vdev writes), and
+        # trims the special-vdev footprint of the library slightly.
+        #
+        # The cost: if all three mirror copies of one L1 block are corrupt, up
+        # to ~1024 records of a single file are lost (16 MB of an incomplete
+        # download, or 1 GiB of a library file), rather than one record.
+        # The loss is detected and reported by name, and this data can be
+        # re-downloaded. Do not inherit this into irreplaceable data.
+        redundant_metadata = "most";
       };
 
-      # Media (movies, etc) that can be re-downloaded if lost.
-      "ds1/media".properties = {
+      # The media library *and* completed downloads that are still seeding.
+      # These must be one dataset: the *arr stack hardlinks completed downloads
+      # into the library, and hardlinks cannot cross datasets.
+      "media/complete".properties = {
         mountpoint = "/srv/media";
         # Use large blocks for movies etc. They are never partially rewritten,
         # so there should be no RMW drawback to large recordsize.
         recordsize = "1M";
-        # No need to snapshot anything that can be downloaded again and which
-        # and doesn't change once written.
-        autoSnapshot = false;
       };
 
-      # Encrypted container dataset for services hosted by this system. These
-      # will generally be mounted into /srv, with child datasets for various
-      # services.
-      "ds1/services" = {
+      # In-progress torrent downloads. Torrent clients write pieces out of
+      # order, which would fragment 1M records; the client moves completed
+      # downloads into `media/complete`, which (crossing datasets) rewrites
+      # them as 1M records. Mounted outside /srv/media so that everything
+      # under /srv/media remains one filesystem.
+      "media/incomplete".properties = {
+        mountpoint = "/srv/media-incomplete";
+        # Matches libtorrent's 16K block size, and is the smallest size at
+        # which raidz2 parity overhead reaches the ideal 1.5x.
+        recordsize = "16K";
+        # Explicitly override the special small blocks setting here in case we
+        # change the parent default in the future. I really don't want temporary
+        # download files that are about to be copied elsewhere to ever spend
+        # flash capacity/write endurance.
+        specialSmallBlocks = 0;
+        # A crash mid-download causes a torrent recheck; piece hashes catch any
+        # torn writes.
+        sync = "disabled";
+      };
+
+      # Encrypted container dataset for services hosted by this system.
+      # Per-service datasets are mounted at the services' default state
+      # directories (mostly under /var/lib), and ownership over these
+      # mountpoints are mostly configured by the service's NixOS modules (i.e.
+      # using systemd `StateDirectory=`). Non-default paths must be created by
+      # hand.
+      #
+      # This subtree is snapshotted by zrepl.
+      ${datasetNames.services} = {
         encryption = {
           keyFile = config.age.secrets.moonpool-service-pass.path;
           keyFormat = "passphrase";
         };
         properties = {
           mountpoint = "none";
-          autoSnapshot = true;
         };
       };
 
-      # Container for per-user encrypted datasets.
-      "ds1/users".properties = {
-        mountpoint = "none";
-        autoSnapshot = false;
+      # PostgreSQL's data directory (`/var/lib/postgresql/<schema>`), configured
+      # by the system-wide `services.postgresql` (if it is enabled).
+      #
+      # This is the single PostgreSQL instance shared by Immich and by nixflix
+      # (`nixflix.postgres.enable`, which uses the system
+      # `services.postgresql`.
+      #
+      # NOTE: when configuring nixflix, override its `log.dbEnabled = true` with
+      # `nixflix.<service>.settings.log.dbEnabled = lib.mkForce false` for each
+      # *arr service, so that they log to files instead. Otherwise, their
+      # application logs are constantly inserted into and trimmed from a
+      # database here, which would result in a great deal of additional flash
+      # writes that are probably not necessary. (nixflix will still create the
+      # empty `<service>-logs` databases, but this is t harmless.)
+      "${datasetNames.services}/postgresql" = lib.mkIf config.services.postgresql.enable {
+        properties = {
+          mountpoint = "/var/lib/postgresql";
+          # NOTE: this must stay at or above PostgreSQL's 8K page size, because
+          # `full_page_writes = false` (see `services.postgresql.settings`)
+          # relies on ZFS writing each page as part of a single record.
+          recordsize = "16K";
+          specialSmallBlocks = "16K";
+          # Set a quota for the postgres dataset since it lands entirely on the
+          # special vdev. This way, if the database grows past its quota, it
+          # fails with ENOSPC rather than silently pushing other stuff off the
+          # special vdev.
+          #
+          # Since exceeding this quota would take down all services sharing this
+          # postgres instance, it's sized pretty generously:
+          #
+          # - Immich at ~450k assets: ~5-15 GB.
+          # - The *arr databases: ~1-15 GB, dominated by Lidarr's MusicBrainz
+          #   metadata if music is managed.
+          # - Snapshot-retained churn on top of that: the monthly snapshots
+          #   keep up to two months of rewritten pages.
+          #
+          # Raise it if more databases move here, and keep the special vdev's
+          # total budget in mind when doing so.
+          quota = "100G";
+          # Postgres pages compress well, and this data lives on flash, so a
+          # better ratio saves both special-vdev capacity and write volume.
+          compression = "zstd";
+          # PostgreSQL's binaries and extensions come from the Nix store, and
+          # its JIT compiles in memory, so nothing in the data directory is
+          # ever executed.
+          exec = "off";
+        };
       };
 
-      "ds1/users/eliza" = {
+      # Immich's media storage, including originals, uploads, transcoded videos,
+      # and Immich's own nightly database dumps. These stay on the HDDs. Uploads
+      # land in `upload/` and are moved into `library/`. Both of those
+      # directories should be on the same dataset, in to ensure that moving
+      # from uploads to library is a rename rather than a copy.
+      ${datasetNames.immich} = lib.mkIf config.services.immich.enable {
+        properties = {
+          mountpoint = config.services.immich.mediaLocation;
+          recordsize = "1M";
+          # Immich's binaries (and ffmpeg, libvips) come from the Nix store, and
+          # its ML model cache is in /var/cache, so nothing here is ever
+          # executed. Inherited by `thumbs`. This is set per dataset rather
+          # than on `services`, since other services' state directories may
+          # need exec (see the pool-root properties).
+          exec = "off";
+        };
+      };
+
+      # Immich's generated images include grid thumbnails (~10-30 KB WebP),
+      # previews (~200-500 KB JPEG), and face crops.
+      #
+      # These can all be regenerated from the library, so they are never
+      # snapshotted, and we store less redundant metadata.
+      #
+      # Only the small files go on the special vdev. Grid thumbnails are read
+      # dozens to hundreds at a time from all over the library (timeline,
+      # search, people, map), so they benefit from flash pretty substantially.
+      # This also helps keep browsing the library responsive the HDDs are busy
+      # (i.e. due to a scrub or periodic backup jobs). On the other hand,
+      # previews are opened one at a time, so HDD seek latency isn't noticeable.
+      # Previews will be large enough to write full 128K full records.
+      # Therefore, they exceed the 64K special small blcoks threshold and are
+      # stored on go on the HDDs, as would any multi-MB images from Immich's
+      # "full-size image" generation (`image.fullsize.enabled`). This puts
+      # ~15-20 GB on the special vdev at ~450k assets, rather than everything.
+      #
+      # If changing any settings on this dataset that only effect newly-written
+      # files, run Immich's "regenerate all thumbnails" job.
+      #
+      # Immich refuses to start if this dataset is not mounted.
+      ${datasetNames.immichThumbs} = lib.mkIf config.services.immich.enable {
+        # Applied at dataset creation. The mount root must be writable by
+        # Immich, and the user only exists while Immich is enabled.
+        owner = config.services.immich.user;
+        group = config.services.immich.group;
+        mode = "0700";
+        properties = {
+          mountpoint = "${config.services.immich.mediaLocation}/thumbs";
+          recordsize = "128K";
+          specialSmallBlocks = "64K";
+          quota = "250G";
+          # Thumbnails and previews can always be regenerated from the library,
+          # sothe same reasoning as on `media` applies. The saving here is small
+          # (~2 GB of flash at ~450k assets), since only previews are large
+          # enough to have L1 indirect blocks at all. The risk of enabling this
+          # is that a corrupt L1 loses one preview, is fine because they can
+          # always be recreated by Immich's "generate missing thumbnails" job.
+          redundant_metadata = "most";
+        };
+      };
+
+      # Container for per-user encrypted datasets. This subtree is snapshotted
+      # by zrepl (see `services.zrepl`).
+      ${datasetNames.users}.properties = {
+        mountpoint = "none";
+      };
+
+      "users/eliza" = {
         encryption = {
           keyFile = config.age.secrets.moonpool-user-eliza-pass.path;
           keyFormat = "passphrase";
         };
         properties = {
           mountpoint = "none";
-          autoSnapshot = true;
-          # TODO: set a `quota` here...
+          # Includes snapshots: edits and deletes in `shares` are retained for
+          # up to two months, so this leaves headroom over ~2-3T of live data.
+          quota = "4T";
         };
       };
 
       # Fileshares for the eliza user
-      "ds1/users/eliza/export" = {
+      "users/eliza/shares" = {
         # Applied at dataset creation.
         owner = "eliza";
         group = "users";
         mode = "0700";
         properties = {
-          mountpoint = "/srv/eliza/export";
+          mountpoint = "/srv/users/eliza/shares";
           recordsize = "1M";
-          specialSmallBlocks = "512K";
+          # Files up to 64K (plus all metadata) live on the special vdev.
+          # The threshold applies to blocks *after* compression, so a larger
+          # value would also pull every 1M record that compresses well (text,
+          # source trees, tarballs) onto flash, competing with the services
+          # datasets and backups for the special class's small-block
+          # budget.
+          specialSmallBlocks = "64K";
           # enable zstd rather than lz4 for better compression ratios.
           compression = "zstd";
-          autoSnapshot = true;
+          # Make `.zfs/snapshot/` visible in the dataset root. This way, files
+          # can be restored from snapshots over SFTP without root.
+          snapdir = "visible";
+          # Only affects executing files on this host. NFS/SFTP clients that
+          # copy or mount files executable from here are unaffected.
+          exec = "off";
         };
       };
+
+      # Backups of other systems, from any mechanism. Children are named after
+      # the mechanism that owns them (e.g. `backups/zrepl`, and in future
+      # `backups/restic`), because different mechanisms need opposite rules:
+      # ZFS replicas must never be snapshotted or written to locally, while
+      # file-level backup targets must be mounted and should be snapshotted.
+      #
+      # This is an encryption root with a server-held key as a fallback. A raw
+      # (`zfs send -w`) stream always becomes its own encryption root, whose key
+      # the server never holds. A non-raw stream inherits this root's
+      # encryption, so a client that forgets to send raw is still encrypted at
+      # rest rather than stored in plaintext.
+      ${datasetNames.backups} = {
+        encryption = {
+          keyFile = config.age.secrets.moonpool-backups-pass.path;
+          keyFormat = "passphrase";
+        };
+        properties = {
+          mountpoint = "none";
+          # Only affects streams that arrive uncompressed (non-raw, without
+          # `zfs send -c`). Raw and compressed streams are written as received,
+          # keeping the source's compression.
+          compression = "zstd";
+          exec = "off";
+        };
+      };
+
+      # zrepl sink `root_fs`. Everything below this dataset is owned by zrepl,
+      # which creates a child per client identity.
+      #
+      # This subtree must never be matched by the local snapshot job (see
+      # `services.zrepl`): a local snapshot newer than the last received one
+      # breaks the next incremental receive.
+      "${datasetNames.backups}/zrepl".properties = {
+        mountpoint = "none";
+      };
     };
+  };
+
+  # immich-server has no dependency on its media location's mount, so it could
+  # start before moonpool is imported and unlocked, and write into the empty
+  # mountpoint on the root filesystem. (postgresql.service already has
+  # `RequiresMountsFor=` on its data directory.)
+  systemd.services.immich-server = lib.mkIf config.services.immich.enable {
+    requiresZfsMounts = [
+      config.services.immich.mediaLocation
+      "${config.services.immich.mediaLocation}/thumbs"
+    ];
+  };
+
+  # PostgreSQL tuning for ZFS. These take effect only once something enables
+  # PostgreSQL (e.g. Immich, which does by default); they do not enable it.
+  #
+  # They cut WAL volume substantially, and WAL is the largest steady writer to
+  # the special vdev.
+  services.postgresql.settings = {
+    # Full-page writes guard against torn pages from a crash partway through
+    # writing an 8K page. ZFS is copy-on-write and writes each record
+    # atomically, so a page can never be torn as long as the dataset's
+    # `recordsize` is at least 8K (see `services/postgresql`).
+    full_page_writes = false;
+    # On a copy-on-write filesystem, zero-filling new WAL segments and
+    # recycling old ones buys nothing, since every write allocates new blocks
+    # anyway. PostgreSQL added these options for exactly this case.
+    wal_init_zero = false;
+    wal_recycle = false;
+  };
+
+  # Local snapshots of both pools are taken and pruned by zrepl, rather than
+  # zfs-auto-snapshot (which the zfs profile enables by default). zrepl will
+  # also handle replication later; having a single tool own every snapshot
+  # avoids two pruners fighting over the same datasets, and zrepl's holds on
+  # snapshots it is replicating from conflicting with another tool's pruning.
+  #
+  # Which datasets are snapshotted is decided by the `filesystems` filter
+  # below, *not* by the `com.sun:auto-snapshot` property.
+  services.zfs.autoSnapshot.enable = false;
+  services.zrepl = {
+    enable = true;
+    settings.jobs = [{
+      # zrepl requires that a job's name never changes.
+      name = "snapshots";
+      type = "snap";
+      # Patterns ending in `<` match a dataset and all of its descendants;
+      # more specific patterns take precedence, and anything not matched is
+      # not snapshotted.
+      filesystems = {
+        "${moonpool}/${datasetNames.services}<" = true;
+        # Regenerable, and would only hold onto deleted images.
+        "${moonpool}/${datasetNames.immichThumbs}" = false;
+        "${moonpool}/${datasetNames.users}<" = true;
+        # Received replicas from other systems. Their snapshots are pruned by
+        # the sending side's `keep_receiver` rules, and a local snapshot would
+        # break the next incremental receive. This is excluded explicitly,
+        # rather than by simply not matching it, so that widening this filter
+        # (e.g. to "${dataPool}<") can never pull it in: the more specific
+        # pattern wins.
+        "${moonpool}/${datasetNames.backups}<" = false;
+        # Also not snapshotted, by not matching: `media` (re-downloadable) and
+        # `reserved` (empty).
+
+        "tranquility-rpool/crypt/system/root" = true;
+        "tranquility-rpool/crypt/user<" = true;
+        # Not snapshotted: `crypt/local` (/nix, /tmp, caches), and `/var` and
+        # `/etc` (whose contents come from this configuration).
+      };
+      snapshotting = {
+        type = "periodic";
+        interval = "1h";
+        prefix = "zrepl_";
+      };
+      pruning.keep = [
+        # Hourly for a day, then daily for 3 days, weekly for 2 weeks, and
+        # every 30 days for 2 months. This matches the retention previously
+        # configured for zfs-auto-snapshot.
+        {
+          type = "grid";
+          regex = "^zrepl_";
+          grid = "24x1h | 3x1d | 2x7d | 2x30d";
+        }
+        # zrepl destroys any snapshot that no rule keeps. Keep every snapshot
+        # zrepl did not create, such as the root dataset's `@blank`, manual
+        # snapshots, and any `zfs-auto-snap_*` snapshots left over from
+        # zfs-auto-snapshot (see the README for cleaning those up).
+        {
+          type = "regex";
+          negate = true;
+          regex = "^zrepl_";
+        }
+      ];
+    }];
   };
 
   # This option defines the first version of NixOS you have installed on this

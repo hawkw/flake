@@ -333,9 +333,17 @@ let
         toZfsValue = toString;
         type = sizeType;
         description = ''
-          Blocks at or below this size are allocated on the pool's special vdev
-          (`0` disables). Must be strictly less than the recordsize, or *all*
-          data is routed to the special vdev.
+          Blocks whose size *after compression and encryption* is at or below
+          this value are allocated on the pool's special vdev (`0` disables).
+          Because the threshold is applied after compression, a value
+          approaching the recordsize also routes every well-compressing
+          full-size record to the special vdev, not just small files. Setting
+          it greater than or equal to the recordsize deliberately places *all*
+          of the dataset's data on the special vdev.
+
+          Once the special class is 75% full (by default, see
+          `zfs_special_class_metadata_reserve_pct`), small blocks are
+          allocated on the normal class instead, without any error.
         '';
       };
       quota = {

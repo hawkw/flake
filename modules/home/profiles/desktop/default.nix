@@ -43,7 +43,7 @@ in {
         losslesscut-bin
 
         ### stuff ###
-        pywal
+        # pywal
         chromium
 
         ### chat clients & stuff

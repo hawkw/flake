@@ -312,26 +312,81 @@ passphrase itself:
 zfs change-key tranquility-rpool/crypt   # key must be loaded; prompts for the new passphrase
 ```
 
+### Snapshots
+
+Local snapshots of both pools are taken hourly and pruned by zrepl's
+`snapshots` job (`services.zrepl` in `configuration.nix`). The `filesystems`
+filter decides which datasets are snapshotted.
+
+Check on it with:
+
+```console
+zrepl status
+zfs list -t snapshot -o name,creation,used -r tranquility-rpool moonpool
+```
+
+zrepl only prunes snapshots with names starting with `zrepl_`. It won't touch
+anything else: `crypt/system/root@blank`, manual snapshots, and any
+`zfs-auto-snap_*` snapshots taken by zfs-auto-snapshot before a host
+switched to zrepl. Those last ones will never expire by themselves. Once they
+are no longer wanted, destroy them by hand (check the list first):
+
+```console
+zfs list -H -t snapshot -o name -r tranquility-rpool | grep '@zfs-auto-snap_'
+zfs list -H -t snapshot -o name -r tranquility-rpool | grep '@zfs-auto-snap_' | xargs -n1 sudo zfs destroy
+```
+
 ## Storage pool setup
 
 list SAS drives:
 
 ```console
-$ lsblk -o NAME,VENDOR,MODEL,SERIAL,WWN -S
-NAME VENDOR   MODEL            SERIAL               WWN
-sda  SEAGATE  ST16000NM004J    ZR5DWPQ40000W3257HRN 0x5000c500da9d0c27
-sdb  SEAGATE  ST16000NM004J    ZR5CGT060000C2127EAG 0x5000c500da3bc09f
-sdc  SEAGATE  XS960LE70124     HSF030NS0000822150Z3 0x5000c500a18fae2b
-sdd  SEAGATE  ST16000NM004J    ZR5CMG610000C3039SWZ 0x5000c500da3be65b
-sde  NTAPCSSD X382_S1643960ATE S57SNA0R205377       0x5002538b012dda50
-sdf  SEAGATE  ST960FM0003      Z87130ES0000822150Z3 0x5000c50030186723
-sdg  WDC      WUH721816AL5204  2CHMU7PP             0x5000cca2a15c6554
-sdh  WDC      WUH721816AL5204  2CHNGUYP             0x5000cca2a15d9a7c
-sdi  WDC      WUH721816AL5204  2CHLHS6N             0x5000cca2a15a0534
-sdj  NTAPCSSD X382_S1643960ATE S57SNA0R205376       0x5002538b012dda40
-sdk  SEAGATE  ST960FM0003      Z87130AR0000822150Z3 0x5000c50030186713
-sdl  NETAPP   X371_S164A960ATE S5JENA0RB07411       0x5002538b01bbde70
+eliza@tranquility ~ $ lsblk -S -o WWN,SIZE,VENDOR,MODEL,REV,SERIAL
+WWN                  SIZE VENDOR   MODEL             REV SERIAL
+0x5000cca2a15a0534  14.6T WDC      WUH721816AL5204  C232 2CHLHS6N
+0x5002538b012dda40 894.3G NTAPCSSD X382_S1643960ATE NA54 S57SNA0R205376
+0x5002538b01bbde70 894.3G NETAPP   X371_S164A960ATE NA53 S5JENA0RB07411
+0x5000c500da3be65b  14.6T SEAGATE  ST16000NM004J    E004 ZR5CMG610000C3039SWZ
+0x5000cca2a15d9a7c  14.6T WDC      WUH721816AL5204  C232 2CHNGUYP
+0x5000cca2a15c6554  14.6T WDC      WUH721816AL5204  C232 2CHMU7PP
+0x5000c50030186713 894.3G SEAGATE  ST960FM0003      0007 Z87130AR0000822150Z3
+0x5000c500da9d0c27  14.6T SEAGATE  ST16000NM004J    E004 ZR5DWPQ40000W3257HRN
+0x5000c500a18fae2b 894.3G SEAGATE  XS960LE70124     0003 HSF030NS0000822150Z3
+0x5000c50030186723 894.3G SEAGATE  ST960FM0003      0007 Z87130ES0000822150Z3
+0x5000c500da3bc09f  14.6T SEAGATE  ST16000NM004J    E004 ZR5CGT060000C2127EAG
+0x5002538b012dda50 894.3G NTAPCSSD X382_S1643960ATE NA54 S57SNA0R205377
 ```
+
+### Pool layout
+
+- **Data:** 6-wide raidz2 16 TB HDDs (~58 TiB usable). Further
+  6-wide raidz2 vdevs can be added later (up to four in this chassis).
+- **Special allocation class:** two 3-way mirrors of 960 GB SAS SSDs
+  (~1.75 TiB usable). These hold all pool metadata, the ZIL (there is no
+  SLOG), and any  blocks at or below its `special_small_blocks`.
+  The pool survives any two HDD failures *and* any two SSD failures at the
+  same time.
+- **Spares:** one Exos X16 and one PM1643a, kept cold on the shelf.
+
+Operational notes:
+
+- The special vdevs can **never be removed**: top-level vdev removal is not
+  supported in a pool with a raidz vdev. To grow the special class, replace a
+  mirror's members with larger SSDs (`autoexpand=on`). Replacing with the old
+  member still attached (temporarily in a free drive bay) keeps the mirror 
+  3-way redundant throughout the replacement.
+- Once the special class is 75% full (`zfs_special_class_metadata_reserve_pct`),
+  new small blocks are allocated on the HDDs. Note that  **nothing reports an
+  error** when this happens. Watch the special class's `ALLOC` in
+  `zpool list -v moonpool`.
+- The estimate at the time of writing is ~0.3--1.1 TiB of special-class use
+  even with four data vdevs, but...that's just kind of a guess. Remember to
+  check the special/pool allocation ratio once the first vdev holds a
+  representative mix of data. 
+- The pool is created with every feature supported by the ZFS version the host
+  was running at the time of creation, which is ZFS 2.4.  Once those features 
+  are in use, the pool can only be imported by ZFS 2.4 or newer. Therefore, any
+  recovery environment (e.g. a NixOS installer USB) must be at least that new.
 
 Creating the zpool:
 
@@ -339,10 +394,14 @@ Creating the zpool:
 sudo zpool create \
   -o ashift=12 \
   -o autoreplace=on \
+  -o autotrim=on \
+  -o autoexpand=on \
+  -O mountpoint=none \
   -O compression=lz4 \
   -O atime=off \
   -O xattr=sa \
   -O acltype=posixacl \
+  -O dnodesize=auto \
   moonpool \
   raidz2 \
     /dev/disk/by-id/wwn-0x5000c500da9d0c27 \
@@ -351,23 +410,28 @@ sudo zpool create \
     /dev/disk/by-id/wwn-0x5000cca2a15c6554 \
     /dev/disk/by-id/wwn-0x5000cca2a15d9a7c \
     /dev/disk/by-id/wwn-0x5000cca2a15a0534 \
-  special raidz2 \
-    /dev/disk/by-id/wwn-0x5000c50030186723 \
-    /dev/disk/by-id/wwn-0x5000c50030186713 \
-    /dev/disk/by-id/wwn-0x5002538b012dda50 \
-    /dev/disk/by-id/wwn-0x5002538b012dda40 \
-    /dev/disk/by-id/wwn-0x5002538b01bbde70 \
-  spare \
-    /dev/disk/by-id/wwn-0x5000c500a18fae2b
+  special \
+    mirror \
+      /dev/disk/by-id/wwn-0x5002538b012dda40 \
+      /dev/disk/by-id/wwn-0x5000c50030186713 \
+      /dev/disk/by-id/wwn-0x5000c500a18fae2b \
+    mirror \
+      /dev/disk/by-id/wwn-0x5002538b012dda50 \
+      /dev/disk/by-id/wwn-0x5000c50030186723 \
+      /dev/disk/by-id/wwn-0x5002538b01bbde70
 ```
 
-ok it works 
+`-O mountpoint=none` keeps `zpool create` from mounting the pool root at
+`/moonpool`; the rest of the dataset properties (quotas, hardening, and so on)
+are applied by the `zfs-datasets-moonpool` service from `configuration.nix`.
+
+The pool should look like this once created:
 
 ```console
 eliza@tranquility ~ $ zpool list && zpool status moonpool
 NAME                SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-moonpool           91.7T  1.41M  91.7T        -         -     0%     0%  1.00x    ONLINE  -
-tranquility-rpool   472G  29.0G   443G        -         -     6%     6%  1.00x    ONLINE  -
+moonpool           89.0T  2.65M  89.0T        -         -     0%     0%  1.00x    ONLINE  -
+tranquility-rpool   472G  42.1G   430G        -         -     7%     8%  1.00x    ONLINE  -
   pool: moonpool
  state: ONLINE
 config:
@@ -382,22 +446,22 @@ config:
             wwn-0x5000cca2a15d9a7c  ONLINE       0     0     0
             wwn-0x5000cca2a15a0534  ONLINE       0     0     0
         special
-          raidz2-1                  ONLINE       0     0     0
-            wwn-0x5000c50030186723  ONLINE       0     0     0
-            wwn-0x5000c50030186713  ONLINE       0     0     0
-            wwn-0x5002538b012dda50  ONLINE       0     0     0
+          mirror-1                  ONLINE       0     0     0
             wwn-0x5002538b012dda40  ONLINE       0     0     0
+            wwn-0x5000c50030186713  ONLINE       0     0     0
+            wwn-0x5000c500a18fae2b  ONLINE       0     0     0
+          mirror-2                  ONLINE       0     0     0
+            wwn-0x5002538b012dda50  ONLINE       0     0     0
+            wwn-0x5000c50030186723  ONLINE       0     0     0
             wwn-0x5002538b01bbde70  ONLINE       0     0     0
-        spares
-          wwn-0x5000c500a18fae2b    AVAIL
 
 errors: No known data errors
-```
-
+````
 
 ### Provision the dataset encryption keys
 
-The `system` and per-user datasets are encrypted with `keyformat=passphrase`.
+The `services`, `backups`, and per-user datasets are encryption roots with
+`keyformat=passphrase`.
 The passphrases are agenix-rekey secrets with a `passphrase` generator (six
 random words), decrypted unattended at boot via this host's TPM-sealed identity.
 
@@ -430,7 +494,7 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    nixos-rebuild switch --flake '.#tranquility'
    systemctl status zfs-datasets-moonpool.service 'srv-*.mount'
    zfs get -r keystatus,mounted moonpool
-   ls -la /srv/users/eliza/   # shares & backups: eliza:users, 0700
+   ls -ld /srv/users/eliza/shares   # eliza:users, 0700
    ```
 
    Then reboot again. This is necessary to check that everything works, because
@@ -455,18 +519,18 @@ random words), decrypted unattended at boot via this host's TPM-sealed identity.
    the passphrase:
 
    ```console
-   sudo zfs unload-key moonpool/ds1/system
-   sudo zfs load-key -L prompt moonpool/ds1/system   # type the 1Password passphrase
+   sudo zfs unload-key moonpool/services
+   sudo zfs load-key -L prompt moonpool/services   # type the passphrase
    ```
 
-   `-L prompt` overrides the key *source* for this load only; the stored
+   `-L prompt` overrides the key *source* for this load only. The configured
    `keylocation` is untouched, so no cleanup is needed afterwards. Note that
    `unload-key` refuses while datasets using the key are mounted --- unmount
    the subtree first, or do this before the datasets hold any data.
 
 #### Rotating a dataset passphrase
 
-`zfs change-key` re-wraps the dataset's master key; data is not re-encrypted,
+`zfs change-key` re-wraps the dataset's master key, so data is not re-encrypted,
 and child datasets are unaffected. Order matters --- `change-key` reads the
 *new* key from the stored `keylocation` (the agenix file), so deploy the new
 secret first:
@@ -481,7 +545,7 @@ agenix rekey -a
 nixos-rebuild switch --flake '.#tranquility'
 
 # On tranquility: re-wrap with the new passphrase from the key file.
-sudo zfs change-key moonpool/ds1/users/eliza
+sudo zfs change-key moonpool/users/eliza
 ```
 
 Then update the copy in 1Password. The old passphrase no longer unlocks the
@@ -493,5 +557,5 @@ If the TPM is ever unavailable, or when importing the pool on another machine,
 unlock a dataset by hand with its 1Password passphrase:
 
 ```console
-zfs load-key -L prompt moonpool/ds1/users/eliza
+zfs load-key -L prompt moonpool/users/eliza
 ```
