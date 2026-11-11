@@ -162,6 +162,9 @@
 # Therefore, all properties **must** either be declared here or added to
 # `disko.zfs.settings.ignoredProperties`.
 #
+# The one exception is the `mountpoint` property of datasets on root pools,
+# which is never reconciled.
+#
 # === Services which use data pool datasets ===
 #
 # A service which requires filesystems on a data pool **must** depend on what
@@ -280,6 +283,18 @@ let
     "pbkdf2iters"
     "pbkdf2salt"
   ];
+
+  # Properties which the early `disko-zfs` service (which reconciles root pools)
+  # must never change, but which the data pool runners do reconcile.
+  #
+  # Changing `mountpoint` on a mounted dataset (with either `zfs set` or `zfs
+  # inherit`) makes ZFS unmount the dataset and mount it again at the new path.
+  # On a root pool, the early service runs while those datasets are in use by
+  # the running system, so this could unmount mountpoints like /etc during a
+  # `nixos-rebuild switch`. Root pool datasets are mounted by systemd from
+  # `fileSystems` entries anyway, so nothing at runtime depends on their
+  # `mountpoint` property. Disko sets this property while creating the pool.
+  rootPoolOnlyIgnoredProperties = [ "mountpoint" ];
 
   # Definitions of typed options for ZFS properties managed by this module (see
   # "Typed properties" in the module-level comment). These must define the
@@ -640,9 +655,17 @@ let
         # they may either be declared in this module, or added to
         # `disko.zfs.settings.ignoredProperties` to prevent them from being
         # reconciled. We must ensure that the late pool runner honors the same
-        # list as early pools.
-        ignoredProperties = unique
-          (config.disko.zfs.settings.ignoredProperties ++ cryptoProperties);
+        # list as early pools, except for the properties in
+        # `rootPoolOnlyIgnoredProperties` (which must be ignored for root
+        # pools). Note that this means that adding `mountpoint` to
+        # `disko.zfs.settings.ignoredProperties` by hand has no effect on data
+        # pools.
+        ignoredProperties =
+          let
+            shared = filter (p: !elem p rootPoolOnlyIgnoredProperties)
+              config.disko.zfs.settings.ignoredProperties;
+          in
+          unique (shared ++ cryptoProperties);
         datasets = listToAttrs (map datasetSpec inPool);
       };
 
@@ -1274,7 +1297,9 @@ let
           The configuration owns every declared local property. A property set
           with `zfs set` but absent here is inherited away at the next
           reconciliation. Declare it here or add it to
-          {option}`disko.zfs.settings.ignoredProperties`.
+          {option}`disko.zfs.settings.ignoredProperties`. The exception is
+          `mountpoint` on root pools, which is never reconciled (see "Usage
+          Notes" in this module's header).
         '';
       };
 
@@ -1751,51 +1776,20 @@ in
       # encryption roots declared in this module, the data pool runner and the
       # check on `disko-zfs.service` (below) prevent this. However, encryption
       # roots declared only in `disko.devices` are not covered.
+      #
+      # The early service also ignores `mountpoint` (see
+      # `rootPoolOnlyIgnoredProperties`). The data pool runners remove it from
+      # their own copy of this list.
       ignoredProperties =
-        [ "nixos:shutdown-time" ":generation" ] ++ cryptoProperties;
+        [ "nixos:shutdown-time" ":generation" ]
+        ++ cryptoProperties
+        ++ rootPoolOnlyIgnoredProperties;
       # Root pools are reconciled by the stock (early) disko-zfs service.
-      datasets =
-        let
-          # disko-zfs imports the datasets of pools declared with disko from
-          # `disko.devices.zpool` (where this module puts them) by itself, so
-          # we only need to add the datasets of root pools that do not use
-          # disko.
-          nonDiskoRootPoolDatasets = listToAttrs (map datasetSpec
-            (filter (d: d.rootPool && !d.diskoPool) datasetList));
-
-          # This compensates for a gap in upstream disko-zfs's auto-import of
-          # `disko.devices.zpool`: it copies each dataset's `options` attrset
-          # but drops the top-level disko `mountpoint` attribute --- which disko
-          # sets as a LOCAL property at creation. An auto-imported spec without
-          # it makes reconciliation `zfs inherit mountpoint` on every such
-          # dataset (today that mostly fails-silently because the datasets are
-          # busy, but that is luck, not design). Therefore, we inject the
-          # missing mountpoints so the spec matches what disko actually
-          # created.
-          #
-          # TODO: upstream this into disko-zfs's auto-import.
-          #
-          # First, flatten every dataset in the disko config (except disko's
-          # internal `__root`) into a list of `{ name, dataset }` records...
-          allDiskoDatasets = concatLists (mapAttrsToList
-            (poolName: zpool: mapAttrsToList
-              (dsName: dataset: { name = "${poolName}/${dsName}"; inherit dataset; })
-              (removeAttrs zpool.datasets [ "__root" ]))
-            config.disko.devices.zpool);
-          # ...then, keep only the filesystems with a top-level `mountpoint`
-          # (zvols have no `mountpoint` at all)...
-          diskoMountedDatasets = filter
-            ({ dataset, ... }: (dataset.type or "") == "zfs_fs" && (dataset.mountpoint or null) != null)
-            allDiskoDatasets;
-          # ...and finally, turn each of them into a disko-zfs spec entry
-          # declaring that mountpoint as a property.
-          diskoMountpoints = listToAttrs (map
-            ({ name, dataset }: nameValuePair name {
-              properties.mountpoint = dataset.mountpoint;
-            })
-            diskoMountedDatasets);
-        in
-        mkMerge [ nonDiskoRootPoolDatasets diskoMountpoints ];
+      # disko-zfs imports the datasets of pools declared with disko from
+      # `disko.devices.zpool` (where this module puts them) by itself, so we
+      # only need to add the datasets of root pools that do not use disko.
+      datasets = listToAttrs (map datasetSpec
+        (filter (d: d.rootPool && !d.diskoPool) datasetList));
       # Keep the early stock `disko-zfs` service away from datasets it must not
       # manage. This way, disko-zfs will not try to create these datasets,
       # clobber their settings, or destroy them.

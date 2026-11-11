@@ -256,6 +256,13 @@ let
       expected = [ [ "zfs-import-tank.service" ] [ ] ];
     };
 
+    # The early service must never change `mountpoint` on a root pool, since
+    # doing so would unmount datasets that the running system is using.
+    testEarlyServiceIgnoresMountpoint = {
+      expr = lib.elem "mountpoint" routing.disko.zfs.settings.ignoredProperties;
+      expected = true;
+    };
+
     testRunnerOrderedAfterAgenix = {
       expr = lib.elem "agenix-install-secrets.service" services.zfs-datasets-tank.after;
       expected = true;
@@ -396,6 +403,10 @@ in
         and $d["tank/manual"].properties == {
           mountpoint: "/srv/manual", canmount: "noauto", "org.openzfs.systemd:ignore": "on" }
       ' "$spec"
+      # Unlike the early service, the runner must reconcile `mountpoint`. If it
+      # did, the properties checked above would never be applied to existing
+      # datasets.
+      jq -e '.ignoredProperties | index("mountpoint") | not' "$spec"
       # The runner mounts only ZFS-mounted datasets; systemd mounts the rest.
       grep -q 'zfs mount tank/scratch' "$runner"
       ! grep -q 'zfs mount tank/media' "$runner"
