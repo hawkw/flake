@@ -19,7 +19,10 @@ in
 
       requireSignedModules = mkOption {
         type = types.bool;
-        default = true;
+        # Default this to off since it requires building a signed kernel image
+        # by overriding boot.kernelPackages, or else all modules will be
+        # unsigned.
+        default = false;
         description = ''
           Require signed kernel modules.
 
