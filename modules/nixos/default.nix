@@ -14,6 +14,7 @@
     ./profiles/eclss-node.nix
     ./profiles/games.nix
     ./profiles/hardened.nix
+    ./profiles/immich.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
     ./profiles/nginx.nix

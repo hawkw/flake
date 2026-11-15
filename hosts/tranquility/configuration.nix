@@ -36,7 +36,7 @@ with pkgs; with lib; {
       enable = true;
       snmp.enable = true;
     };
-
+    immich.enable = true;
     yubikey.ssh.enable = true;
     zfs.enable = true;
   };
@@ -44,6 +44,7 @@ with pkgs; with lib; {
   age.secrets.hakofoundry-secret = {
     generator.script = "base64";
   };
+
   # Generate a file in the .env format
   age.secrets.hakofoundry-env = {
     generator = {
@@ -59,6 +60,11 @@ with pkgs; with lib; {
   services.hakoFoundry = {
     enable = true;
     secretFilePath = config.age.secrets.hakofoundry-env.path;
+    openFirewall = true;
+  };
+
+  services.caddy = {
+    enable = true;
     openFirewall = true;
   };
 
@@ -395,6 +401,17 @@ with pkgs; with lib; {
       # directories should be on the same dataset, in to ensure that moving
       # from uploads to library is a rename rather than a copy.
       ${datasetNames.immich} = lib.mkIf config.services.immich.enable {
+        # Owner, group, and mode are applied to the mount root at dataset
+        # creation, and to the immutable mountpoint underlay on every run of the
+        # dataset service. These must match the immich module's tmpfiles rule
+        # for `mediaLocation` (`immich:immich 0700`), which runs at boot before
+        # moonpool is mounted. Tmpfiles attempts to set these attributes if they
+        # don't match the configured ones, and it can't change immutable
+        # directories, so `systemd-tmpfiles-setup.service` would fail if the
+        # dataset doesn't have the correct ownership.
+        owner = config.services.immich.user;
+        group = config.services.immich.group;
+        mode = "0700";
         properties = {
           mountpoint = config.services.immich.mediaLocation;
           recordsize = "1M";
