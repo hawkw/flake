@@ -5,7 +5,6 @@
 with lib;
 let
   cfg = config.profiles.storage;
-
 in
 {
   options.profiles.storage = {
@@ -31,10 +30,10 @@ in
 
     # Continuous drive-health monitoring via smartd.
     #
-    # This is enabled even on ZFS-based storage systems: ZFS scrubs detect damage
-    # already done to data, while smartd detects pre-failure physical hardware
-    # health indicators. It is also the only thing which will poll idle hot-spare
-    # drives.
+    # This is enabled even on ZFS-based storage systems: ZFS scrubs detect
+    # damage already done to data, while smartd detects pre-failure physical
+    # hardware health indicators. It is also the only thing which will poll idle
+    # hot-spare drives.
     services.smartd = {
       # If a system wants to spin down drives, such as in very infrequently
       # written offsite backups, consider disabling smartd.
@@ -45,7 +44,7 @@ in
       # Timing:
       #    - short weekly (Sat 03:00),
       #    - long monthly (1st of the month at 04:00). This is intended to be
-      #      offset from the  weekly scrub configured for ZFS systems.
+      #      offset from the weekly scrub configured for ZFS systems.
       defaults.autodetected = mkDefault "-a -s (S/../../6/03|L/../01/./04)";
     };
   };
