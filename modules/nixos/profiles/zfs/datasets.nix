@@ -205,16 +205,54 @@
 #
 # === Immutable mountpoint underlays ===
 #
-# Before the runner mounts a ZFS-mounted dataset on a data pool, it makes the
-# mountpoint underlay directory immutable (`chattr +i`). While the dataset is
-# unmounted, any writes to its mountpoint will fail with `EPERM`, even for root.
-# Without this, such writes would succeed, but the written files would then be
-# silently hidden once the dataset is mounted over them, since ZFS's `overlay`
-# property (which is on by default on Linux) allows it to mount over a
-# non-empty directory. When the dataset is mounted, the immutable directory is
-# overlayed by the mounted filesystem. Systemd-mounted datasets do not get this
-# treatment. Instead, they rely on the services which use them declaring
-# dependencies on their mount units.
+# The _underlay directory_ of a mounted dataset refers to the directory on the
+# parent filesystem that the dataset is mounted over. For data pools, the runner
+# will make each mounted dataset's mountpoint underlay immutable before mounting
+# the dataset. This ensures that, while the dataset is unmounted, any writes to
+# its mountpoint will fail with `EPERM` errors, even if written by root. When
+# the dataset is mounted, the immutable directory is overlayed by the mounted
+# filesystem
+#
+# Without immutable underlay directories, any writes to a dataset's mountpoint
+# while it is not mounted would succeed, but the written files would then be
+# silently hidden once the dataset is mounted over them. This is because both
+# ZFS (where the `overlay` property is enabled by default on Linux) and systemd
+# will mount over a non-empty directory. Accepting writes while a dataset is not
+# mounted but then silently hiding them once it is is a much more insidious
+# failure mode than simply failing the writes until the dataset is mounted.
+#
+# This is particularly important for systemd-mounted datasets at a service's
+# *default* state directory (such as `/var/lib/<service>`). If a service does
+# not declare its dependency on the mount (see "Services which use data pool
+# datasets"), then a systemd config which sets a `StateDirectory=` would
+# re-create the directory on the parent filesystem, with the right owner, and
+# the service would use that directory until the dataset it's *supposed* to be
+# using is mounted, which results in state being written and then disappearing.
+# With an immutable underlay, the service fails instead.
+#
+# The underlay directories created by this module are given is given the
+# dataset's declared `owner`, `group`, and `mode` (or `root:root 0755` if they
+# are not declared), every time the configuration is applied. Note that this
+# differs from the mounted root of the dataset, where ownership is only set when
+# the dataset is created. This behavior is intended to prevent
+# `systemd-tmpfiles`, which runs before data pools are mounted, from failing
+# because it cannot change the ownership or mode of an immutable directory.
+# Luckily, tmpfiles only attempts to change the ownership or modes of a
+# directory if they differ from its config. Therefore, if a tmpfiles rule (such
+# as one in another NixOS module) sets the owner or mode of a dataset's
+# mountpoint, the dataset must declare the same `owner`, `group`, and `mode`, or
+# `systemd-tmpfiles-setup.service` will fail at every boot. Tmpfiles rules that
+# create paths *beneath* such a mountpoint will also fail at boot, rather than
+# writing into the underlay as they otherwise would.
+#
+# The path of each managed underlay is recorded in the
+# `eliza-nix-datasets:underlay` user property (set and reconciled like any
+# declared property). For systemd-mounted datasets, which have
+# `mountpoint=legacy`, this is the only record of the path in the pool. It lets
+# the runner find and remove a dataset's old underlay when its mountpoint
+# changes, or when it is no longer mounted by the runner or systemd (see
+# below). Underlays are not cleaned up when a dataset is removed from the
+# configuration entirely.
 #
 # There is one important operational consideration that results from this: if a
 # dataset's mountpoint *changes*, this module will attempt to remove the old
@@ -283,6 +321,17 @@ let
     "pbkdf2iters"
     "pbkdf2salt"
   ];
+
+  # User property recording the path of a data-pool dataset's mountpoint
+  # underlay (see "Immutable mountpoint underlays" in the header).
+  #
+  # This is necessary because systemd-mounted datasets have `mountpoint=legacy`,
+  # so their path is otherwise not recorded in the pool. For those datasets, the
+  # runner cannot not tell that a dataset has moved in order to clean up its old
+  # (immutable) underlay. However, we set this for both systemd-mounted *and*
+  # ZFS-mounted datasets, and it is used regardless of whether there is also a
+  # mountpoint property.
+  underlayProperty = "eliza-nix-datasets:underlay";
 
   # Properties which the early `disko-zfs` service (which reconciles root pools)
   # must never change, but which the data pool runners do reconcile.
@@ -444,12 +493,21 @@ let
   # "Mounting datasets" in the header). Explicitly declared properties take
   # precedence, except that a systemd-mounted dataset on a data pool must always
   # have `mountpoint=legacy`, to ensure that it is only mounted by systemd.
+  #
+  # On data pools, datasets mounted by systemd or the runner (see
+  # `managesUnderlay`) also record their path in `underlayProperty`, for
+  # underlay cleanup.
   mountProperties = { rootPool, mounted, mountedBy }: props:
     if !mounted then props
     else if mountedBy == "systemd" then
-      (if rootPool then props else props // { mountpoint = "legacy"; })
+      (if rootPool then props else props // {
+        mountpoint = "legacy";
+        ${underlayProperty} = props.mountpoint;
+      })
     else if mountedBy == "zfs" then
-      (if rootPool then props else { canmount = "noauto"; } // props)
+      (if rootPool then props else { canmount = "noauto"; } // props // {
+        ${underlayProperty} = props.mountpoint;
+      })
     else { canmount = "noauto"; "org.openzfs.systemd:ignore" = "on"; } // props;
 
   # Given an attrset declaring a pool (in `pools.<name>.{properties,datasets}`),
@@ -466,7 +524,9 @@ let
   # - `properties`: the ZFS properties to apply. This includes both the
   #   declared ones and those implied by `mountedBy` (see `mountProperties`).
   #   For a systemd-mounted dataset on a data pool, `properties.mountpoint` is
-  #   therefore `legacy`, and the path is only in `mountpoint`.
+  #   therefore `legacy`, and the path is only in `mountpoint` (and in the
+  #   `underlayProperty` user property, which every dataset mounted by the
+  #   runner or systemd on a data pool has).
   # - `conflicts`: any conflicts between typed and untyped properties, used to
   #   output evaluation errors if non-empty,
   # - `encryption`, `owner`, `group`, `mode`, `mountedBy`, `neededForBoot`,
@@ -644,6 +704,90 @@ let
       (sort (a: b: mountDepth a < mountDepth b))
     ];
 
+  # Whether this module manages a dataset's mountpoint underlay. This is true if
+  # the dataset is on a data pool, and is mounted at boot by the runner or by
+  # systemd (rather than explicitly).
+  #
+  # If a dataset's underlay is managed by this module, then the underlay is made
+  # immutable by the runner, and the underlay path is tracked by the
+  # `underlayProperty` property (see `mountProperties`), and their underlays are
+  # hardened by the runner.
+  managesUnderlay = d:
+    d.relname != null && d.mounted && !d.rootPool && d.mountedBy != "explicit";
+
+  # Makes one dataset's mountpoint underlay immutable, owned by the given user
+  # and group with the given mode. This ensures that that writes to the
+  # mountpoint fail while the dataset is not mounted. See "Immutable mountpoint
+  # underlays" in the header.
+  #
+  # Usage: zfs-datasets-harden-underlay <mountpoint> <owner> <group> <mode>
+  #
+  # This must be run in a private mount namespace (`unshare --mount
+  # --propagation private`), since it may bind-mount the mountpoint's parent
+  # directory, and that mount must not be visible to the rest of the system.
+  hardenUnderlay = pkgs.writeShellApplication {
+    name = "zfs-datasets-harden-underlay";
+    runtimeInputs = with pkgs; [ coreutils e2fsprogs findutils util-linux ];
+    text = ''
+      mp="$1"
+      owner="$2"
+      group="$3"
+      mode="$4"
+
+      if mountpoint -q "$mp"; then
+        # The dataset is already mounted (such as when the runner is reloaded
+        # by `nixos-rebuild switch`), hiding the underlay. A non-recursive bind
+        # mount of the parent directory shows the parent filesystem without the
+        # mounts on top of it, including the underlay.
+        tempMount="$(mktemp -d)"
+        mount --bind "$(dirname "$mp")" "$tempMount"
+        trap 'umount "$tempMount" && rmdir "$tempMount"' EXIT
+        dir="$tempMount/$(basename "$mp")"
+      else
+        dir="$mp"
+      fi
+
+      # Re-applied on every run, so that changes to the declared owner or mode
+      # take effect. The underlay is briefly mutable while this runs.
+      chattr -i "$dir" 2>/dev/null || true
+      mkdir -p "$dir"
+      if [ -n "$(find "$dir" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+        # Oh no, there's stuff there! Log a warning.
+        echo "<4>underlay directory of $mp is not empty! its contents will be hidden while the dataset is mounted:" \
+          "$(find "$dir" -mindepth 1 -maxdepth 1 -printf '%f ' | head -c 1024)" >&2
+      fi
+      chown "$owner:$group" "$dir"
+      chmod "$mode" "$dir"
+      chattr +i "$dir" \
+        || echo "<4>could not set +i on the underlay directory of $mp! writes while it is unmounted will not be blocked" >&2
+    '';
+  };
+
+  # Generates the command that hardens a dataset's underlay directory.
+  #
+  # This sets the underlay's ownership to either the dataset's declared owner,
+  # group, and mode, or `root:root 0755` if these are not declared (which is
+  # what systemd uses when it creates a mountpoint). Giving the underlay the
+  # same ownership and mode that the mounted dataset will have prevents
+  # `systemd-tmpfiles`, which runs before data pools are mounted, from trying to
+  # change an immutable directory, because it leaves ownership and modes that
+  # already match alone.
+  hardenUnderlayCmd = d:
+    let
+      orDefault = v: default: if v != null then v else default;
+      mountpoint = d.mountpoint;
+      owner = orDefault d.owner "root";
+      group = orDefault d.group "root";
+      mode = orDefault d.mode "0755";
+    in
+    ''
+      unshare --mount --propagation private -- ${getExe hardenUnderlay} \
+        ${escapeShellArg mountpoint} \
+        ${escapeShellArg owner} \
+        ${escapeShellArg group} \
+        ${escapeShellArg mode}
+    '';
+
   mkRunner = pool:
     let
       inPool = filter (d: poolOf d.name == pool) datasetList;
@@ -770,21 +914,20 @@ let
 
       mountDatasets =
         let
-          # Before each mount, we make the underlay directory immutable (`chattr
-          # +i`), to protect against files at that path from being written while
-          # the dataset is unmounted, which would break the mount. Not every
-          # filesystem supports this flag, so this is a best-effort attempt. If
-          # we can't chattr the underlay, we just log a warning.
           mountOneDataset = d:
             let
               name = escapeShellArg d.name;
               mountpoint = escapeShellArg d.mountpoint;
             in
             ''
+              # First, harden the underlay directory of the dataset, by making
+              # it immutable and setting its ownership and mode to match the
+              # dataset's. This also runs for datasets that are already mounted,
+              # in case their declared ownership has changed.
+              ${hardenUnderlayCmd d}
+
+              # Next, mount the dataset if it is not already moutned.
               if [ "$(zfs get -H -o value mounted ${name})" != yes ]; then
-                mkdir -p ${mountpoint}
-                chattr +i ${mountpoint} \
-                  || echo "<4>could not set +i on underlay of ${mountpoint}; writes while unmounted will not be blocked" >&2
                 echo "<6>mounting ${d.name} at ${mountpoint}"
                 zfs mount ${name}
               fi
@@ -792,13 +935,32 @@ let
         in
         concatMapStringsSep "\n" mountOneDataset (runnerMountedDatasets inPool);
 
-      # Snapshot every declared dataset's effective mountpoint into
-      # `$RUNTIME_DIRECTORY/old-mountpoints`, after any newly declared datasets
-      # are created (so that they do not appear to have 'moved') but before
-      # disko-zfs reconciles properties.
+      # Shell snippet to read the `underlayProperty` ZFS user property of
+      # a dataset.
+      #
+      # We must be careful to read only values which are *locally set* for
+      # this dataset, and not one which is inherited (using `-s local` in
+      # the `zfs get` invocation). Because user properties are inherited, if
+      # we read the property without `-s local`, a newly created child would
+      # appear to have moved from its parent's path, and cleanup would
+      # remove the parent's underlay incorrectly.
+      #
+      # This is a plain (single-line) string, rather than an indented '' string,
+      # since it is interpolated into the middle of a command line, and a
+      # trailing newline would end that command early.
+      getUnderlay = "zfs get -H -s local -o value ${escapeShellArg underlayProperty}";
+
+      # Snapshot every declared dataset's managed underlay path (from its
+      # `underlayProperty`) into `$RUNTIME_DIRECTORY/old-mountpoints`, after
+      # any newly declared datasets are created (so that they do not appear to
+      # have 'moved') but before disko-zfs reconciles properties.
       #
       # cleanupOldMountpoints (below) uses this snapshot to find any old
-      # underlay directories left behind by a dataset's mountpoint changing.
+      # underlay directories left behind if a dataset's mountpoint has changed
+      # or if it is no longer being mounted by the runner or systemd. Every
+      # declared dataset is captured, not just those that currently manage an
+      # underlay. That way, we also track datasets which no longer have managed
+      # underlays.
       captureMountpoints =
         let
           # We generate a separate line for each mountpoint, rather than
@@ -806,10 +968,11 @@ let
           # them, because shellcheck will complain about a loop over a list with
           # one element, which is what this will generate when a pool only has
           # one declared dataset. Isn't that fun?
-          captureOneMountpoint = d: ''
-            printf '%s\t%s\n' ${escapeShellArg d.name} \
-              "$(zfs get -H -o value mountpoint ${escapeShellArg d.name})"
-          '';
+          captureOneMountpoint = d:
+            let name = escapeShellArg d.name; in
+            ''
+              printf '%s\t%s\n' ${name} "$(${getUnderlay} ${name})"
+            '';
           # Group all the generated printfs into one redirect, so that we can
           # truncate the file if it already exists rather than having each
           # printf append to it. This is necessary because a systemd unit's
@@ -833,13 +996,14 @@ let
       # annoying, so it's nicer to remove them automatically. This also helps
       # preventing disused underlays from gradually accumulating over time.
       #
-      # After changing a dataset's mountpoint, we will delete the old mountpoint
-      # if all of the following conditions are true:
+      # After a dataset's managed underlay path changes (or it no longer has
+      # one), we will delete the old underlay if all of the following
+      # conditions are true:
       #
-      # 1. The pre-reconciliation mountpoint is different from the current one,
-      # 2. The old mountpoint is a real path ( not `none`, `legacy`, or `-`),
-      #    and is not `/`
-      # 3. The previous mountpoint directory still exists,
+      # 1. The pre-reconciliation path is different from the current one (or
+      #    there is no current one),
+      # 2. The old path is a real path, and is not `/`,
+      # 3. The old underlay directory still exists,
       # 4. No other dataset is mounted at that path (we could have just swapped
       #    mountpoints).
       #
@@ -851,13 +1015,19 @@ let
       # with something else since the directory was made mutable...). If
       # something *is* there, we log a warning and leave it for manual
       # intervention.
+      #
+      # Systemd-mounted datasets are mounted after this service, so condition 4
+      # cannot catch a swap involving one of them. Therefore, we wait to harden
+      # their underlay paths until after this step. The underlay hardening pass
+      # re-creates any underlay that this step removed but which is still in
+      # use.
       cleanupOldMountpoints = ''
         while IFS=$'\t' read -r ds old_mp; do
           case "$old_mp" in
             /?*) ;;
             *) continue ;;
           esac
-          new_mp="$(zfs get -H -o value mountpoint "$ds")"
+          new_mp="$(${getUnderlay} "$ds")"
           if [ "$new_mp" = "$old_mp" ] || [ ! -d "$old_mp" ]; then
             continue
           fi
@@ -867,12 +1037,34 @@ let
           fi
           chattr -i "$old_mp" 2>/dev/null || true
           if err="$(rmdir "$old_mp" 2>&1)"; then
-            echo "<5>removed previous mountpoint directory $old_mp (dataset $ds moved to $new_mp)"
+            echo "<5>removed previous mountpoint directory $old_mp (dataset $ds is now mounted at ''${new_mp:-<none, or not mounted by the zfs-datasets module>})"
           else
             echo "<4>could not remove old mountpoint $old_mp of dataset $ds: $err. it will need to be removed manually." >&2
           fi
         done < "$RUNTIME_DIRECTORY/old-mountpoints"
       '';
+
+      # Harden the underlays of systemd-mounted datasets (see `hardenUnderlay`
+      # and `hardenUnderlayCmd`). ZFS-mounted datasets' underlays are hardened
+      # by the mount step instead, since each must be hardened just before it
+      # is mounted, in mountpoint order.
+      #
+      # Underlays that are inside another dataset mounted from the same pool
+      # (such as a child mounted inside its parent) are skipped. This is
+      # because, at boot, the parent is not mounted yet, so its underlay can't
+      # be reached without mounting it here. Systemd will not mount the parent
+      # or child datasets until after this service succeeds, so it is unlikely
+      # for the child to be unmounted while the parent is mounted.
+      hardenSystemdUnderlays =
+        let
+          underlayOnPool = d: lib.any
+            (o: o.name != d.name && o.mounted && hasPrefix "${o.mountpoint}/" d.mountpoint)
+            inPool;
+          hardened = filter
+            (d: managesUnderlay d && d.mountedBy == "systemd" && !underlayOnPool d)
+            inPool;
+        in
+        concatMapStringsSep "\n" hardenUnderlayCmd hardened;
 
       # Declared ownership is ordinary POSIX metadata on the dataset's root
       # directory, applied if this run created the dataset (tracked in
@@ -955,10 +1147,10 @@ let
           coreutils
           e2fsprogs # chattr, for underlay hardening
           gnugrep
-          util-linux # mountpoint(1), for old-mountpoint cleanup
+          util-linux # mountpoint(1) and unshare(1), for underlays
         ];
         text = ''
-          # This file records datasets created by this run, so that step 6 can
+          # This file records datasets created by this run, so that step 7 can
           # set their owners. This file must be truncated now, since it persists
           # across reloads of the same activation of this service, and we do not
           # want to re-apply ownership changes every time, so that ownership may
@@ -974,7 +1166,7 @@ let
           #    accidentally created unencrypted.
           ${createDatasets}
 
-          # 2. Record every declared dataset's pre-reconcile mountpoint, so
+          # 2. Record every declared dataset's pre-reconcile underlay path, so
           #    step 5 can clean up underlay directories orphaned by a
           #    mountpoint change.
           ${captureMountpoints}
@@ -994,11 +1186,17 @@ let
           ${mountDatasets}
 
           # 5. Remove old mountpoint underlay directories orphaned by a
-          #    mountpoint change, now that every dataset is mounted at its
-          #    declared path.
+          #    mountpoint change, now that every ZFS-mounted dataset is mounted
+          #    at its declared path.
           ${cleanupOldMountpoints}
 
-          # 6. Apply declared ownership to datasets created by this run.
+          # 6. Make the underlays of systemd-mounted datasets immutable, before
+          #    systemd mounts them once this service succeeds. This runs after
+          #    step 5, so that it re-creates an underlay which step 5 removed
+          #    but which another dataset now uses.
+          ${hardenSystemdUnderlays}
+
+          # 7. Apply declared ownership to datasets created by this run.
           ${chownAllDatasets}
         '';
       };
@@ -1318,6 +1516,17 @@ let
           Ownership is applied by a data pool's oneshot, so it is only supported
           on data pools (asserted). Configuring owner, group, or mode for a root
           pool is an evaluation-time error.
+
+          The owner, group, and mode are also applied to the dataset's
+          immutable mountpoint underlay, on *every* run of the
+          oneshot (see "Immutable mountpoint underlays" in the module's
+          header). If no owner, group, or mode are set, the underlay directory
+          is `root:root 0755`.
+
+          Note: if another module's `systemd.tmpfiles` rules set the owner or
+          mode of this dataset's mountpoint, the configured ownership here must
+          match the ownership configured by systemd-tmpfiles, or that unit will
+          fail.
         '';
       };
 
@@ -1598,6 +1807,31 @@ in
             via a typed option and as a freeform ZFS property name: ${concatStringsSep ", " d.conflicts}.
             Use one or the other.'';
         }
+        # A ZFS-mounted dataset is mounted by its pool's runner. In contrast, a
+        # systemd-mounted dataset on a data pool is mounted only after its
+        # pool's runner succeeds. A ZFS-mounted dataset inside a systemd-mounted
+        # would therefore be mounted first and then hidden when the parent is
+        # mounted over it (and at boot, its underlay can't be created inside the
+        # parent's immutable underlay, so the runner fails).
+        ++ (
+          let
+            systemdParents = filter
+              (o: o.mounted && o.mountedBy == "systemd" && !o.rootPool
+                && hasPrefix "${o.mountpoint}/" d.mountpoint)
+              datasetList;
+          in
+          optional (managesUnderlay d && d.mountedBy == "zfs" && systemdParents != [ ]) {
+            assertion = false;
+            message = ''
+              profiles.zfs.pools: dataset "${d.name}" has `mountedBy = "zfs"`,
+              but its mountpoint (${d.mountpoint}) is inside that of
+              systemd-mounted data-pool dataset(s) ${concatMapStringsSep ", " (o: "\"${o.name}\"") systemdParents},
+              which are mounted by systemd only *after* the runner mounts this
+              dataset. This means that the ZFS-mounted dataset will be hidden
+              by the systemd-mounted parent(s).
+              Both datasets must either be mounted by systemd or by ZFS!'';
+          }
+        )
         ++ optional (d.encryption != null) {
           assertion =
             if d.encryption.external
