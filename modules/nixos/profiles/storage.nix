@@ -20,10 +20,12 @@ in
       storcli2
       lsirec
       lsiutil
+      # SAS utilities
       lsscsi
+      sg3_utils
+      sdparm
       # seagate drive firmware utility
       openseachest
-      sg3_utils
       # smartctl, for drive burn-in and periodic health checks
       smartmontools
     ];
