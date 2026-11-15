@@ -49,15 +49,39 @@ let
   # filtered out: this minimal system is not bootable, and they are not what
   # these checks are about. `assertion` must be tested before `message` is
   # read: some nixpkgs messages only evaluate when their assertion fails.
-  failedAssertions = config: map (a: a.message)
-    (lib.filter (a: !a.assertion && lib.hasPrefix "profiles.zfs.pools:" a.message)
-      config.assertions);
+  #
+  # This module's messages are recognized by their `profiles.zfs.pools:` prefix,
+  # so a message that doesn't start with it exactly (e.g. because of stray
+  # indentation) is filtered out too. `failsWith` reports the filtered-out
+  # messages when a test fails, so that this is visible.
+  isModuleMessage = lib.hasPrefix "profiles.zfs.pools:";
+  failingMessages = config: map (a: a.message) (lib.filter (a: !a.assertion) config.assertions);
+  failedAssertions = config: lib.filter isModuleMessage (failingMessages config);
 
-  # Evaluates `extra` and returns, for each failing assertion of this module,
-  # whether its message contains `needle`. `[ true ]` means exactly one
-  # assertion failed, and it was the intended one. Messages are wrapped, so
-  # `needle` must not span a line break in the message source.
-  failsWith = needle: extra: map (lib.hasInfix needle) (failedAssertions (eval extra));
+  # Evaluates `extra`, and returns `true` if exactly one of this module's
+  # assertions failed, and its message contains `needle`. Otherwise, it returns
+  # a record of the needle and every failing assertion's message, so that a
+  # failing test shows what actually happened (no assertion failing, the wrong
+  # one, or more than one) rather than just that it didn't match.
+  #
+  # Line breaks in messages are matched as spaces, since messages are wrapped
+  # in the module's source.
+  failsWith = needle: extra:
+    let
+      config = eval extra;
+      messages = failedAssertions config;
+      matches = lib.hasInfix needle (lib.replaceStrings [ "\n" ] [ " " ] (lib.head messages));
+    in
+    if lib.length messages == 1 && matches then true
+    else {
+      expectedOnlyFailureContaining = needle;
+      failedAssertions = messages;
+      # Expected to be non-empty (this minimal system isn't bootable), but
+      # it would also contain any of this module's messages which are missing
+      # the prefix.
+      otherModulesFailedAssertions =
+        lib.filter (m: !isModuleMessage m) (failingMessages config);
+    };
 
   keyFile = { keyFile = "/run/keys/k"; keyFormat = "passphrase"; };
 
@@ -312,14 +336,14 @@ let
         fileSystems."/" = { device = "rpool/root"; fsType = "zfs"; };
         profiles.zfs.pools.rpool.datasets."home".properties.mountpoint = "/home";
       };
-      expected = [ true ];
+      expected = true;
     };
     testDiskoDeclaredPoolMustSetDisko = {
       expr = failsWith "but does not set `disko`" {
         disko.devices.zpool.tank = { };
         profiles.zfs.pools.tank.datasets."media".properties.mountpoint = "/srv/media";
       };
-      expected = [ true ];
+      expected = true;
     };
     testNoDatasetsInDiskoDevices = {
       expr = failsWith "also declares datasets in" {
@@ -329,7 +353,7 @@ let
           datasets."media".properties.mountpoint = "/srv/media";
         };
       };
-      expected = [ true ];
+      expected = true;
     };
     testBootPathMustBeSystemdMounted = {
       expr = failsWith "which is needed for boot" {
@@ -338,32 +362,32 @@ let
           properties.mountpoint = "/";
         };
       };
-      expected = [ true ];
+      expected = true;
     };
     testRootPoolRejectsKeyFile = {
       expr = failsWith "uses a key file managed by" (rpoolWith {
         "secret" = { encryption = keyFile; properties.mountpoint = "none"; };
       });
-      expected = [ true ];
+      expected = true;
     };
     testRootPoolExternalRootNeedsKeyFormat = {
       expr = failsWith "so that disko can create it" (rpoolWith {
         "secret" = { encryption.external = true; properties.mountpoint = "none"; };
       });
-      expected = [ true ];
+      expected = true;
     };
     testRootPoolRejectsOwnership = {
       expr = failsWith "declares a POSIX owner" (rpoolWith {
         "home" = { owner = "alice"; properties.mountpoint = "/home"; };
       });
-      expected = [ true ];
+      expected = true;
     };
     testRootPoolRejectsImportAtBootFalse = {
       expr = failsWith "`importAtBoot = false`" {
         imports = [ (rpoolWith { }) ];
         profiles.zfs.pools.rpool.importAtBoot = false;
       };
-      expected = [ true ];
+      expected = true;
     };
     testUnimportedDataPoolRejectsSystemdMounts = {
       expr = failsWith "but has systemd-mounted datasets" {
@@ -372,7 +396,7 @@ let
           datasets."archive".properties.mountpoint = "/srv/archive";
         };
       };
-      expected = [ true ];
+      expected = true;
     };
   };
 
@@ -394,15 +418,23 @@ in
       # The properties the runner applies, as the ZFS side of `mountedBy`:
       # systemd-mounted data pool datasets are `legacy` (systemd mounts them),
       # and ZFS-mounted and explicit ones are `noauto` (so `zfs-mount.service`
-      # does not).
+      # does not). Datasets mounted by systemd or the runner also record their
+      # managed underlay's path; explicitly mounted ones don't have one.
       spec="$(grep -o '/nix/store/[a-z0-9]*-zfs-datasets-tank-spec.json' "$runner" | head -n1)"
       jq -e '.datasets as $d
         | $d["tank/media"].properties.mountpoint == "legacy"
+        and $d["tank/media"].properties["eliza-nix-datasets:underlay"] == "/srv/media"
         and $d["tank/vault/docs"].properties.mountpoint == "legacy"
-        and $d["tank/scratch"].properties == { mountpoint: "/srv/scratch", canmount: "noauto" }
+        and $d["tank/scratch"].properties == {
+          mountpoint: "/srv/scratch", canmount: "noauto",
+          "eliza-nix-datasets:underlay": "/srv/scratch" }
         and $d["tank/manual"].properties == {
           mountpoint: "/srv/manual", canmount: "noauto", "org.openzfs.systemd:ignore": "on" }
-      ' "$spec"
+      ' "$spec" || {
+        echo "runner spec properties did not match; actual datasets:" >&2
+        jq '.datasets | with_entries(.value = .value.properties)' "$spec" >&2
+        exit 1
+      }
       # Unlike the early service, the runner must reconcile `mountpoint`. If it
       # did, the properties checked above would never be applied to existing
       # datasets.
@@ -410,6 +442,15 @@ in
       # The runner mounts only ZFS-mounted datasets; systemd mounts the rest.
       grep -q 'zfs mount tank/scratch' "$runner"
       ! grep -q 'zfs mount tank/media' "$runner"
+      # Regression guards for generated shell that is *valid*, so shellcheck
+      # accepts it, but wrong (both were once introduced by reformatting Nix
+      # strings): the underlay property must be read from the named dataset
+      # in a single command, rather than the dataset name ending up on a line
+      # of its own, and a failed `chattr +i` must only log a warning, rather
+      # than the warning being passed to `chattr` as arguments.
+      grep -qF 'zfs get -H -s local -o value eliza-nix-datasets:underlay tank/media)' "$runner"
+      harden="$(grep -o '/nix/store/[a-z0-9]*-zfs-datasets-harden-underlay' "$runner" | head -n1)"
+      grep -A1 'chattr +i "$dir"' "$harden/bin/zfs-datasets-harden-underlay" | grep -q '|| echo'
       touch $out
     '');
 }
