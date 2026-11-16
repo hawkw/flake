@@ -63,6 +63,21 @@ with pkgs; with lib; {
     openFirewall = true;
   };
 
+
+  # Cloudflare API token for ACME DNS-01 challenges (see `profiles.acme`).
+  age.secrets.cloudflare-dns-token.rekeyFile =
+    ../../secrets/cloudflare-dns-token.age;
+
+  # Enable DNS-01 challenge to get a Let's Encrypt certificate for services on
+  # this host.
+  profiles.acme = {
+    enable = true;
+    domain = "home.elizas.website";
+    dnsProvider = "cloudflare";
+    credentialFiles.CF_DNS_API_TOKEN_FILE =
+      config.age.secrets.cloudflare-dns-token.path;
+  };
+
   services.caddy = {
     enable = true;
     openFirewall = true;

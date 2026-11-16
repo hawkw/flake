@@ -7,6 +7,7 @@
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/probes.nix
+    ./profiles/acme.nix
     ./profiles/age.nix
     ./profiles/arm-cross-dev.nix
     ./profiles/desktop

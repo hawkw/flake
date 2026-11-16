@@ -52,10 +52,14 @@ in
             inherit (config.services.immich) port;
           in
           {
-            # TODO(eliza): remove tls internal
+            useACMEHost = "home.elizas.website";
             extraConfig = ''
-              reverse_proxy http://[::1]:${toString port}
-              tls internal
+              reverse_proxy http://[::1]:${toString port} {
+                header_up Host {http.reverse_proxy.header.Host}
+                header_up X-Real-IP {http.request.remote.host}
+                header_up X-Forwarded-For {http.request.remote.host}
+                header_up X-Forwarded-Proto {http.request.scheme}
+              }
             '';
           };
       })
@@ -68,6 +72,7 @@ in
           {
             # enableACME = true;
             # forceSSL = true;
+            useACMEHost = "home.elizas.website";
             locations."/" = {
               proxyPass = "http://[::1]:${toString port}";
               proxyWebsockets = true;
