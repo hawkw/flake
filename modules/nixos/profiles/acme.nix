@@ -75,36 +75,39 @@ let
   # The group that may read the cert's private key.
   group = "acme";
 
-  # A list of virtual hostnames served by Caddy or nginx that use the cert
+  # Build lists of virtual hostnames served by Caddy or nginx that use the cert
   # configured in this module, in the format:
   # `{ vhost = <attr name>; names = [ ... ]; }`.
-  proxyVhosts =
-    let
 
-      # Luckily, both the nginx and Caddy modules use the same `useACMEHost`
-      # attribute to configure this.
-      vhostUsesCert = vhost: vhost.useACMEHost == cfg.domain;
+  # Luckily, both the nginx and Caddy modules use the same `useACMEHost`
+  # attribute to configure this.
+  vhostUsesCert = vhost: vhost.useACMEHost == cfg.domain;
 
-      nginxVhosts = optionals cfgNginx.enable (
-        mapAttrsToList
-          (attr: v: {
-            vhost = "nginx: ${attr}";
-            names = [ (if v.serverName != null then v.serverName else attr) ]
-              ++ v.serverAliases;
-          })
-          (filterAttrs (_: vhostUsesCert) cfgNginx.virtualHosts)
-      );
+  nginxVhosts = optionals cfgNginx.enable (
+    mapAttrsToList
+      (attr: v: {
+        vhost = "nginx: ${attr}";
+        names = [ (if v.serverName != null then v.serverName else attr) ]
+          ++ v.serverAliases;
+      })
+      (filterAttrs (_: vhostUsesCert) cfgNginx.virtualHosts)
+  );
 
-      caddyVhosts = optionals cfgCaddy.enable (
-        mapAttrsToList
-          (attr: v: {
-            vhost = "caddy: ${attr}";
-            names = [ v.hostName ] ++ v.serverAliases;
-          })
-          (filterAttrs (_: vhostUsesCert) cfgCaddy.virtualHosts)
-      );
-    in
-    nginxVhosts ++ caddyVhosts;
+  caddyVhosts = optionals cfgCaddy.enable (
+    mapAttrsToList
+      (attr: v: {
+        vhost = "caddy: ${attr}";
+        names = [ v.hostName ] ++ v.serverAliases;
+      })
+      (filterAttrs (_: vhostUsesCert) cfgCaddy.virtualHosts)
+  );
+
+  proxyVhosts = nginxVhosts ++ caddyVhosts;
+
+  # Determine which reverse proxies need their users added to the ACME group.
+  proxyUsers =
+    optional (nginxVhosts != [ ]) cfgNginx.user
+    ++ optional (caddyVhosts != [ ]) cfgCaddy.user;
 
   # Every subject alternate name (SAN) is included in the certificate.
   allSANs = [ cfg.domain "*.${cfg.domain}" ] ++ cfg.extraDomainNames;
@@ -131,10 +134,6 @@ let
           pattern == hostname;
     in
     any (includesHostname) allSANs;
-
-  proxyUsers =
-    optional (nginxVhosts != [ ]) cfgNginx.user
-    ++ optional (caddyVhosts != [ ]) cfgCaddy.user;
 in
 {
   options.profiles.acme = {
