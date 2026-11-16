@@ -155,7 +155,8 @@
       ghostty = {
         url = "github:ghostty-org/ghostty";
         inputs = {
-          nixpkgs.follows = "nixpkgs";
+          # nixpkgs.follows = "nixpkgs";
+          home-manager.follows = "home";
         };
       };
 
