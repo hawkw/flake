@@ -370,7 +370,7 @@
                 #   extraOpts = { sshOpts = [ "-t" ]; };
                 # };
 
-                noctis = mkNode { hostname = "noctis"; };
+                # noctis = mkNode { hostname = "noctis"; };
 
                 tereshkova = mkNode { hostname = "tereshkova"; };
 
