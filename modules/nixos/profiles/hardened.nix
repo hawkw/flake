@@ -13,8 +13,10 @@ in
       enable = mkEnableOption "kernel hardening" // { default = true; };
 
       lockdownLevel = mkOption {
-        type = types.enum [ "integrity" "confidentiality" ];
-        default = "integrity";
+        type = types.enum [ "none" "integrity" "confidentiality" ];
+        # TODO(eliza): it would be nice to default to "integrity" but
+        # unfortunately that also requires building signed kernel modules. Sigh.
+        default = "none";
       };
 
       requireSignedModules = mkOption {
