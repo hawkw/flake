@@ -1,5 +1,5 @@
 # Configuration for immich
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 let
