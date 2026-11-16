@@ -263,7 +263,6 @@ in
 
     security.acme = {
       acceptTerms = true;
-      email = cfg.email;
 
       certs.${cfg.domain} = {
         inherit group;
@@ -274,7 +273,7 @@ in
         # The DNS-01 settings are per-cert rather than `defaults`, so that they
         # don't leak onto unrelated certs on the host (e.g. an HTTP-01 cert from
         # a public vhost with `enableACME`).
-        inherit (cfg) dnsProvider credentialFiles;
+        inherit (cfg) dnsProvider credentialFiles email;
 
         # Resolve through Cloudflare's resolver rather than the system's. On my
         # LAN the system resolver is split-horizon, and may not see the
