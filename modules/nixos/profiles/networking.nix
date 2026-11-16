@@ -60,23 +60,21 @@ in with lib; {
 
       # DNS configurations --- Avahi (mDNS)
       avahi = {
-        enable = true;
         # allow local applications to resolve `local.` domains using avahi.
-        # nssmdns4 = true;
-        ipv4 = true;
-        # ipv6 = true;
+        enable = true;
         # publish this machine on mDNS.
-        publish = {
-          enable = true;
-          addresses = true;
-          # publish ._workstation._tcp
-          workstation = true;
-          domain = true;
-          # publish user services running on this machine
-          userServices = true;
-          # publish a HINFO record, which contains information about the local
-          # operating system and CPU.
-          hinfo = true;
+        settings = {
+          server.use-ipv4 = true;
+          publish = {
+            publish-addresses = true;
+            disable-user-service-publishing = false;
+            # publish ._workstation._tcp
+            publish-workstation = true;
+            publish-domain = true;
+            # publish a HINFO record, which contains information about the local
+            # operating system and CPU.
+            publish-hinfo = true;
+          };
         };
       };
 
