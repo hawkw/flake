@@ -44,6 +44,10 @@ in
             local ${name} ${user} peer
             local all ${user} reject
           '';
+
+        environment.systemPackages = with pkgs; [
+          immich-cli # let's also include the CLI
+        ];
       }
       # if caddy is enabled, use it to reverse proxy to immich
       (mkIf config.services.caddy.enable {
