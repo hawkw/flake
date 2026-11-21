@@ -10,7 +10,7 @@ with lib; {
         castle = "castle";
         engDomain = "eng.oxide.computer";
         all-racklettes = "all-racklettes";
-        racklette-gimlets = "racklette-gimlets";
+        racklette-cubbies = "racklette-gimlets";
         mkRacklette =
           {
             # name of the racklet
@@ -20,7 +20,6 @@ with lib; {
           ,
           }: (
             let
-              brm = "${name}BRM";
               mkPilotProxyCommand = (cmd: tgt: "ssh ${castle} pilot -r ${name} ${cmd} nc ${tgt} %p");
               scrimletGzs =
                 let
@@ -31,7 +30,7 @@ with lib; {
                         hostPattern = h + (if n == 0 then " ${name}gz" else "");
                       in
                       {
-                        ${h} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                        ${h} = hm.dag.entryBefore [ all-racklettes racklette-cubbies ] {
                           header = "Host ${hostPattern}";
                           User = "root";
                           ProxyCommand = mkPilotProxyCommand "host" serial;
@@ -48,12 +47,12 @@ with lib; {
                     in
                     {
                       # The attribute name doubles as the `Host` pattern here.
-                      ${host} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                      ${host} = hm.dag.entryBefore [ all-racklettes racklette-cubbies ] {
                         User = "root";
                         ProxyCommand = proxyCommand;
                       };
                     } // (if n == "any" then {
-                      "${name}wicket" = hm.dag.entryBefore [ all-racklettes racklette-gimlets ] {
+                      "${name}wicket" = hm.dag.entryBefore [ all-racklettes racklette-cubbies ] {
                         User = "wicket";
                         ProxyCommand = proxyCommand;
                       };
@@ -62,12 +61,12 @@ with lib; {
                 attrsets.mergeAttrsList (map mkSwitch [ "0" "1" "any" ]);
             in
             {
-              ${brm} = hm.dag.entryBefore [ all-racklettes racklette-gimlets ]
+              "${name}-*" = hm.dag.entryBefore [ all-racklettes racklette-cubbies ]
                 {
-                  header = "Host ${brm}*";
+                  header = "Host ${name}-*";
                   ProxyCommand =
                     let
-                      host = ''$(echo %h | sed 's/^${name}//' | tr "[:lower:]" "[:upper:]")'';
+                      host = ''$(echo %h | sed 's/^${name}-//' | tr "[:lower:]" "[:upper:]")'';
                     in
                     ''
                       ssh ${castle} pilot -r ${name} tp nc any ${host} %p
@@ -90,9 +89,7 @@ with lib; {
           # racklette: madrid
           {
             name = "madrid";
-            # note madrid only has one k.2-accessible scrimlet, while london has
-            # two.
-            scrimletSerials = [ "BRM42220007" ];
+            scrimletSerials = [ "BRM42220007" "BRM4220081" ];
           }
           # racklette: london
           {
@@ -130,9 +127,9 @@ with lib; {
         };
 
         #
-        # racklette gimlets by cubby number
+        # racklette sleds by cubby number
         #
-        ${racklette-gimlets} = hm.dag.entryBefore [ labBlock all-racklettes ] {
+        ${racklette-cubbies} = hm.dag.entryBefore [ labBlock all-racklettes ] {
           header = "Host ${trivial.pipe rackletteNames [
             (map (name: "${name}gc*"))
             (concatStringsSep " ")
