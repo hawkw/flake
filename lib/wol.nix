@@ -3,17 +3,21 @@
 #
 # A magic packet is an Ethernet broadcast, so it can't cross the WireGuard
 # tunnel into the home network, and the UniFi gateway has no persistent way to
-# turn a routed packet into one. Instead, each target names a *relay*: an
-# always-on host in the same broadcast domain. Clients SSH to the relay with a
-# dedicated key whose `authorized_keys` entry is restricted to running
-# `wakeonlan` for that one target, and nothing else.
+# turn a routed packet into one. Instead, each target names one or more
+# *relays*: always-on hosts in the same broadcast domain. Clients SSH to a
+# relay with a dedicated key whose `authorized_keys` entry is restricted to
+# running `wakeonlan` for that one target, and nothing else. Clients try the
+# relays in order, so any one of them being up is enough.
 #
-# The moving parts, and who owns them:
+# The moving parts, and who owns them (all in
+# `modules/nixos/profiles/wol.nix` unless noted):
 #
-# - The target host arms WoL on its NIC (see `hosts/<target>/configuration.nix`).
-# - The relay (`modules/nixos/profiles/wol.nix`) authorizes each target's relay
-#   key for the `wol` user, forced to `wakeonlan <mac>`. A host is a relay
-#   exactly when some target here names it as `relay`.
+# - The target arms WoL on the NIC with the given `mac`, and keeps the PCIe
+#   path from that NIC to its root port out of D3cold, so that the wake can
+#   arrive as an in-band PME. A host is a target exactly when it is named here.
+# - Each relay authorizes the target's relay key for the `wol` user, forced to
+#   `wakeonlan <mac>`. A host is a relay exactly when some target here lists it
+#   in `relays`.
 # - Clients (`profiles.wol.client.enable`) receive each target's relay private
 #   key as an agenix secret.
 # - The home-manager SSH config (`modules/home/ssh.nix`) sets a `ProxyCommand`
@@ -22,8 +26,14 @@
 let
   targets = {
     hekate = {
-      mac = "7c:c2:55:6a:76:08";
-      relay = "tereshkova";
+      # A USB RTL8153 adapter used only for waking. The onboard bnxt_en NICs
+      # can wake from S5, but `bnxt_en` drops their link in s2idle.
+      mac = "a0:ce:c8:82:5d:c4";
+      # The NIC carries no traffic: the target brings its link up (so the PHY
+      # stays powered and can see magic packets) without configuring any
+      # addresses on it.
+      dedicatedNic = true;
+      relays = [ "tereshkova" "tranquility" ];
       # The relay sends to the subnet-directed broadcast address rather than
       # 255.255.255.255, so that the packet leaves through the interface on
       # this subnet even if the relay has more than one. This assumes the
