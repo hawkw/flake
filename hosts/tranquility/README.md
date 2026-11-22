@@ -1,5 +1,45 @@
 # tranquility: storage
 
+This is a ZFS-based storage system. Its purpose in life is to host backups,
+media, NFS/SFTP shares, and not much else. Therefore, the current hardware
+consists of a low-end Ryzen CPU, an ASRockRack [B650D4U-2L2T/BCM] AM5 server
+motherboard with dual 10GbE, and a generous amount of DDR5 ECC RAM for the ZFS
+ARC. And a whole bunch of hard drives.
+
+```console
+eliza@tranquility ~ $ inxi -bM
+System:
+  Host: tranquility Kernel: 7.0.13 arch: x86_64 bits: 64
+  Console: pty pts/0 Distro: NixOS 26.11 (Zokor)
+Machine:
+  Type: Server System: AsrockRack product: B650D4U-2L2T/BCM v: N/A serial: <superuser required>
+  Mobo: ASRockRack model: B650D4U-2L2T/BCM v: 4.01 serial: <superuser required> Firmware: UEFI
+    vendor: American Megatrends LLC. v: 21.08 date: 05/22/2025
+CPU:
+  Info: 6-core AMD Ryzen 5 9600X [MT MCP] speed (MHz): avg: 3008 min/max: 628/5486
+Graphics:
+  Device-1: ASPEED Graphics Family driver: ast v: kernel
+  Device-2: Advanced Micro Devices [AMD/ATI] Granite Ridge [Radeon Graphics] driver: amdgpu
+    v: kernel
+  Display: unspecified server: X.org v: 1.21.1.24 driver: gpu: ast note: X driver n/a, try
+    sudo/root tty: 122x70
+  API: OpenGL Message: GL data unavailable in console, glxinfo missing.
+  Info: Tools: x11: xprop,xrandr
+Network:
+  Device-1: Intel I210 Gigabit Network driver: igb
+  Device-2: Intel I210 Gigabit Network driver: igb
+  Device-3: Broadcom BCM57416 NetXtreme-E Dual-Media 10G RDMA Ethernet driver: bnxt_en
+  Device-4: Broadcom BCM57416 NetXtreme-E Dual-Media 10G RDMA Ethernet driver: bnxt_en
+  Device-5: American Megatrends Virtual Ethernet. driver: cdc_ether type: USB
+Drives:
+  Local Storage: total: raw: 93.49 TiB usable: 68.09 TiB used: 28.96 GiB (0.0%)
+Info:
+  Memory: total: 128 GiB available: 123.44 GiB used: 24.95 GiB (20.2%)
+  Processes: 474 Uptime: 90d 22h 31m Init: systemd Shell: Zsh inxi: 3.3.41
+```
+
+[B650D4U-2L2T/BCM]: https://www.asrockrack.com/general/productdetail.asp?Model=B650D4U-2L2T%2FBCM
+
 ## Root Filesystem
 
 `tranquility` boots unattended from a **mirrored pair of NVMe devices** with a
@@ -33,8 +73,8 @@ fallback (entered on the BMC console) if the TPM ever refuses.
 
 ## Initial install
 
-uns from a NixOS installer on the target machine. The
-TPM-sealing step (step 3) runs **after first boot, on the installed system** ---
+Steps 1 and 2 run from a NixOS installer on the target machine. The
+TPM-sealing step (step 3) runs **after first boot, on the installed system**:
 there is no need to seal against the TPM from the installer, because the
 configuration evaluates fine without the JWE (clevis is gated on
 `builtins.pathExists` and the pool simply prompts for the passphrase until the
@@ -79,14 +119,20 @@ This must be run as root, as the seal requires root access to the TPM
 (`/dev/tpmrm0` is `root:tss`).
 
 ```console
-sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c \
-  sh -c "printf '%s' $RPOOL_PASSPHRASE | clevis encrypt tpm2 '{}'" \
-  > hosts/tranquility/tranquility-rpool-crypt.jwe
+sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c bash -c \
+  'IFS= read -rsp "rpool passphrase: " P && echo >&2 && printf "%s" "$P" | clevis encrypt tpm2 "$1"' \
+  _ '{}' > hosts/tranquility/tranquility-rpool-crypt.jwe
 ```
 
-The resulting `.jwe` is decryptable **only by this host's TPM**, so commit it to
-the repo (same trust model as the TPM-backed SSH host key and agenix secrets),
-then rebuild to activate unattended unlock:
+The passphrase is read from the terminal rather than interpolated into the
+command line, which would strip any spaces from the sealed value and leave the
+passphrase in shell history.
+
+The resulting `.jwe` is decryptable **only by this host's TPM**, so it can be
+committed to the repo. This is the same trust model as the TPM-backed SSH host
+key and agenix secrets. 
+
+Then, rebuild to activate unattended unlock:
 
 ```console
 nixos-rebuild switch --flake '.#tranquility'
@@ -228,15 +274,16 @@ zpool online tranquility-rpool <reconnected-partition>
 
 ### Optional: bind the disk key to Secure Boot (PCR 7)
 
-The clevis JWE (step 2) uses an empty TPM policy so it survives updates but only
+The clevis JWE (step 3) uses an empty TPM policy so it survives updates but only
 protects *removed* drives. Once Secure Boot is enrolled and verified, PCR 7 (the
 Secure Boot policy) is stable across kernel updates, so you can re-seal the disk
 key to it. The TPM then releases the key **only** under your signed boot
 chain, defeating boot-chain tampering while staying unattended:
 
 ```console
-printf '%s' 'YOUR-ZFS-PASSPHRASE' | clevis encrypt tpm2 '{"pcr_ids":"7"}' \
-  > hosts/tranquility/tranquility-rpool-crypt.jwe
+sudo nix shell nixpkgs#clevis nixpkgs#tpm2-tools -c bash -c \
+  'IFS= read -rsp "rpool passphrase: " P && echo >&2 && printf "%s" "$P" | clevis encrypt tpm2 "$1"' \
+  _ '{"pcr_ids":"7"}' > hosts/tranquility/tranquility-rpool-crypt.jwe
 nixos-rebuild switch --flake '.#tranquility'
 ```
 
@@ -258,11 +305,35 @@ sudo nixos-rebuild boot --flake '.#tranquility'
 ### Rotating the TPM-sealed key
 
 If you change the ZFS passphrase or move to a different TPM, regenerate the JWE
-(step 2) with the new passphrase and `nixos-rebuild switch`. To change the
+(step 3) with the new passphrase and `nixos-rebuild switch`. To change the
 passphrase itself:
 
 ```console
-zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
+zfs change-key tranquility-rpool/crypt   # key must be loaded; prompts for the new passphrase
+```
+
+### Snapshots
+
+Local snapshots of both pools are taken hourly and pruned by zrepl's
+`snapshots` job (`services.zrepl` in `configuration.nix`). The `filesystems`
+filter decides which datasets are snapshotted.
+
+Check on it with:
+
+```console
+zrepl status
+zfs list -t snapshot -o name,creation,used -r tranquility-rpool moonpool
+```
+
+zrepl only prunes snapshots with names starting with `zrepl_`. It won't touch
+anything else: `crypt/system/root@blank`, manual snapshots, and any
+`zfs-auto-snap_*` snapshots taken by zfs-auto-snapshot before a host
+switched to zrepl. Those last ones will never expire by themselves. Once they
+are no longer wanted, destroy them by hand (check the list first):
+
+```console
+zfs list -H -t snapshot -o name -r tranquility-rpool | grep '@zfs-auto-snap_'
+zfs list -H -t snapshot -o name -r tranquility-rpool | grep '@zfs-auto-snap_' | xargs -n1 sudo zfs destroy
 ```
 
 ## Storage pool setup
@@ -270,21 +341,52 @@ zfs change-key tranquility-rpool/crypt   # prompts for old then new passphrase
 list SAS drives:
 
 ```console
-$ lsblk -o NAME,VENDOR,MODEL,SERIAL,WWN -S
-NAME VENDOR   MODEL            SERIAL               WWN
-sda  SEAGATE  ST16000NM004J    ZR5DWPQ40000W3257HRN 0x5000c500da9d0c27
-sdb  SEAGATE  ST16000NM004J    ZR5CGT060000C2127EAG 0x5000c500da3bc09f
-sdc  SEAGATE  XS960LE70124     HSF030NS0000822150Z3 0x5000c500a18fae2b
-sdd  SEAGATE  ST16000NM004J    ZR5CMG610000C3039SWZ 0x5000c500da3be65b
-sde  NTAPCSSD X382_S1643960ATE S57SNA0R205377       0x5002538b012dda50
-sdf  SEAGATE  ST960FM0003      Z87130ES0000822150Z3 0x5000c50030186723
-sdg  WDC      WUH721816AL5204  2CHMU7PP             0x5000cca2a15c6554
-sdh  WDC      WUH721816AL5204  2CHNGUYP             0x5000cca2a15d9a7c
-sdi  WDC      WUH721816AL5204  2CHLHS6N             0x5000cca2a15a0534
-sdj  NTAPCSSD X382_S1643960ATE S57SNA0R205376       0x5002538b012dda40
-sdk  SEAGATE  ST960FM0003      Z87130AR0000822150Z3 0x5000c50030186713
-sdl  NETAPP   X371_S164A960ATE S5JENA0RB07411       0x5002538b01bbde70
+eliza@tranquility ~ $ lsblk -S -o WWN,SIZE,VENDOR,MODEL,REV,SERIAL
+WWN                  SIZE VENDOR   MODEL             REV SERIAL
+0x5000cca2a15a0534  14.6T WDC      WUH721816AL5204  C232 2CHLHS6N
+0x5002538b012dda40 894.3G NTAPCSSD X382_S1643960ATE NA54 S57SNA0R205376
+0x5002538b01bbde70 894.3G NETAPP   X371_S164A960ATE NA53 S5JENA0RB07411
+0x5000c500da3be65b  14.6T SEAGATE  ST16000NM004J    E004 ZR5CMG610000C3039SWZ
+0x5000cca2a15d9a7c  14.6T WDC      WUH721816AL5204  C232 2CHNGUYP
+0x5000cca2a15c6554  14.6T WDC      WUH721816AL5204  C232 2CHMU7PP
+0x5000c50030186713 894.3G SEAGATE  ST960FM0003      0007 Z87130AR0000822150Z3
+0x5000c500da9d0c27  14.6T SEAGATE  ST16000NM004J    E004 ZR5DWPQ40000W3257HRN
+0x5000c500a18fae2b 894.3G SEAGATE  XS960LE70124     0003 HSF030NS0000822150Z3
+0x5000c50030186723 894.3G SEAGATE  ST960FM0003      0007 Z87130ES0000822150Z3
+0x5000c500da3bc09f  14.6T SEAGATE  ST16000NM004J    E004 ZR5CGT060000C2127EAG
+0x5002538b012dda50 894.3G NTAPCSSD X382_S1643960ATE NA54 S57SNA0R205377
 ```
+
+### Pool layout
+
+- **Data:** 6-wide raidz2 16 TB HDDs (~58 TiB usable). Further
+  6-wide raidz2 vdevs can be added later (up to four in this chassis).
+- **Special allocation class:** two 3-way mirrors of 960 GB SAS SSDs
+  (~1.75 TiB usable). These hold all pool metadata, the ZIL (there is no
+  SLOG), and any  blocks at or below its `special_small_blocks`.
+  The pool survives any two HDD failures *and* any two SSD failures at the
+  same time.
+- **Spares:** one Exos X16 and one PM1643a, kept cold on the shelf.
+
+Operational notes:
+
+- The special vdevs can **never be removed**: top-level vdev removal is not
+  supported in a pool with a raidz vdev. To grow the special class, replace a
+  mirror's members with larger SSDs (`autoexpand=on`). Replacing with the old
+  member still attached (temporarily in a free drive bay) keeps the mirror 
+  3-way redundant throughout the replacement.
+- Once the special class is 75% full (`zfs_special_class_metadata_reserve_pct`),
+  new small blocks are allocated on the HDDs. Note that  **nothing reports an
+  error** when this happens. Watch the special class's `ALLOC` in
+  `zpool list -v moonpool`.
+- The estimate at the time of writing is ~0.3--1.1 TiB of special-class use
+  even with four data vdevs, but...that's just kind of a guess. Remember to
+  check the special/pool allocation ratio once the first vdev holds a
+  representative mix of data. 
+- The pool is created with every feature supported by the ZFS version the host
+  was running at the time of creation, which is ZFS 2.4.  Once those features 
+  are in use, the pool can only be imported by ZFS 2.4 or newer. Therefore, any
+  recovery environment (e.g. a NixOS installer USB) must be at least that new.
 
 Creating the zpool:
 
@@ -292,10 +394,14 @@ Creating the zpool:
 sudo zpool create \
   -o ashift=12 \
   -o autoreplace=on \
+  -o autotrim=on \
+  -o autoexpand=on \
+  -O mountpoint=none \
   -O compression=lz4 \
   -O atime=off \
   -O xattr=sa \
   -O acltype=posixacl \
+  -O dnodesize=auto \
   moonpool \
   raidz2 \
     /dev/disk/by-id/wwn-0x5000c500da9d0c27 \
@@ -304,23 +410,28 @@ sudo zpool create \
     /dev/disk/by-id/wwn-0x5000cca2a15c6554 \
     /dev/disk/by-id/wwn-0x5000cca2a15d9a7c \
     /dev/disk/by-id/wwn-0x5000cca2a15a0534 \
-  special raidz2 \
-    /dev/disk/by-id/wwn-0x5000c50030186723 \
-    /dev/disk/by-id/wwn-0x5000c50030186713 \
-    /dev/disk/by-id/wwn-0x5002538b012dda50 \
-    /dev/disk/by-id/wwn-0x5002538b012dda40 \
-    /dev/disk/by-id/wwn-0x5002538b01bbde70 \
-  spare \
-    /dev/disk/by-id/wwn-0x5000c500a18fae2b
+  special \
+    mirror \
+      /dev/disk/by-id/wwn-0x5002538b012dda40 \
+      /dev/disk/by-id/wwn-0x5000c50030186713 \
+      /dev/disk/by-id/wwn-0x5000c500a18fae2b \
+    mirror \
+      /dev/disk/by-id/wwn-0x5002538b012dda50 \
+      /dev/disk/by-id/wwn-0x5000c50030186723 \
+      /dev/disk/by-id/wwn-0x5002538b01bbde70
 ```
 
-ok it works 
+`-O mountpoint=none` keeps `zpool create` from mounting the pool root at
+`/moonpool`; the rest of the dataset properties (quotas, hardening, and so on)
+are applied by the `zfs-datasets-moonpool` service from `configuration.nix`.
+
+The pool should look like this once created:
 
 ```console
 eliza@tranquility ~ $ zpool list && zpool status moonpool
 NAME                SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
-moonpool           91.7T  1.41M  91.7T        -         -     0%     0%  1.00x    ONLINE  -
-tranquility-rpool   472G  29.0G   443G        -         -     6%     6%  1.00x    ONLINE  -
+moonpool           89.0T  2.65M  89.0T        -         -     0%     0%  1.00x    ONLINE  -
+tranquility-rpool   472G  42.1G   430G        -         -     7%     8%  1.00x    ONLINE  -
   pool: moonpool
  state: ONLINE
 config:
@@ -335,14 +446,116 @@ config:
             wwn-0x5000cca2a15d9a7c  ONLINE       0     0     0
             wwn-0x5000cca2a15a0534  ONLINE       0     0     0
         special
-          raidz2-1                  ONLINE       0     0     0
-            wwn-0x5000c50030186723  ONLINE       0     0     0
-            wwn-0x5000c50030186713  ONLINE       0     0     0
-            wwn-0x5002538b012dda50  ONLINE       0     0     0
+          mirror-1                  ONLINE       0     0     0
             wwn-0x5002538b012dda40  ONLINE       0     0     0
+            wwn-0x5000c50030186713  ONLINE       0     0     0
+            wwn-0x5000c500a18fae2b  ONLINE       0     0     0
+          mirror-2                  ONLINE       0     0     0
+            wwn-0x5002538b012dda50  ONLINE       0     0     0
+            wwn-0x5000c50030186723  ONLINE       0     0     0
             wwn-0x5002538b01bbde70  ONLINE       0     0     0
-        spares
-          wwn-0x5000c500a18fae2b    AVAIL
 
 errors: No known data errors
+````
+
+### Provision the dataset encryption keys
+
+The `services`, `backups`, and per-user datasets are encryption roots with
+`keyformat=passphrase`.
+The passphrases are agenix-rekey secrets with a `passphrase` generator (six
+random words), decrypted unattended at boot via this host's TPM-sealed identity.
+
+1. Generate and rekey the passphrases (on the admin machine), then commit them:
+
+   ```console
+   agenix generate   # creates secrets/generated/moonpool-*-pass.age
+   agenix rekey -a
+   ```
+
+2. **Recommended:** escrow each passphrase in 1Password (or another password
+   manager), so that datasets can be unlocked on another machine for recovery
+   purposes. This is why `keyformat=passphrase` is used rather than binary
+   keys. Read the generated values with:
+
+   ```console
+   agenix view
+   ```
+
+   If the passphrases are not escrowed externally, recovery will only be
+   possible with the Agenix master identity and access to this flake.
+
+3. Rebuild. The oneshot creates, unlocks, and mounts the datasets during
+   the switch itself (and again at every boot). Verify, including that
+   declared ownership landed (the one step that can fail silently if the run
+   aborts partway --- fix this by hand with `chown`/`chmod` if needed):
+
+   ```console
+   nix build '.#nixosConfigurations.tranquility.config.system.build.toplevel'  # cheap pre-flight
+   nixos-rebuild switch --flake '.#tranquility'
+   systemctl status zfs-datasets-moonpool.service 'srv-*.mount'
+   zfs get -r keystatus,mounted moonpool
+   ls -ld /srv/users/eliza/shares   # eliza:users, 0700
+   ```
+
+   Then reboot again. This is necessary to check that everything works, because
+   the unlock path when booting the system is different from 
+   `nixos-rebuild switch`, as will import the pool and decrypt the TPM-sealed
+   passphrase before running the oneshot.
+
+   At boot, agenix decrypts the passphrases in the `initrd`. With systemd
+   in stage 1, NixOS runs the activation script in stage 1, before switch-root.
+   To confirm that `age-plugin-tpm` works in the `initrd`, check the system
+   journal for Agenix "decrypting" lines prior to "switching root", with no
+   errors:
+
+   ```console
+   journalctl -b -o short-monotonic | grep -E 'agenix|Switching root'
+   ```
+
+4. **Test the recovery path once.** The disaster-recovery story rests on the
+   invariant *key-file contents ≡ what you type at the prompt* (libzfs strips
+   the file's trailing newline for `keyformat=passphrase`, so it should hold
+   --- verify it does). For each encryption root, with the 1Password copy of
+   the passphrase:
+
+   ```console
+   sudo zfs unload-key moonpool/services
+   sudo zfs load-key -L prompt moonpool/services   # type the passphrase
+   ```
+
+   `-L prompt` overrides the key *source* for this load only. The configured
+   `keylocation` is untouched, so no cleanup is needed afterwards. Note that
+   `unload-key` refuses while datasets using the key are mounted --- unmount
+   the subtree first, or do this before the datasets hold any data.
+
+#### Rotating a dataset passphrase
+
+`zfs change-key` re-wraps the dataset's master key, so data is not re-encrypted,
+and child datasets are unaffected. Order matters --- `change-key` reads the
+*new* key from the stored `keylocation` (the agenix file), so deploy the new
+secret first:
+
+```console
+# On the admin machine: regenerate this secret, rekey, commit.
+agenix generate -f moonpool-user-eliza-pass
+agenix rekey -a
+
+# Deploy so /run/agenix/... contains the new passphrase (the key is still
+# loaded from boot, so nothing breaks in between):
+nixos-rebuild switch --flake '.#tranquility'
+
+# On tranquility: re-wrap with the new passphrase from the key file.
+sudo zfs change-key moonpool/users/eliza
+```
+
+Then update the copy in 1Password. The old passphrase no longer unlocks the
+dataset (but old raw `zfs send` streams remain wrapped with the old key).
+
+#### Manual unlock
+
+If the TPM is ever unavailable, or when importing the pool on another machine,
+unlock a dataset by hand with its 1Password passphrase:
+
+```console
+zfs load-key -L prompt moonpool/users/eliza
 ```

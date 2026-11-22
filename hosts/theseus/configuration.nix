@@ -59,6 +59,15 @@ with lib; {
     # use the latest stable Linux kernel
     kernelPackages = pkgs.linuxPackages_latest;
 
+    initrd.systemd = {
+      # Allow a root rescue shell in the initrd emergency target. Without
+      # this, any stage-1 failure drops to emergency mode with root locked,
+      # and un-stranding the machine requires a live USB. This is reachable
+      # only *before* the volumes are unlocked, so it exposes no decrypted
+      # data.
+      emergencyAccess = true;
+    };
+
     initrd.luks.devices."luks-c8e922ff-11e1-473c-a52e-c2b86a042e44".device =
       "/dev/disk/by-uuid/c8e922ff-11e1-473c-a52e-c2b86a042e44";
 

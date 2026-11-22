@@ -13,13 +13,18 @@ in
       enable = mkEnableOption "kernel hardening" // { default = true; };
 
       lockdownLevel = mkOption {
-        type = types.enum [ "integrity" "confidentiality" ];
-        default = "integrity";
+        type = types.enum [ "none" "integrity" "confidentiality" ];
+        # TODO(eliza): it would be nice to default to "integrity" but
+        # unfortunately that also requires building signed kernel modules. Sigh.
+        default = "none";
       };
 
       requireSignedModules = mkOption {
         type = types.bool;
-        default = true;
+        # Default this to off since it requires building a signed kernel image
+        # by overriding boot.kernelPackages, or else all modules will be
+        # unsigned.
+        default = false;
         description = ''
           Require signed kernel modules.
 
@@ -127,12 +132,12 @@ in
         # force-enable the Page Table Isolation (PTI) Linux kernel feature
         forcePageTableIsolation = true;
 
-        # User namespaces are required for sandboxing.
-        # this means you cannot set `"user.max_user_namespaces" = 0;` in sysctl
+        # User namespaces are required for sandboxing. this means you cannot set
+        # `"user.max_user_namespaces" = 0;` in sysctl i think the
+        # `unprivileged_userns_clone` sysctl has also been removed/deprecated in
+        # newer linuces?
         allowUserNamespaces = true;
 
-        # Disable unprivileged user namespaces, unless containers are enabled
-        unprivilegedUsernsClone = config.virtualisation.containers.enable;
         allowSimultaneousMultithreading = true;
       };
 

@@ -13,6 +13,9 @@ with pkgs; with lib; {
     owner = "grafana";
   };
 
+  # Cloudflare API token for ACME DNS-01 challenges (see `profiles.acme`).
+  age.secrets.cloudflare-dns-token.rekeyFile = ../../secrets/cloudflare-dns-token.age;
+
   profiles = let rootDomain = "elizas.website"; in {
     hardened = {
       enable = true;
@@ -40,6 +43,17 @@ with pkgs; with lib; {
       enable = true;
       domain = rootDomain;
       acmeSubdomain = "home";
+    };
+    acme = {
+      enable = true;
+      # Must match `profiles.nginx`'s ACME domain (`home.<rootDomain>`).
+      domain = "home.${rootDomain}";
+      # The observability vhosts live directly under the root domain, outside
+      # the built-in `*.home.<rootDomain>` wildcard.
+      extraDomainNames = [ "*.${rootDomain}" ];
+      dnsProvider = "cloudflare";
+      credentialFiles.CF_DNS_API_TOKEN_FILE =
+        config.age.secrets.cloudflare-dns-token.path;
     };
 
     yubikey.ssh.enable = true;

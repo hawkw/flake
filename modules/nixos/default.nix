@@ -7,6 +7,7 @@
     ./hardware/framework-amd.nix
     ./hardware/tpm.nix
     ./hardware/probes.nix
+    ./profiles/acme.nix
     ./profiles/age.nix
     ./profiles/arm-cross-dev.nix
     ./profiles/desktop
@@ -14,6 +15,7 @@
     ./profiles/eclss-node.nix
     ./profiles/games.nix
     ./profiles/hardened.nix
+    ./profiles/immich.nix
     ./profiles/laptop.nix
     ./profiles/networking.nix
     ./profiles/nginx.nix
@@ -21,10 +23,11 @@
     ./profiles/perftools.nix
     ./profiles/raspberry-pi
     ./profiles/server.nix
+    ./profiles/storage.nix
     ./profiles/vu-dials.nix
     ./profiles/wol.nix
     ./profiles/yubikey.nix
-    ./profiles/zfs.nix
+    ./profiles/zfs
     ./programs/openrgb.nix
     ./programs/xfel.nix
     ./services/dashy.nix

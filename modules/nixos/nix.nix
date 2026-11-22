@@ -13,9 +13,6 @@ with lib; {
 
       nix = {
         package = pkgs.lixPackageSets.stable.lix;
-        extraOptions = ''
-          experimental-features = nix-command flakes
-        '';
         generateNixPathFromInputs = true;
         generateRegistryFromInputs = true;
         linkInputs = true;
@@ -35,6 +32,7 @@ with lib; {
             ];
           in
           {
+            experimental-features = [ "nix-command" "flakes" ];
             trusted-users = [ "root" "eliza" ];
             extra-substituters = substituters;
             extra-trusted-substituters = substituters;

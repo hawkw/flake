@@ -104,7 +104,6 @@ in
       "ip=dhcp"
     ];
     initrd.systemd = {
-      enable = true;
       # Allow a root rescue shell in the initrd emergency target. Without this,
       # a failed pool import (or any stage-1 failure) drops to emergency mode
       # with root locked, which strands a headless box. This is reachable only
@@ -174,10 +173,6 @@ in
 
   environment.systemPackages = with pkgs; [
     fwupd
-    # various LSI SAS card thingies
-    storcli2
-    lsirec
-    lsiutil
     lsscsi
   ];
 

@@ -18,8 +18,15 @@
   #### INPUTS ################################################################
   inputs =
     {
+
+      ### nixpkgs selection ##################################################
+      # currently, i'm using nixpkgs-weekly to try to reduce exposure to
+      # supply-chain attacks.
+
       # nixpkgs-stable.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
-      nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+      # nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+      nixpkgs.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/0.1";
+
       flake-utils.url = "github:numtide/flake-utils";
       flake-parts.url = "github:hercules-ci/flake-parts";
 
@@ -31,7 +38,7 @@
           # don't download nix-darwin deps as this flake only contains Linux
           # configurations.
           ### NOTE: remove this line to enable nix-darwin support!!! ###
-          darwin.follows = "";
+          # darwin.follows = "";
         };
       };
       agenix-rekey = {
@@ -148,7 +155,8 @@
       ghostty = {
         url = "github:ghostty-org/ghostty";
         inputs = {
-          nixpkgs.follows = "nixpkgs";
+          # nixpkgs.follows = "nixpkgs";
+          home-manager.follows = "home";
         };
       };
 
@@ -260,6 +268,11 @@
               # config.programs._1password.package
             ];
           };
+
+          checks = import ./modules/nixos/profiles/zfs/checks.nix {
+            inherit pkgs;
+            inherit (inputs) nixpkgs disko disko-zfs;
+          };
         };
 
         flake = {
@@ -358,7 +371,7 @@
                 #   extraOpts = { sshOpts = [ "-t" ]; };
                 # };
 
-                noctis = mkNode { hostname = "noctis"; };
+                # noctis = mkNode { hostname = "noctis"; };
 
                 tereshkova = mkNode { hostname = "tereshkova"; };
 
