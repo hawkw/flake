@@ -68,6 +68,7 @@ with lib; {
           # Set the default branch name to `main`.
           init.defaultBranch = "main";
           commit.gpgsign = true;
+          rerere.enabled = false;
         };
 
         # aliases
