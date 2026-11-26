@@ -28,7 +28,7 @@ with lib; {
     nix-ld.enable = true;
     games.enable = true;
     # Wake hekate et al. through their LAN relay when connecting from off-site.
-    wol.client.enable = true;
+    wakeOnLan.client.enable = true;
     yubikey = {
       enable = true;
       provisioning.enable = true;

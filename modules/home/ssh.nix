@@ -36,28 +36,33 @@ let
       })
     yubikeys.ssh.bySerial;
 
-  # Wake-on-LAN targets, and their relays (see lib/wol.nix).
-  wol = import ../../lib/wol.nix { inherit lib; };
-  # Whether this host has the relay keys installed. Without them, `ssh-wol`
-  # only broadcasts locally, which works on the LAN but not over the tunnel.
-  wolClient = osConfig.profiles.wol.client.enable or false;
+  # From the NixOS config, the list of Wake-on-LAN targets, and the systems
+  # configured as SSH WoL relays (see modules/nixos/profiles/wake-on-lan.nix).
+  wolTargets = osConfig.profiles.wakeOnLan.targets or { };
+  # True if this host is configured as a Wake-on-LAN SSH relay client. If it is,
+  # then it has the ssh keys installed to use with the WoL relays. Without
+  # relays, `ssh-wol` only works while on the same LAN as the target.
+  wolClient = osConfig.profiles.wakeOnLan.client.enable or false;
 
-  # `ProxyCommand` that wakes a host with a Wake-on-LAN magic packet if its SSH
-  # port isn't reachable, waits for sshd to come up, and then relays the
-  # connection.
+  # A shell script run as a `ProxyCommand` that wakes a host with a Wake-on-LAN
+  # magic packet if its SSH port isn't reachable, waits for sshd to come up, and
+  # then relays the connection.
   #
-  # This is a `ProxyCommand` rather than a `Match exec`, because `Match exec`
-  # runs whenever the config is parsed (including `ssh -G`, and twice under
-  # hostname canonicalization). A `ProxyCommand` runs only when ssh actually
-  # opens a new transport.
+  # This is implemented as a `ProxyCommand` rather than a `Match exec`, because
+  # `Match exec` runs whenever the config is parsed, which would include `ssh -G`
+  # and hostname canonicalization. A `ProxyCommand` runs only when ssh actually
+  # opens a new transport, which is when the target should actually be woken.
   #
   # stdout is the SSH transport, so all diagnostics go to stderr.
   #
-  # The magic packet is an L2 broadcast, so a local broadcast only works from
-  # the target's LAN. If relays are given, the script also asks them (always-on
-  # hosts on that LAN) to broadcast it, in order, stopping at the first that
-  # succeeds. This works from anywhere a relay is reachable. No failure here is
-  # fatal on its own: whether the target came up is decided by the wait loop.
+  # Because a WoL magic packet is an L2 broadcast, sending one directly only
+  # works when the client is on the same LAN as the target. This is where the
+  # SSH relaying scheme described in `nixos/profiles/wake-on-lan.nix` comes in:
+  # if other always-on systems on the same LAN are configured as WoL relays, the
+  # script attempts to use them to send the magic packet to the target until one
+  # succeeds. This way, the target can be woken even if the client is not on the
+  # same LAN, as long as a relay is reachable. Multiple relays may be specified
+  # for redundancy in case some relays are unavailable.
   sshWol = pkgs.writeShellApplication {
     name = "ssh-wol";
     runtimeInputs = with pkgs; [ netcat-openbsd openssh wakeonlan ];
@@ -74,21 +79,21 @@ let
       timeout_secs=300
 
       if ! nc -z -w 1 "$host" "$port" 2>/dev/null; then
-        echo "ssh-wol: $host:$port unreachable; sending magic packet to $mac" >&2
+        echo "ssh-wol: $host:$port is unreachable, sending magic packet to $mac" >&2
         if ! wakeonlan "$mac" >&2; then
           echo "ssh-wol: local broadcast failed" >&2
         fi
 
         if [ "$#" -gt 0 ] && [ ! -r "$relay_key" ]; then
-          echo "ssh-wol: relay key $relay_key is not readable; not waking via relays" >&2
+          echo "ssh-wol: SSH relay key $relay_key is not readable! cannot wake via relays" >&2
         elif [ "$#" -gt 0 ]; then
           for relay in "$@"; do
             # The relay's authorized_keys entry forces the wake command, so no
-            # command is sent. `-n` is load-bearing: this script's stdin is the
-            # outer SSH transport, which the inner ssh must not consume.
-            # `-F none` keeps the user's config (agents, other identities,
-            # ProxyCommands) out of it; host keys are still checked against
-            # known_hosts.
+            # command is sent. `-n`, which prevents SSH from reading from stdin,
+            # is necessary here, because this script's stdin is the SSH
+            # transport intended for the *target*, which should not be forwarded
+            # to the relay. `-F none` prevents this command from running with the
+            # user's SSH config (agents, other identities, ProxyCommands).
             if ssh -n -F none \
                 -o BatchMode=yes \
                 -o ConnectTimeout=5 \
@@ -107,7 +112,7 @@ let
         start=$SECONDS
         until nc -z -w 1 "$host" "$port" 2>/dev/null; do
           if [ $((SECONDS - start)) -ge "$timeout_secs" ]; then
-            echo "ssh-wol: $host:$port still unreachable ''${timeout_secs}s after wake; giving up" >&2
+            echo "ssh-wol: $host:$port still unreachable ''${timeout_secs}s after sending a wake-on-LAN packet. giving up!" >&2
             exit 1
           fi
           sleep 2
@@ -176,7 +181,7 @@ with lib;
                   ++ map (relay: "${relay}.${sysdomain}") target.relays
                 ));
               }))
-              wol.targets
+              wolTargets
             // {
               "*" = {
                 # Settings previously provided by
