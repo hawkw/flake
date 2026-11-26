@@ -84,28 +84,40 @@ let
           echo "ssh-wol: local broadcast failed" >&2
         fi
 
+        wake_via_relay() {
+          # The relay's authorized_keys entry forces the wake command, so no
+          # command is sent. `-n`, which prevents SSH from reading from stdin,
+          # is necessary here, because this script's stdin is the SSH transport
+          # intended for the *target*, which should not be forwarded to the
+          # relay. `-F none` prevents this command from running with the user's
+          # SSH config (agents, other identities, ProxyCommands). `-T` skips pty
+          # allocation, which would fail anyway without a terminal.
+          if ssh -n -T -F none \
+              -o BatchMode=yes \
+              -o ConnectTimeout=5 \
+              -o IdentitiesOnly=yes \
+              -o IdentityAgent=none \
+              -i "$relay_key" \
+              "wol@$1" >&2; then
+            echo "ssh-wol: asked $1 to wake $mac" >&2
+          else
+            echo "ssh-wol: waking via $1 failed (ssh exited $?)" >&2
+          fi
+        }
+
+        # Fire off an attempt to wake via every relay concurrently, in the
+        # background. This is intended to reduce the latency with which the host
+        # is woken in the case where one or more relays are not available. If we
+        # did this sequentially, the attempt to wake via a relay that's down
+        # will wait out its connect timeout before trying the next one. Having
+        # extra magic packets flying around is harmless, so this is fine.
+        relay_pids=()
         if [ "$#" -gt 0 ] && [ ! -r "$relay_key" ]; then
           echo "ssh-wol: SSH relay key $relay_key is not readable! cannot wake via relays" >&2
-        elif [ "$#" -gt 0 ]; then
+        else
           for relay in "$@"; do
-            # The relay's authorized_keys entry forces the wake command, so no
-            # command is sent. `-n`, which prevents SSH from reading from stdin,
-            # is necessary here, because this script's stdin is the SSH
-            # transport intended for the *target*, which should not be forwarded
-            # to the relay. `-F none` prevents this command from running with the
-            # user's SSH config (agents, other identities, ProxyCommands).
-            if ssh -n -F none \
-                -o BatchMode=yes \
-                -o ConnectTimeout=5 \
-                -o IdentitiesOnly=yes \
-                -o IdentityAgent=none \
-                -i "$relay_key" \
-                "wol@$relay" >&2; then
-              echo "ssh-wol: asked $relay to wake $mac" >&2
-              break
-            else
-              echo "ssh-wol: waking via $relay failed (ssh exited $?)" >&2
-            fi
+            wake_via_relay "$relay" &
+            relay_pids+=("$!")
           done
         fi
 
@@ -115,9 +127,13 @@ let
             echo "ssh-wol: $host:$port still unreachable ''${timeout_secs}s after sending a wake-on-LAN packet. giving up!" >&2
             exit 1
           fi
-          sleep 2
+          sleep 0.25
         done
         echo "ssh-wol: $host:$port is up after $((SECONDS - start))s" >&2
+        # The host is up, so any relays still trying no longer matter.
+        if [ "''${#relay_pids[@]}" -gt 0 ]; then
+          kill "''${relay_pids[@]}" 2>/dev/null || true
+        fi
       fi
 
       exec nc "$host" "$port"
@@ -192,7 +208,17 @@ with lib;
                 # YubiKey key handle on first use.
                 AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
-                ServerAliveInterval = 0;
+                # The hekate suspend + WoL stuff doesn't play nicely with
+                # ServerAliveInterval=0, since the host suspnding makes the
+                # session hang, and Zed's ssh remote thingy seems to pool ssh
+                # ControlMaster connections, rather than reconnecting every
+                # time, which results in it trying to use a stuck ControlMaster
+                # rather than reconnect.
+                #
+                # TODO(eliza): if/when changing the WoL config to use
+                # wake-on-unicast + ARP caching, this can (and should!) go away,
+                # so that input into a n idle session just wakes.
+                ServerAliveInterval = 15;
                 ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";
