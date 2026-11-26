@@ -38,6 +38,9 @@ with pkgs; with lib; {
     };
     immich.enable = true;
     yubikey.ssh.enable = true;
+    # Enable wake-on-LAN relaying, since this system should always be up on the
+    # LAN.
+    wakeOnLan.relay.enable = true;
     zfs.enable = true;
   };
 

@@ -25,6 +25,7 @@
     ./profiles/server.nix
     ./profiles/storage.nix
     ./profiles/vu-dials.nix
+    ./profiles/wake-on-lan.nix
     ./profiles/yubikey.nix
     ./profiles/zfs
     ./programs/openrgb.nix

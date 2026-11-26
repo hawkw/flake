@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, osConfig, lib, pkgs, ... }:
 let
   _1passwordAgent = {
     enable = config.programs._1password-gui.enableSshAgent;
@@ -35,6 +35,110 @@ let
         IdentitiesOnly = "yes";
       })
     yubikeys.ssh.bySerial;
+
+  # From the NixOS config, the list of Wake-on-LAN targets, and the systems
+  # configured as SSH WoL relays (see modules/nixos/profiles/wake-on-lan.nix).
+  wolTargets = osConfig.profiles.wakeOnLan.targets or { };
+  # True if this host is configured as a Wake-on-LAN SSH relay client. If it is,
+  # then it has the ssh keys installed to use with the WoL relays. Without
+  # relays, `ssh-wol` only works while on the same LAN as the target.
+  wolClient = osConfig.profiles.wakeOnLan.client.enable or false;
+
+  # A shell script run as a `ProxyCommand` that wakes a host with a Wake-on-LAN
+  # magic packet if its SSH port isn't reachable, waits for sshd to come up, and
+  # then relays the connection.
+  #
+  # This is implemented as a `ProxyCommand` rather than a `Match exec`, because
+  # `Match exec` runs whenever the config is parsed, which would include `ssh -G`
+  # and hostname canonicalization. A `ProxyCommand` runs only when ssh actually
+  # opens a new transport, which is when the target should actually be woken.
+  #
+  # stdout is the SSH transport, so all diagnostics go to stderr.
+  #
+  # Because a WoL magic packet is an L2 broadcast, sending one directly only
+  # works when the client is on the same LAN as the target. This is where the
+  # SSH relaying scheme described in `nixos/profiles/wake-on-lan.nix` comes in:
+  # if other always-on systems on the same LAN are configured as WoL relays, the
+  # script attempts to use them to send the magic packet to the target until one
+  # succeeds. This way, the target can be woken even if the client is not on the
+  # same LAN, as long as a relay is reachable. Multiple relays may be specified
+  # for redundancy in case some relays are unavailable.
+  sshWol = pkgs.writeShellApplication {
+    name = "ssh-wol";
+    runtimeInputs = with pkgs; [ netcat-openbsd openssh wakeonlan ];
+    text = ''
+      if [ "$#" -lt 3 ] || [ "$#" -eq 4 ]; then
+        echo "usage: ssh-wol <mac> <host> <port> [<relay-key> <relay-host>...]" >&2
+        exit 2
+      fi
+      mac="$1" host="$2" port="$3"
+      shift 3
+      relay_key="''${1:-}"
+      if [ "$#" -gt 0 ]; then shift; fi
+      # A cold boot from S5 includes server-board POST, which is slow.
+      timeout_secs=300
+
+      if ! nc -z -w 1 "$host" "$port" 2>/dev/null; then
+        echo "ssh-wol: $host:$port is unreachable, sending magic packet to $mac" >&2
+        if ! wakeonlan "$mac" >&2; then
+          echo "ssh-wol: local broadcast failed" >&2
+        fi
+
+        wake_via_relay() {
+          # The relay's authorized_keys entry forces the wake command, so no
+          # command is sent. `-n`, which prevents SSH from reading from stdin,
+          # is necessary here, because this script's stdin is the SSH transport
+          # intended for the *target*, which should not be forwarded to the
+          # relay. `-F none` prevents this command from running with the user's
+          # SSH config (agents, other identities, ProxyCommands). `-T` skips pty
+          # allocation, which would fail anyway without a terminal.
+          if ssh -n -T -F none \
+              -o BatchMode=yes \
+              -o ConnectTimeout=5 \
+              -o IdentitiesOnly=yes \
+              -o IdentityAgent=none \
+              -i "$relay_key" \
+              "wol@$1" >&2; then
+            echo "ssh-wol: asked $1 to wake $mac" >&2
+          else
+            echo "ssh-wol: waking via $1 failed (ssh exited $?)" >&2
+          fi
+        }
+
+        # Fire off an attempt to wake via every relay concurrently, in the
+        # background. This is intended to reduce the latency with which the host
+        # is woken in the case where one or more relays are not available. If we
+        # did this sequentially, the attempt to wake via a relay that's down
+        # will wait out its connect timeout before trying the next one. Having
+        # extra magic packets flying around is harmless, so this is fine.
+        relay_pids=()
+        if [ "$#" -gt 0 ] && [ ! -r "$relay_key" ]; then
+          echo "ssh-wol: SSH relay key $relay_key is not readable! cannot wake via relays" >&2
+        else
+          for relay in "$@"; do
+            wake_via_relay "$relay" &
+            relay_pids+=("$!")
+          done
+        fi
+
+        start=$SECONDS
+        until nc -z -w 1 "$host" "$port" 2>/dev/null; do
+          if [ $((SECONDS - start)) -ge "$timeout_secs" ]; then
+            echo "ssh-wol: $host:$port still unreachable ''${timeout_secs}s after sending a wake-on-LAN packet. giving up!" >&2
+            exit 1
+          fi
+          sleep 0.25
+        done
+        echo "ssh-wol: $host:$port is up after $((SECONDS - start))s" >&2
+        # The host is up, so any relays still trying no longer matter.
+        if [ "''${#relay_pids[@]}" -gt 0 ]; then
+          kill "''${relay_pids[@]}" 2>/dev/null || true
+        fi
+      fi
+
+      exec nc "$host" "$port"
+    '';
+  };
 in
 with lib;
 {
@@ -84,6 +188,17 @@ with lib;
                 AddKeysToAgent = true;
               };
 
+            } // mapAttrs'
+              (name: target: nameValuePair "${name}-wol" (hm.dag.entryBefore [ "homeAliases" ] {
+                header = "Host ${name} ${name}.${sysdomain}";
+                ProxyCommand = concatStringsSep " " ([ (getExe sshWol) target.mac "%h" "%p" ]
+                ++ optionals wolClient (
+                  [ osConfig.age.secrets.${target.relayKey.secretName}.path ]
+                  ++ map (relay: "${relay}.${sysdomain}") target.relays
+                ));
+              }))
+              wolTargets
+            // {
               "*" = {
                 # Settings previously provided by
                 # `programs.ssh.enableDefaultConfig`, which has been deprecated.
@@ -93,7 +208,17 @@ with lib;
                 # YubiKey key handle on first use.
                 AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
-                ServerAliveInterval = 0;
+                # The hekate suspend + WoL stuff doesn't play nicely with
+                # ServerAliveInterval=0, since the host suspnding makes the
+                # session hang, and Zed's ssh remote thingy seems to pool ssh
+                # ControlMaster connections, rather than reconnecting every
+                # time, which results in it trying to use a stuck ControlMaster
+                # rather than reconnect.
+                #
+                # TODO(eliza): if/when changing the WoL config to use
+                # wake-on-unicast + ARP caching, this can (and should!) go away,
+                # so that input into a n idle session just wakes.
+                ServerAliveInterval = 15;
                 ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";

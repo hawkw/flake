@@ -12,7 +12,24 @@
       tpmHostIdentity.enable = true;
     };
     docs.enable = true;
-    server.enable = true;
+    server = {
+      enable = true;
+      # Suspend to idle when not in use. Remote access over SSH will wake the
+      # system via wake-on-LAN, and active SSH sessions keep the system awake.
+      idleSuspend.enable = true;
+    };
+    wakeOnLan.target = {
+      enable = true;
+      # A USB RTL8153 adapter used only for waking. The existence of this thing
+      # bums me out: this system has a pair of Broadcom 10GbE NICs which
+      # theoretically support wake-on-lan magic packets (and indeed, WoL
+      # works...in S5). Sadly, the Linux `bnxt_en` driver seems to consistently
+      # command them to take down the link in s2idle, so they can't receive
+      # WoL packets when the system suspends to RAM. Sigh.
+      mac = "a0:ce:c8:82:5d:c4";
+      dedicatedNic = true;
+      broadcast = "10.0.10.255";
+    };
     desktop = {
       gnome3.enable = true;
     };
@@ -51,6 +68,7 @@
     # replicates the default behaviour.
     useDHCP = false;
   };
+
 
   #### Boot configuration ####
   boot = {

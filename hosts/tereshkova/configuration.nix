@@ -57,6 +57,9 @@ with pkgs; with lib; {
     };
 
     yubikey.ssh.enable = true;
+    # Enable wake-on-LAN relaying, since this system should always be up on the
+    # LAN.
+    wakeOnLan.relay.enable = true;
   };
 
   hardware = {

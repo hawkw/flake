@@ -55,6 +55,13 @@ in with lib; {
           X11Forwarding = true;
           # Necessary to use forwarded SSH keys for Git signing etc.
           AllowAgentForwarding = true;
+          # Drop connections whose client has gone away (e.g. a laptop that
+          # suspended) after ~90s, rather than when TCP keepalive gives up
+          # (2h+). This is mainly intended for hosts which suspend on idle,
+          # since logind considers non-pty SSH sessions as "activity" as long as
+          # it's up.
+          ClientAliveInterval = 30;
+          ClientAliveCountMax = 3;
         };
       };
 

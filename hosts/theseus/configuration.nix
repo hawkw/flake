@@ -27,6 +27,8 @@ with lib; {
     arm-cross-dev.enable = true;
     nix-ld.enable = true;
     games.enable = true;
+    # Wake hekate et al. through their LAN relay when connecting from off-site.
+    wakeOnLan.client.enable = true;
     yubikey = {
       enable = true;
       provisioning.enable = true;
