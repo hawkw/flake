@@ -393,14 +393,23 @@ with lib;
           };
 
           # Start the wake-path oneshot unit when the NIC appears.
+          #
+          # Because this is a NIC, the kernel kernel emits a udev `move` event
+          # when it renames the interface to its "predictable" name (i.e. from
+          # `eth$N` to `enp$STUFF`) name. Therefore, this must run on
+          # `ACTION=="move"`, as well as `ACTION=="add"`, well as This must not
+          # be restricted to `ACTION=="add"`. Otherwise, the device unit after
+          # the rename will not have the correct `SYSTEMD_WANTS` set.
           services.udev.extraRules = ''
-            ACTION=="add", SUBSYSTEM=="net", \
+            ACTION!="remove", SUBSYSTEM=="net", \
               ATTR{address}=="${cfg.target.mac}", \
               TAG+="systemd", \
               ENV{SYSTEMD_WANTS}+="${deviceUnitName}.service"
           '';
           systemd.services.${deviceUnitName} = {
-            description = "Prepare devices to receive wakeups from a Wake-on-LAN NIC";
+            description = ''
+              Prepare devices to receive wakeups from a Wake-on-LAN NIC
+            '';
             serviceConfig = {
               Type = "oneshot";
               ExecStart = getExe wakePathScript;

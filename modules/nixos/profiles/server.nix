@@ -21,6 +21,8 @@ in
         in an interactive shell should be wrapped in
         `systemd-inhibit --what=idle`, or they will be suspended mid-run.
 
+        Note: enabling this setting may require a reboot to take effect.
+
         Hibernation stays disabled'';
 
       timeout = mkOption {
