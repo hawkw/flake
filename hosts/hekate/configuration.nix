@@ -28,7 +28,7 @@
       # WoL packets when the system suspends to RAM. Sigh.
       mac = "a0:ce:c8:82:5d:c4";
       dedicatedNic = true;
-      broadcast = "10.0.10.255";
+      subnet = "10.0.8.0/21";
     };
     desktop = {
       gnome3.enable = true;

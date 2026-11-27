@@ -76,6 +76,54 @@ let
   relayHosts = lib.attrNames
     (lib.filterAttrs (_: c: c.profiles.wakeOnLan.relay.enable) allConfigs);
 
+  # Parses an IPv4 CIDR subnet ("10.0.8.0/21") into its four octets and its
+  # prefix length. Returns `null` if the string isn't a CIDR.
+  parseCidr = cidr:
+    let
+      matches = builtins.match "([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})\\.([0-9]{1,3})/([0-9]{1,2})" cidr;
+      octets = map lib.toInt (lib.take 4 matches);
+      prefix = lib.toInt (lib.last matches);
+    in
+    if
+    # Does the string match the regex at all?
+      matches == null ||
+      # Okay, make sure none of its "octets" are >255 (nix, famously, has a rich
+      # array of numeric types of various sizes, which --- as you can see --- we
+      # are using to implement this nicely!)
+      lib.any (o: o > 255) octets ||
+      # The prefix length must be between 0 and 32.
+      prefix > 32
+    then null
+    else { inherit octets prefix; };
+
+  # Returns the directed broadcast address of an IPv4 CIDR subnet, as a string.
+  # This is the subnet address its address with every host bit set (so
+  # "10.0.8.0/21" becomes "10.0.15.255") and so forth.
+  broadcastAddrOfSubnet = cidr:
+    let
+      inherit (parseCidr cidr) octets prefix;
+      # Returns the number of host bits in the `i`th octet, based on the
+      # subnet's prefix length.
+      nHostBits = i: lib.min 8 (lib.max 0 (32 - prefix - 8 * (3 - i)));
+      # Returns a mask with its low `n` bits set, without exponentiation
+      # (another extremely normal numeric operation which the wonderful Nix
+      # language completely lacks).
+      lowMask = n: lib.elemAt [ 0 1 3 7 15 31 63 127 255 ] n;
+      # Returns the `i`th octet of the broadcast address for CIDR. This is the
+      # input octet | mask where `mask` has all the host bits in this octet set.
+      broadcastOctet = i:
+        let
+          octet = lib.elemAt octets i;
+          mask = lowMask (nHostBits i);
+        in
+        builtins.bitOr octet mask;
+    in
+    # Okay, so for each octet, compute the broadcast octet, turn them back into
+      # a string, and join them with dots to form the broadcast address.
+    lib.concatMapStringsSep "."
+      (i: toString (broadcastOctet i))
+      [ 0 1 2 3 ];
+
   mkTarget = name: target:
     let
       secretName = "wol-${name}";
@@ -83,7 +131,8 @@ let
       pubkeyFile = ../../.. + "/secrets/generated/${secretName}.pub";
     in
     {
-      inherit (target) mac broadcast;
+      inherit (target) mac;
+      broadcast = broadcastAddrOfSubnet target.subnet;
       # A system configured as both a wake-on-LAN target and as a relay (weird!)
       # should not relay wakeups to itself, since...it'll be asleep...
       relays = lib.remove name relayHosts;
@@ -221,18 +270,29 @@ with lib;
         '';
       };
 
-      broadcast = mkOption {
-        type = types.str;
-        example = "10.0.10.255";
+      subnet = mkOption {
+        type = types.addCheck types.str (s: parseCidr s != null) // {
+          description = "IPv4 subnet in CIDR notation";
+        };
+        example = "10.0.8.0/21";
         description = ''
-          Broadcast address on this host's subnet which relays should use when
-          sending magic packets.
+          The wake NIC's IPv4 subnet, in CIDR notation.
 
-          This should be the subnet-directed broadcast address of the wake NIC's
-          subnet, rather than 255.255.255.255. This way, if a relay has network
-          interfaces on multiple subnets, the magic packet will be always be
-          sent on an interface that's on the same subnet as this host.
+          Relays send this host's magic packets to the subnet's directed
+          broadcast address (computed from this), rather than to
+          255.255.255.255. This way, if a relay has network interfaces on
+          multiple subnets, the magic packet is always sent on the interface
+          that's on this host's subnet.
+
+          This must match the subnet's real prefix length: with too long a
+          prefix, the computed address is an ordinary host address inside the
+          real subnet. Otherwise, relays will attempt to resolve the address via
+          ARP rather than broadcasting.
         '';
+        # TODO(eliza): it would be cool if there was a way to assert that relay
+        # has an interface on this subnet, but that would only work if the relay
+        # has either a networkmanager or systemd-networkd config that configures
+        # a static IP...sigh. Could be fun to figure out.
       };
 
       dedicatedNic = mkOption {
