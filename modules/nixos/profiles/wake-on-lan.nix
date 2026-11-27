@@ -405,15 +405,28 @@ with lib;
               TAG+="systemd", \
               ENV{SYSTEMD_WANTS}+="${deviceUnitName}.service"
           '';
-          systemd.services.${deviceUnitName} = {
-            description = ''
-              Prepare devices to receive wakeups from a Wake-on-LAN NIC
-            '';
-            serviceConfig = {
-              Type = "oneshot";
-              ExecStart = getExe wakePathScript;
+          systemd.services.${deviceUnitName} =
+            let
+              sleepTarget = "sleep.target";
+            in
+            {
+              description = ''
+                Prepare devices to receive wakeups from a Wake-on-LAN NIC
+              '';
+              # Also re-run the script immediately before suspending, just in
+              # case the udev rule didn't trigger properly or something else
+              # changed the device settings. This is a bit ugly, but should help
+              # ensure we are always able to receive wakeups even if other
+              # things break. Since this is "Wants=" rather than "Requires=", a
+              # failure will not stop suspend from working, which is probably
+              # good?
+              wantedBy = [ "${sleepTarget}" ];
+              before = [ "${sleepTarget}" ];
+              serviceConfig = {
+                Type = "oneshot";
+                ExecStart = getExe wakePathScript;
+              };
             };
-          };
         }
       )
       (mkIf cfg.target.dedicatedNic {
