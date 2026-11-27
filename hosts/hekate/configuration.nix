@@ -57,17 +57,48 @@
   };
 
   #### System configuration ####
-  networking = {
-    # machine's hostname
-    hostName = "hekate";
-    # this has to be a unique 32-bit number. ZFS requires us to define this.
-    hostId = "4ECA7E00";
+  networking =
+    let
+      primaryNic = "eno1np0";
+      gatewayIpv4 = "10.0.8.1";
 
-    # The global useDHCP flag is deprecated, therefore explicitly set to false here.
-    # Per-interface useDHCP will be mandatory in the future, so this generated config
-    # replicates the default behaviour.
-    useDHCP = false;
-  };
+      # EXTREMELY IMPORTANT WARNING: HEY DIPSHIT, IF YOU CHANGE THIS HOST'S
+      # DHCP RESERVATION ON THE ROUTER, REMEMBER TO ALSO CHANGE THE IP HERE!!
+      # YES, I KNOW WILL PROBABLY FORGET ABOUT THIS!!!! SO DONT!!!!1
+      primaryIpv4 = "10.0.10.77";
+    in
+    {
+      # machine's hostname
+      hostName = "hekate";
+      # this has to be a unique 32-bit number. ZFS requires us to define this.
+      hostId = "4ECA7E00";
+
+      # The global useDHCP flag is deprecated, therefore explicitly set to false
+      # here. Per-interface useDHCP will be mandatory in the future, so this
+      # generated config replicates the default behaviour.
+      useDHCP = false;
+
+      # Configure the primary 10GbE NIC statically, rather than with DHCP. This
+      # mostly saves time when resuming from suspend. NetworkManager takes down
+      # the interface when suspending, and the DHCP exchange when bringing it
+      # back up takes several seconds.
+      networkmanager.ensureProfiles.profiles.${primaryNic} = {
+        connection = {
+          id = "${primaryNic}";
+          type = "ethernet";
+          autoconnect = true;
+          autoconnect-priority = 10;
+        };
+        ethernet.mac-address = "7c:c2:55:6a:76:08";
+        ipv4 = {
+          method = "manual";
+          address1 = "${primaryIpv4}/21,${gatewayIpv4}";
+          dns = "${gatewayIpv4};";
+          dns-search = "home.elizas.website;";
+        };
+        ipv6.method = "auto";
+      };
+    };
 
 
   #### Boot configuration ####
