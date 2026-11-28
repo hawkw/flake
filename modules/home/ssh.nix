@@ -180,7 +180,16 @@ with lib;
             default = "10m";
             example = "1h30s";
           };
-          # TODO(eliza): make the socket path configurable?
+          path = mkOption {
+            type = types.path;
+            description = ''
+              The path to the socket directory.
+
+              This will be created by a systemd-tmpfiles rule if it does not
+              exist. It must be owned by the user.
+            '';
+            default = "${config.home.homeDirectory}/.ssh/sockets";
+          };
         };
         serverKeepalive = {
           enable = mkEnableOption ''
@@ -310,7 +319,7 @@ with lib;
                 # Defaults are potentially enabled by the
                 # `defaults.controlMaster.enable` option.
                 ControlMaster = mkDefault false;
-                ControlPath = "$XDG_RUNTIME_DIR/${socketdir}/%r@%n:%p";
+                ControlPath = "${cfg.defaults.controlMaster.path}/%r@%n:%p";
                 ControlPersist = mkDefault false;
 
                 # Defaults are potentially overridden by the
@@ -353,10 +362,10 @@ with lib;
 
     systemd.user.tmpfiles.rules = mkIf cfg.defaults.controlMaster.enable [
       # Remove stale socket files on boot.
-      "r! %t/${socketdir}/*"
+      "r! ${cfg.defaults.controlMaster.path}/*"
       # Ensure that the socket directory exists in /run/user, and is
       # only rw for the user.
-      "D  %t/${socketdir} 600 - - - -"
+      "D  ${cfg.defaults.controlMaster.path} 700 - - - -"
     ];
   };
 }
