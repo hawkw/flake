@@ -1180,8 +1180,15 @@ in
         # Generates notifications when the YubiKey is asking to be touched. By
         # default, send these to libnotify for desktop use.
         programs.yubikey-touch-detector = {
-          enable = mkDefault true;
-          libnotify = mkDefault true;
+          enable = true;
+          # libnotify support is deprecated; one is supposed to use the
+          # `YUBIKEY_TOUCH_DETECTOR_NOTIFY` environment variable (which upstream
+          # nixpkgs does not know about) instead.
+          libnotify = mkDefault false;
+        };
+
+        systemd.user.services.yubikey-touch-detector.environment = {
+          YUBIKEY_TOUCH_DETECTOR_NOTIFY = "true";
         };
 
         # /dev/yubikey/<serial> symlinks used as presence markers for attached
