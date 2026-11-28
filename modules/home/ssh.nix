@@ -182,6 +182,60 @@ with lib;
           };
           # TODO(eliza): make the socket path configurable?
         };
+        serverKeepalive = {
+          enable = mkEnableOption ''
+            "sending keepalive messages to the server.
+
+            If this is disabled, connections to unresponsive servers will never
+            be closed."
+          '' // {
+            # Enable server keepalive by default.
+            #
+            # The hekate suspend + WoL stuff doesn't play nicely with
+            # ServerAliveInterval=0, since the host suspnding makes the
+            # session hang, and Zed's ssh remote thingy seems to pool ssh
+            # ControlMaster connections, rather than reconnecting every
+            # time, which results in it trying to use a stuck ControlMaster
+            # rather than reconnect.
+            #
+            # TODO(eliza): if/when changing the WoL config to use
+            # wake-on-unicast + ARP caching, this can (and should!) go away,
+            # so that input into a n idle session just wakes.
+            default = true;
+          };
+          interval = mkOption {
+            type = sshDuration;
+            description = ''
+              The interval at which to send keepalive messages to the server.
+
+              This sets the default value of `ServerAliveInterval` for * in the
+              SSH configuration.
+
+              For example, if this is `15s` and
+              {option}\home.profiles.ssh.defaults.serverKeepalive.countMax``
+              is `3`, then a connection to an unresponsive server will be
+              closed after about 45 seconds.
+            '';
+            default = "15s";
+            example = "10s";
+          };
+          countMax = mkOption {
+            type = types.ints.positive;
+            description = ''
+              The maximum number of missed keepalive messages before the
+              connection is closed.
+
+              This sets the default value of `ServerAliveCountMax` for * in the
+              SSH configuration.
+
+              For example, if this is `3` and
+              {option}\home.profiles.ssh.defaults.serverKeepalive.interval``
+              is 15 seconds, then a connection to an unresponsive server will be
+              closed after about 45 seconds.
+            '';
+            default = 3;
+          };
+        };
       };
       programs._1password-gui.enableSshAgent =
         mkEnableOption "Enable 1Password SSH Agent";
@@ -250,21 +304,19 @@ with lib;
                 # YubiKey key handle on first use.
                 AddKeysToAgent = if _1passwordAgent.enable then "no" else "yes";
                 Compression = false;
-                # The hekate suspend + WoL stuff doesn't play nicely with
-                # ServerAliveInterval=0, since the host suspnding makes the
-                # session hang, and Zed's ssh remote thingy seems to pool ssh
-                # ControlMaster connections, rather than reconnecting every
-                # time, which results in it trying to use a stuck ControlMaster
-                # rather than reconnect.
-                #
-                # TODO(eliza): if/when changing the WoL config to use
-                # wake-on-unicast + ARP caching, this can (and should!) go away,
-                # so that input into a n idle session just wakes.
-                ServerAliveInterval = 15;
-                ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";
+
+                # Defaults are potentially enabled by the
+                # `defaults.controlMaster.enable` option.
+                ControlMaster = mkDefault false;
                 ControlPath = "$XDG_RUNTIME_DIR/ssh/sockets/%r@%n:%p";
+                ControlPersist = mkDefault false;
+
+                # Defaults are potentially overridden by the
+                # `defaults.serverKeepalive.enable` option.
+                ServerAliveInterval = mkDefault 0;
+                ServerAliveCountMax = mkDefault 0;
               };
             };
         }
@@ -281,16 +333,20 @@ with lib;
         (mkIf (!_1passwordAgent.enable) {
           settings = yubikeyIdentityBlocks;
         })
+
+        # Default ControlMaster settings.
         (mkIf cfg.defaults.controlMaster.enable {
           settings."*" = {
             ControlMaster = "auto";
             ControlPersist = cfg.defaults.controlMaster.persist;
           };
         })
-        (mkIf (!cfg.defaults.controlMaster.enable) {
+
+        # Default ServerAliveInterval and ServerAliveCountMax settings.
+        (mkIf (cfg.defaults.serverKeepalive.enable) {
           settings."*" = {
-            ControlMaster = false;
-            ControlPersist = false;
+            ServerAliveInterval = cfg.defaults.serverKeepalive.interval;
+            ServerAliveCountMax = cfg.defaults.serverKeepalive.countMax;
           };
         })
       ];
