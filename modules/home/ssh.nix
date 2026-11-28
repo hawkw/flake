@@ -250,7 +250,7 @@ with lib;
         mkEnableOption "Enable 1Password SSH Agent";
     };
 
-  config = let socketdir = "ssh/sockets"; in {
+  config = {
     home.packages = with pkgs; [ ssh-tools ];
     programs.ssh =
       mkMerge [
