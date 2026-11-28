@@ -241,7 +241,7 @@ with lib;
         mkEnableOption "Enable 1Password SSH Agent";
     };
 
-  config = {
+  config = let socketdir = "ssh/sockets"; in {
     home.packages = with pkgs; [ ssh-tools ];
     programs.ssh =
       mkMerge [
@@ -310,7 +310,7 @@ with lib;
                 # Defaults are potentially enabled by the
                 # `defaults.controlMaster.enable` option.
                 ControlMaster = mkDefault false;
-                ControlPath = "$XDG_RUNTIME_DIR/ssh/sockets/%r@%n:%p";
+                ControlPath = "$XDG_RUNTIME_DIR/${socketdir}/%r@%n:%p";
                 ControlPersist = mkDefault false;
 
                 # Defaults are potentially overridden by the
@@ -350,5 +350,13 @@ with lib;
           };
         })
       ];
+
+    systemd.user.tmpfiles.rules = mkIf cfg.defaults.controlMaster.enable [
+      # Remove stale socket files on boot.
+      "r! %t/${socketdir}/*"
+      # Ensure that the socket directory exists in /run/user, and is
+      # only rw for the user.
+      "D  %t/${socketdir} 600 - - - -"
+    ];
   };
 }
