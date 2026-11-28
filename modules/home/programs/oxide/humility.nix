@@ -49,10 +49,8 @@ configuredRustPlatform.buildRustPackage {
   };
 
   nativeBuildInputs = [ pkg-config ];
-  buildInputs = [ udev ];
+  buildInputs = [ udev zstd ];
 
   # the humility test suite is enormous and takes forever, don't do that.
   doCheck = false;
-
-  PKG_CONFIG_PATH = "${udev.dev}/lib/pkgconfig";
 }
