@@ -4,6 +4,7 @@ let
     enable = config.programs._1password-gui.enableSshAgent;
     path = "${config.home.homeDirectory}/.1password/agent.sock";
   };
+  cfg = config.profiles.ssh;
 
   # SSH identities for provisioned YubiKeys (see lib/yubikeys.nix). The key
   # handles live in ~/.ssh on machines they've been copied to.
@@ -142,8 +143,49 @@ let
 in
 with lib;
 {
-  options.programs._1password-gui.enableSshAgent =
-    mkEnableOption "Enable 1Password SSH Agent";
+  options =
+    let
+      # Option type for an SSH duration string in the format specified in
+      # sshd_config(5):
+      # https://man7.org/linux/man-pages/man5/sshd_config.5.html#TIME_FORMATS
+      #
+      # TODO(eliza): a fancier regex could enforce that the duration is given in
+      # descending order (e.g. "1d2h3m", not "3m2h1d"), and that units are not
+      # repeated. AFAICT, OpenSSH SSH will accept weirder duration strings, but
+      # they're harder to interpret when reading the config...
+      sshDuration = types.strMatching "([0-9]+[sSmMhHdDwW]?)+";
+    in
+    {
+      profiles.ssh.defaults = {
+        controlMaster = {
+          enable = mkEnableOption ''
+            SSH ControlMaster by default for all sessions
+          '';
+          persist = mkOption {
+            type = with types; either bool sshDuration;
+            description = ''
+              How long to keep the ControlMaster socket open after all sessions
+              have ended.
+
+              This should either be a duration or a boolean. Durations are
+              specified in [the syntax described in `sshd_config(5)`][1].
+              If `true`, the socket will persist indefinitely, and if `false`,
+              it will be closed immediately after the session ends. If this is a
+              duration, it will be closed after the specified time has elapsed,
+              unless a new session is started.
+
+              [1]:
+                https://man7.org/linux/man-pages/man5/sshd_config.5.html#TIME_FORMATS
+            '';
+            default = "10m";
+            example = "1h30s";
+          };
+          # TODO(eliza): make the socket path configurable?
+        };
+      };
+      programs._1password-gui.enableSshAgent =
+        mkEnableOption "Enable 1Password SSH Agent";
+    };
 
   config = {
     home.packages = with pkgs; [ ssh-tools ];
@@ -222,9 +264,7 @@ with lib;
                 ServerAliveCountMax = 3;
                 HashKnownHosts = false;
                 UserKnownHostsFile = "~/.ssh/known_hosts";
-                ControlMaster = false;
-                ControlPath = "~/.ssh/master-%r@%n:%p";
-                ControlPersist = false;
+                ControlPath = "$XDG_RUNTIME_DIR/ssh/sockets/%r@%n:%p";
               };
             };
         }
@@ -240,6 +280,18 @@ with lib;
         # the 1Password agent and should only be added if it's not in use.
         (mkIf (!_1passwordAgent.enable) {
           settings = yubikeyIdentityBlocks;
+        })
+        (mkIf cfg.defaults.controlMaster.enable {
+          settings."*" = {
+            ControlMaster = "auto";
+            ControlPersist = cfg.defaults.controlMaster.persist;
+          };
+        })
+        (mkIf (!cfg.defaults.controlMaster.enable) {
+          settings."*" = {
+            ControlMaster = false;
+            ControlPersist = false;
+          };
         })
       ];
   };

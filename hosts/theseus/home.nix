@@ -20,6 +20,7 @@
       enable = true;
     };
     terminal.font.family = "TX-02";
+    ssh.defaults.controlMaster.enable = true;
   };
 
   home.packages = with pkgs; [
