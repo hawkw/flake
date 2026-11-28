@@ -17,8 +17,6 @@ in {
           discord
           signal-desktop
           zoom-us
-          keybase
-          keybase-gui
           spotify
           telegram-desktop
           obsidian
